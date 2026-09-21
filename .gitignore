@@ -1,5 +1,12 @@
-# Replit monorepo kept locally as reference only — never push (Clerk/Replit plumbing)
+# Replit dump kept locally as reference only — never push (Clerk/Replit plumbing)
+_replit/
 danielyi-jeoul/
+
+# Local operating files (rosters, score sheets). Minors' PII — never push.
+_local/
+*.xlsx
+*.xls
+~$*
 
 node_modules/
 dist/
@@ -8,7 +15,7 @@ dist/
 !.env.example
 *.local
 
-# Never commit real student data or credentials (minors' PII)
+# Never commit real student data or credentials
 seed.real*.sql
 **/roster*
 **/accounts*
