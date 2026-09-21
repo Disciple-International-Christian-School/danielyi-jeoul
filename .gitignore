@@ -1,0 +1,17 @@
+# Replit monorepo kept locally as reference only — never push (Clerk/Replit plumbing)
+danielyi-jeoul/
+
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.local
+
+# Never commit real student data or credentials (minors' PII)
+seed.real*.sql
+**/roster*
+**/accounts*
+
+.DS_Store
+Thumbs.db
