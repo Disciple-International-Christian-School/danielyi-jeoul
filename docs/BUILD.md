@@ -36,9 +36,9 @@ Josh(Academic Director) 혼자 운영하는 DICS 상·벌점 관리 콘솔.
 
 같은 앱을 Replit에서 풀스택으로 다시 짰다. Drizzle 스키마, Express API, OpenAPI/orval 클라이언트, React 화면 8개가 나왔다. Auth는 Replit 기본값인 Clerk.
 
-Limit에 걸려 중단. 그때까지 나온 파일을 이 워크스페이스로 가져왔다. 그 덤프는 지금 `_replit/`에 있다 (git에 안 올림).
+Limit에 걸려 중단. 그때까지 나온 파일을 이 워크스페이스로 가져왔다. 포팅이 끝난 뒤 덤프는 `_replit/`에 **원본 두 개만** 남겼다 (`school.ts`, Drizzle `schema/`). git에 안 올림.
 
-스펙 원문은 `_replit/attached_assets/`에 35개 섹션짜리 프롬프트로 들어 있었고, 그걸 정리한 것이 `docs/spec.md`다.
+스펙 원문은 Replit `attached_assets/`에 35개 섹션짜리 프롬프트로 들어 있었고, 그걸 정리한 것이 `docs/spec.md`다.
 
 ### 3. 아키텍처 결정 (2026-09-18)
 
@@ -100,11 +100,11 @@ Confirm email은 꺼 둔 상태여야 바로 로그인된다.
 | `src/` | 커밋 | 운영 앱 |
 | `supabase/` | 커밋 | 스키마 소스. 원격에 적용한 SQL의 원본 |
 | `docs/` | 커밋 | spec / architecture / 이 파일 |
-| `_replit/` | 무시 | Replit 원본. Clerk·Express 참고용. `node_modules`는 지웠음 |
+| `_replit/` | 무시 | 포팅 원본만. `school.ts` + Drizzle `schema/` (`audit-logs`는 아직 미구현) |
 | `_local/` | 무시 | 명단·엑셀. 미성년 개인정보. 절대 푸시하지 않음 |
 | `.env` | 무시 | 로컬 키. 예시는 `.env.example` |
 
-루트에 `danielyi-jeoul/`이 중첩돼 있던 것은 `_replit/`로 바꿨다. 워크스페이스 폴더 이름과 겹쳐서 헷갈렸기 때문이다.
+루트에 `danielyi-jeoul/`이 중첩돼 있던 것은 `_replit/`로 바꿨다가, Clerk·orval·중첩 git·node_modules는 지우고 원본 두 개만 남겼다.
 
 원래 만들려던 `hylen707/daniels-scale` 리포는 비어 있다. 운영 원본은 `shualoalumin/danielyi-jeoul`이다.
 

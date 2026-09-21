@@ -24,4 +24,4 @@ npm run dev
 
 Vite + React + supabase-js. 비즈니스 룰은 Postgres 뷰·트리거·RPC, 권한은 RLS. Netlify가 `main`을 배포한다. `service_role` 키는 클라이언트에 넣지 않는다.
 
-명단 엑셀·Replit 원본은 `_local/`, `_replit/`에 두며 git에 올리지 않는다 (미성년 개인정보).
+명단 엑셀은 `_local/`에 두며 git에 올리지 않는다. Replit 덤프는 `_replit/`에 `school.ts`와 Drizzle 스키마만 남겨 두었다.

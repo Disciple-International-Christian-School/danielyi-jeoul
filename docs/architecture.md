@@ -17,9 +17,9 @@ Production rebuild is deployed. Three generations still exist as reference:
 
 1. **Lovable deploy** (mockup, code not extractable):
    https://pixel-perfect-match-0249.lovable.app — UI/UX reference only.
-2. **Replit build** — local dump in `_replit/` (gitignored). Complete Drizzle schema,
-   Express business logic, and React UI (Clerk auth). Hit Replit's limit before a
-   clean extract; kept as the port source.
+2. **Replit build** — hit the platform limit. After the port, `_replit/` (gitignored)
+   keeps only `school.ts` and the Drizzle `schema/` as a frozen contrast. Clerk,
+   Express hosting, orval clients, and the nested git were deleted.
 3. **This repo** — Vite + supabase-js + Postgres views/RPCs/RLS. Netlify auto-deploys
    `main`. Two admin accounts (`seondo`, `sasaeng`) are linked.
 
@@ -121,7 +121,7 @@ docs/
   BUILD.md              # how this was built
   architecture.md       # this file
   spec.md               # original 35-section spec
-_replit/                # gitignored Replit dump
+_replit/                # gitignored: school.ts + drizzle schema only
 _local/                 # gitignored rosters / xlsx
 ```
 
