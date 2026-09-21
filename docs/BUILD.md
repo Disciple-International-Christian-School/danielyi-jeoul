@@ -1,6 +1,6 @@
 # 빌드 과정 — 다니엘의 저울
 
-Josh(Academic Director) 혼자 운영하는 DICS 상·벌점 관리 콘솔.
+DICS 상·벌점 관리 콘솔.
 학생은 로그인하지 않는다. 관리자 역할은 선도부(`SEONDO`)와 사생회(`SASAENG`) 두 개.
 
 이 문서는 **어떻게 여기까지 왔는지**를 적는다. 설계 결정은 [architecture.md](./architecture.md), 원본 규칙은 [spec.md](./spec.md).
