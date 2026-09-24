@@ -87,37 +87,20 @@ weeks3 as (
   group by student_id
 )
 select
+  -- -----------------------------------------------------------------------
+  -- Backward-compatible first 12 columns. Existing production frontend and
+  -- PostgREST consumers may rely on these names/order.
+  -- -----------------------------------------------------------------------
   ds.legacy_student_id as id,
-  ds.core_student_id,
-  ds.student_no,
   ds.name,
   ds.grade,
-  ds.homeroom,
-
-  -- Lifetime raw totals: never netted or rewritten.
+  ls.created_at,
+  ls.updated_at,
   coalesce(lt.positive_points, 0)::int as positive_points,
   coalesce(lt.negative_points, 0)::int as negative_points,
-
-  -- Current week.
-  coalesce(w.positive_points, 0)::int as weekly_positive_points,
   coalesce(w.negative_points, 0)::int as weekly_penalty_points,
-  coalesce(w.net_penalty_points, 0)::int as weekly_net_penalty_points,
-  coalesce(w.penalty_incident_count, 0)::int as weekly_record_count,
-  coalesce(w.physical_training_required, false) as physical_training_required,
-
-  -- Current admin-controlled settlement period.
-  st.period_id as settlement_period_id,
-  st.period_label as settlement_period_label,
-  st.starts_on as settlement_starts_on,
-  coalesce(st.positive_points, 0)::int as settlement_positive_points,
-  coalesce(st.negative_points, 0)::int as settlement_penalty_points,
-  coalesce(st.net_penalty_points, 0)::int as settlement_net_penalty_points,
-  coalesce(st.physical_training_weeks, 0)::int as physical_training_weeks,
-  coalesce(st.committee_required, false) as committee_required,
-
-  -- Temporary backward-compatibility alias. Frontend should migrate to the
-  -- explicit settlement_* fields and stop calling this "monthly".
   coalesce(st.negative_points, 0)::int as monthly_penalty_points,
+  coalesce(w.penalty_incident_count, 0)::int as weekly_record_count,
 
   case
     when ap.student_id is not null then array_to_string(ap.types, ', ')
@@ -132,8 +115,6 @@ select
       then '반성문 미제출' end,
     case when coalesce(r.has_double, false)
       then '반성문 2배 제출 대상' end,
-    -- Existing dorm sanction workflow remains raw-weekly-penalty based until
-    -- the 선도부/사생회 policy is separately revised.
     case when coalesce(w.negative_points, 0) >= 5 and ap.student_id is null
       then '처분 선택 필요' end,
     case when coalesce(w3.qualifying_weeks, 0) >= 3
@@ -145,10 +126,25 @@ select
        else ap.types
      end as statuses,
 
-  -- Legacy timestamps continue to come from the compatibility row until the
-  -- discipline FK cut-over is complete.
-  ls.created_at,
-  ls.updated_at
+  -- -----------------------------------------------------------------------
+  -- New Core / operational columns are appended after the legacy contract.
+  -- -----------------------------------------------------------------------
+  ds.core_student_id,
+  ds.student_no,
+  ds.homeroom,
+
+  coalesce(w.positive_points, 0)::int as weekly_positive_points,
+  coalesce(w.net_penalty_points, 0)::int as weekly_net_penalty_points,
+  coalesce(w.physical_training_required, false) as physical_training_required,
+
+  st.period_id as settlement_period_id,
+  st.period_label as settlement_period_label,
+  st.starts_on as settlement_starts_on,
+  coalesce(st.positive_points, 0)::int as settlement_positive_points,
+  coalesce(st.negative_points, 0)::int as settlement_penalty_points,
+  coalesce(st.net_penalty_points, 0)::int as settlement_net_penalty_points,
+  coalesce(st.physical_training_weeks, 0)::int as physical_training_weeks,
+  coalesce(st.committee_required, false) as committee_required
 
 from public.v_discipline_students ds
 join public.students ls
@@ -169,11 +165,10 @@ left join weeks3 w3
 create or replace view public.v_dashboard_counts
 with (security_invoker = true) as
 select
+  -- Preserve existing first five columns.
   (select count(*) from public.v_student_summary)::int as students,
   (select count(*) from public.v_student_summary
     where physical_training_required)::int as weekly_targets,
-  (select count(*) from public.v_student_summary
-    where committee_required)::int as committee_targets,
   (select count(*) from public.v_reflections
     where status = 'MISSING')::int as missing_reflections,
   (select count(*) from public.v_reflections
@@ -181,4 +176,8 @@ select
   (select count(distinct student_id)
    from public.punishments
    where start_date <= private.kst_today()
-     and end_date >= private.kst_today())::int as active_punishments;
+     and end_date >= private.kst_today())::int as active_punishments,
+
+  -- New field appended for compatibility.
+  (select count(*) from public.v_student_summary
+    where committee_required)::int as committee_targets;
