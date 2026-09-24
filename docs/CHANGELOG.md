@@ -614,9 +614,11 @@ Identity ≠ Role
 작업 브랜치: `gpt/operations-foundation`
 
 - 실제 운영 요구사항을 `docs/OPERATIONS_ROADMAP.md`로 정리.
-- 학교 공통 연결키를 이름이 아닌 `student_no`로 통일하는 방향 정의.
+- DICS 앱별 학생 master 중복을 중단하고 `core.students.id` UUID를 canonical student identity로 사용하는 통합 스키마 방향으로 확정.
+- Student identity와 Auth identity를 분리: `core.students.id`는 학생 자체, `auth_user_id`는 optional 로그인 계정.
 - 생활지도 DB에는 불필요한 생년월일/성별을 복제하지 않는 데이터 최소화 원칙 명시.
-- `students.student_no`, `students.homeroom`용 migration 추가. 실제 값은 Supabase에서만 backfill 예정.
+- `core.students`, `core.academic_terms`, `core.classes`, `core.enrollments` migration foundation 추가. 학년/반을 학기별 enrollment로 관리하도록 변경.
+- 기존 Daniel `public.students`는 `core_student_id` bridge를 가진 legacy compatibility table로 전환 준비.
 - 상점/벌점 원본은 분리 보존하면서 `net_penalty = negative - positive`를 계산하는 주간 view 추가.
 - 달력 월 대신 관리자가 종료하는 `settlement_periods` 모델과 정산기간 집계 view/RPC 추가.
 - 반성문 마감을 date가 아닌 `due_at`으로 확장: G7–12 당일 17:00, 재량 21:00 연장, G1–6 익일 08:20 기준.
