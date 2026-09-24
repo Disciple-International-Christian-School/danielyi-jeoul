@@ -33,77 +33,122 @@
 징계위원회 대상 확인
 ```
 
-장기적으로는 Study Planner 등 다른 DICS 시스템과 학생 신원을 공유할 수 있도록 데이터 모델을 준비한다.
+이제부터는 **DICS Core 통합 스키마를 목표 구조로 간주한다.** 다니엘의 저울은 독립 학생 DB를 확장하지 않고, Core 학생 원본을 참조하는 discipline 도메인으로 이동한다.
 
 ---
 
-## 2. 학교 공통 학생 식별자 방향
+## 2. DICS Core 학생 Identity
 
-### 현재
-
-- 다니엘의 저울: 자체 `students.id`(serial), 이름/학년 중심
-- Study Planner: Supabase Auth user UUID + `student_no`
-- SP 일부 학생: 학번 + 6자리 PIN으로 로그인
-
-### 원칙
-
-앞으로 앱 간 학생을 연결할 때 **이름을 키로 사용하지 않는다.**
+### 목표 구조
 
 ```text
-school student
-    ↓
-student_no  ← 학교 공통 식별 키
-    ├─ Daniel's Scale
-    ├─ Study Planner
-    └─ future DICS apps
+auth.users
+   │  (optional login account)
+   ▼
+core.students
+   │
+   ├─ study_planner.*
+   ├─ discipline.*
+   ├─ computer_lab.*
+   └─ assessment.*
 ```
 
-다니엘의 저울 `students`에도 `student_no`를 추가한다.
+핵심 원칙:
+
+- `core.students.id` = 학교 전체에서 사용하는 canonical `student_id` UUID
+- `student_no` = 사람이 확인하는 학교 공통 학번
+- `auth_user_id` = 로그인 계정 연결값이며 학생 ID 자체가 아님
+- 이름으로 앱 간 학생을 연결하지 않음
+- 각 앱에 별도 `students` master table을 새로 만들지 않음
+
+### 기존 시스템의 전환
+
+현재:
+
+- 다니엘의 저울: `public.students.id` serial
+- Study Planner: `public.students.id = auth.users.id`
+
+이 두 구조 모두 최종형이 아니다.
+
+전환 후:
+
+```text
+core.students.id
+      │
+      ├─ Daniel's Scale discipline records
+      └─ Study Planner records
+
+core.students.auth_user_id
+      └─ auth.users.id
+```
+
+다니엘의 저울의 기존 `public.students`는 전환 기간 동안만 legacy compatibility table로 유지하고, `core_student_id`로 Core 행에 연결한 뒤 최종적으로 discipline FK를 UUID로 교체한다.
 
 ### PIN
 
 PIN은 학생 프로필 데이터가 아니라 **인증 수단**이다.
 
-- PIN 평문을 일반 학생 테이블에 저장하지 않는다.
+- PIN 평문을 `core.students`에 저장하지 않는다.
 - Git에 넣지 않는다.
-- 인증 프로젝트의 Auth password로만 관리한다.
-- PIN 배포가 필요하면 최초 발급용 별도 운영 문서를 사용하고 이후 폐기/보호한다.
+- Supabase Auth password/PIN 프로비저닝 계층에서 관리한다.
+- 학생이 아직 로그인하지 않는 경우에도 `core.students`에는 존재할 수 있다.
 
-### 장기 방향
+### 개인정보 위치
 
-당장은 두 Supabase 프로젝트를 강제로 합치지 않는다.
+전교생 원본 명부의 생년월일/성별은 필요하다면 `core.students`에만 둔다.
 
-대신 모든 시스템에서 동일한 `student_no`를 사용해 나중에 학교 공통 Directory/Auth 계층으로 이동할 수 있게 한다.
-
-> **중요:** 성별과 생년월일은 원본 명부에는 있지만, 생활지도 사이트 기능에 꼭 필요한 정보가 아니다.  
-> 데이터 최소화 원칙에 따라 현재 다니엘의 저울 DB에는 자동으로 복제하지 않는다. 추후 학교 공통 학생 Directory를 만들 때 별도로 검토한다.
-
----
-
-## 3. 학생 학적 / 반
-
-다니엘의 저울 학생 기본 정보는 운영상 다음 수준까지 필요하다.
+다니엘의 저울이 사용하는 discipline view에는 기본적으로:
 
 ```text
+student_id
 student_no
 name
-grade (1–12)
+grade
 homeroom
-active/deleted status
 ```
 
-특히 G9은 A/B 분반이 있으므로 단순 `grade=9`만으로는 반별 공지를 만들 수 없다.
+만 노출한다.
+
+즉 **Core가 보유하는 정보와 각 앱이 실제로 보는 정보를 분리**한다.
+
+## 3. 학기 / 반 배정
+
+학년과 반은 학생의 영구 속성이 아니라 **학기별 소속**이다.
+
+따라서:
+
+```text
+core.students
+  └─ 학생 자체
+
+core.academic_terms
+  └─ 2026 Fall 등
+
+core.classes
+  └─ G9-A / G9-B / G11 등
+
+core.enrollments
+  └─ 학생 ↔ 학기 ↔ 반
+```
+
+구조로 관리한다.
 
 예:
 
 ```text
-grade = 9
-homeroom = "9-A"
+Student A
+  student_id = UUID
+        ↓
+2026-FALL enrollment
+        ↓
+G9-A
 ```
 
-반 배정 실제 행 데이터는 Supabase에만 적재한다.
+2027 Spring에 반이 바뀌어도 학생 master row를 덮어쓰지 않는다.
 
----
+다니엘의 저울은 현재 학기의 enrollment를 통해 학년/반을 읽으며, 반별 공지와 출력에도 같은 Core 정보를 사용한다.
+
+실제 명단/학번/반 배정 행은 Supabase에만 적재하고 Git에는 넣지 않는다.
 
 ## 4. 점수 계산 원칙
 
@@ -410,39 +455,75 @@ audit log
 
 ---
 
-## 16. Study Planner 연결 — 지금은 연결하지 않음
+## 16. Study Planner / 다른 DICS 앱과의 관계
 
-장기 목표:
+DB 통합을 먼 미래 과제로 미루지 않고, **지금부터 모든 신규 설계를 Core 기준으로 한다.**
+
+다만 운영 중인 기존 앱을 한 번에 깨뜨리지 않기 위해 migration은 단계적으로 진행한다.
+
+### Phase A — Core 생성
+
+- `core.students`
+- `core.academic_terms`
+- `core.classes`
+- `core.enrollments`
+- 공통 학번
+- optional `auth_user_id`
+
+### Phase B — Legacy Mapping
 
 ```text
-학생 포털 / Study Planner
-├─ 학습 진척도
-└─ 생활점수 현황
+Daniel public.students.id (int)
+          ↓
+core_student_id
+          ↓
+core.students.id (uuid)
 ```
 
-하지만 지금 두 프로젝트 DB를 직접 결합하면 구조가 굳어질 위험이 있다.
+Study Planner의 기존 Auth UUID 기반 학생 행도 같은 Core 학생에 매핑한다.
 
-현재 할 일:
+### Phase C — Domain FK Cut-over
 
-1. 학교 공통 `student_no` 확립
-2. 두 프로젝트에서 같은 학생을 같은 `student_no`로 식별
-3. PIN은 Auth 계층에서 관리
-4. 장기적으로 DICS Core Student Directory/Auth 설계
+최종적으로:
 
-실제 cross-project 데이터 연결은 별도 단계에서 진행한다.
+```text
+discipline.*.student_id
+study_planner.*.student_id
+computer_lab.*.student_id
+assessment.*.student_id
+        ↓
+core.students.id
+```
 
----
+가 되도록 전환한다.
+
+### Phase D — Unified Student Profile
+
+추후 Student Portal / Study Planner에서:
+
+- 학습 진척도
+- 생활점수/벌점
+- 시험 결과
+- 컴퓨터실 사용기록
+
+을 같은 `core.student_id`로 조합한다.
+
+즉 Cross-project 연결을 위해 이름이나 학번 문자열로 JOIN하는 것이 아니라 **동일 UUID FK를 사용**하는 것이 최종 목표다.
 
 ## 17. 구현 우선순위
 
-### P1-A — 운영 기반
+### P1-A — DICS Core + 운영 기반
 
-- [ ] `students.student_no`
-- [ ] `students.homeroom`
-- [ ] G9 A/B 반 데이터 적재
-- [ ] 간단 로그인 화면
-- [ ] 주간 positive / negative / NET 계산 view
-- [ ] 주간 체력훈련 대상 판정
+- [x] `core.students` 설계
+- [x] `core.academic_terms / classes / enrollments` 설계
+- [x] Daniel legacy `public.students.core_student_id` bridge migration 준비
+- [ ] 2026 Fall 전교생 roster를 Core에 적재
+- [ ] 기존 Daniel 학생 행을 Core UUID에 매핑
+- [ ] Study Planner 기존 학생과 Core mapping 계획 확정
+- [ ] G9-A / G9-B 포함 현재 학기 enrollment 적재
+- [x] 간단 로그인 화면 변경 준비
+- [x] 주간 positive / negative / NET 계산 view 준비
+- [x] 주간 체력훈련 대상 판정 준비
 
 ### P1-B — 정산기간
 
@@ -476,12 +557,14 @@ audit log
 - [ ] 벌점 시트 사진 업로드 + 검토 기반 추출
 - [ ] 개인 관리자 계정 + 상세 Audit trail 완성
 
-### P3 — DICS 공통 데이터
+### P3 — Legacy 제거 / 통합 프로필
 
-- [ ] 전교생 학번/PIN 발급 정책 통일
-- [ ] DICS Core Student Directory 검토
-- [ ] Study Planner와 학생 identity 연결
-- [ ] 학생 본인 화면에 학습 + 생활점수 통합
+- [ ] discipline 테이블 FK를 `core.students.id` UUID로 전환
+- [ ] 기존 `public.students` legacy master 제거
+- [ ] Study Planner FK를 동일 Core UUID로 전환
+- [ ] 컴퓨터실/Assessment 신규 테이블은 처음부터 Core UUID 사용
+- [ ] 전교생 PIN/Auth 프로비저닝 정책 통일
+- [ ] 학생 본인 화면에 학습 + 생활점수 + 학교 기록 통합
 
 ---
 
