@@ -192,7 +192,8 @@ grant select on core.students, core.academic_terms, core.classes, core.enrollmen
 -- birth_date and gender are not projected here.
 -- ---------------------------------------------------------------------------
 
-create or replace view public.v_core_current_students as
+create or replace view public.v_core_current_students
+with (security_invoker = true) as
 select
   s.id as student_id,
   s.student_no,
@@ -238,7 +239,8 @@ comment on column public.students.core_student_id is
 
 -- Existing app pages may continue to use legacy integer IDs until the final
 -- discipline cut-over. Once a row is mapped, name/grade/class come from Core.
-create or replace view public.v_discipline_students as
+create or replace view public.v_discipline_students
+with (security_invoker = true) as
 select
   ls.id as legacy_student_id,
   cs.student_id as core_student_id,
