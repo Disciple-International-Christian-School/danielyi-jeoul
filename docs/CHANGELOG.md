@@ -632,6 +632,37 @@ Identity ≠ Role
 - SP의 기존 학번 로그인 + 6자리 PIN 규칙을 확인했으며, 기존 Auth UUID는 앞으로 `core.students.auth_user_id`로 연결하는 compatibility 대상으로 정의.
 - 이 항목들은 아직 운영 DB/`main`에 적용하지 않은 review 단계이며, 검증 후 상태를 갱신한다.
 
+### Production DB applied — 2026-09-25
+
+- `daniels-scale` 운영 Supabase에 DICS Core bootstrap migration 적용.
+- 기존 Daniel 학생 180명 모두 canonical Core UUID 생성/매핑 완료.
+  - active 175
+  - inactive 5
+  - 비활성 학생의 기존 discipline 기록도 Core 경로 유지.
+- `core.students` 및 Core RLS / current student projection 적용.
+- 주간 NET 계산 및 관리자 종료형 `settlement_periods` 적용.
+- 반성문 `due_at` 적용.
+  - G7–12 기본 17:00
+  - 선도부 재량 21:00 연장 RPC
+  - G1–6 익일 08:20
+- Core-aware `v_student_summary` / `v_dashboard_counts` 적용.
+- 기존 production view의 첫 컬럼 계약을 보존해 기존 frontend와 호환 유지.
+- Supabase security advisor의 mutable function search_path 경고 수정.
+- 신규 FK access path 인덱스 추가.
+- 현재 열린 정산기간은 0개이며, 실제 귀가 사이클 시작일은 관리자가 UI에서 지정하도록 유지.
+
+### Frontend in branch — deployment pending
+
+- 학생 명부를 DICS Core read-only roster 관점으로 변경.
+- Dashboard를 주간 NET / 정산 NET 중심으로 개편.
+- 선도부 전용 `정산 관리` 화면 추가.
+  - 정산 시작일/라벨 지정
+  - 현재 기간 종료
+  - 종료 다음날 새 기간 자동 시작 선택
+- 반성문 화면에 실제 제출 마감 시각 표시 및 중고등부 21시 연장 조치 추가.
+- 운영 날짜 기본값을 UTC가 아닌 Asia/Seoul 기준으로 수정.
+- 로컬 실행 환경의 외부 GitHub DNS 제한 때문에 이 세션에서 `npm build` 검증은 실행하지 못함.
+
 ## Change Log
 
 ### 2026-09-25 — 재학생 명단을 Supabase에 적재
