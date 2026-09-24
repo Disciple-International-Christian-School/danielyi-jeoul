@@ -13,6 +13,7 @@ import { supabase } from './supabase';
 export type Role = 'SEONDO' | 'SASAENG';
 export type PointType = 'POSITIVE' | 'NEGATIVE';
 export type ReflectionStatus = 'SUBMITTED' | 'MISSING' | 'DOUBLE';
+export type DisciplineScope = 'ALL' | 'ELEMENTARY' | 'MIDDLE' | 'HIGH';
 
 export const PUNISHMENT_TYPES = ['운동금지', '간식금지', '면회금지'] as const;
 export type PunishmentType = (typeof PUNISHMENT_TYPES)[number];
@@ -97,6 +98,7 @@ export interface Reflection {
   deadlineChangeReason: string | null;
   submittedAt: string | null;
   status: ReflectionStatus;
+  assignedScope: Exclude<DisciplineScope, 'ALL'>;
 }
 
 export interface DashboardCounts {
@@ -280,6 +282,7 @@ interface ReflectionRow {
   submitted: boolean; submission_deadline: string; due_at: string;
   deadline_change_reason: string | null; submitted_at: string | null;
   status: ReflectionStatus;
+  assigned_scope: Exclude<DisciplineScope, 'ALL'>;
 }
 interface DashboardCountsRow {
   students: number;
@@ -427,6 +430,7 @@ function mapReflection(row: ReflectionRow): Reflection {
     deadlineChangeReason: row.deadline_change_reason,
     submittedAt: row.submitted_at,
     status: row.status,
+    assignedScope: row.assigned_scope,
   };
 }
 
