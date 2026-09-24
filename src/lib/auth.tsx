@@ -4,7 +4,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 
-import type { Role } from './api';
+import type { DisciplineScope, Role } from './api';
 import { supabase } from './supabase';
 
 export interface AdminProfile {
@@ -13,6 +13,9 @@ export interface AdminProfile {
   displayName: string;
   role: Role;
   roleLabel: string;
+  disciplineScope: DisciplineScope | null;
+  isLead: boolean;
+  isActive: boolean;
 }
 
 interface AdminRow {
@@ -20,6 +23,9 @@ interface AdminRow {
   user_id: string;
   display_name: string;
   role: Role;
+  discipline_scope: DisciplineScope | null;
+  is_lead: boolean;
+  is_active: boolean;
 }
 
 export function roleLabel(role: Role): string {
@@ -90,6 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             displayName: row.display_name,
             role: row.role,
             roleLabel: roleLabel(row.role),
+            disciplineScope: row.discipline_scope,
+            isLead: row.is_lead,
+            isActive: row.is_active,
           });
         }
         setAdminLoading(false);
