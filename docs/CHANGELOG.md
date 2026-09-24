@@ -651,6 +651,44 @@ Identity ≠ Role
 - 신규 FK access path 인덱스 추가.
 - 현재 열린 정산기간은 0개이며, 실제 귀가 사이클 시작일은 관리자가 UI에서 지정하도록 유지.
 
+### 공지·출력 Phase — 2026-09-25
+
+**Production DB applied**
+
+- `v_daily_discipline_notice` 적용.
+  - 날짜별 벌점 기록
+  - 학생 학년/반
+  - 벌점 사유/점수
+  - 반성문 상태/마감 시각
+- `v_weekly_discipline_report` 적용.
+  - 주간 상점/벌점/NET
+  - 벌점 발생 횟수
+  - 체력훈련 대상
+  - 열린 정산기간 NET
+  - 체력훈련 판정 주차 수
+  - 징계위원회 대상
+- 운영 DB 검증 결과:
+  - daily notice view 정상 조회
+  - weekly report view 활성 학생 175명 정상 조회
+  - 현재 실제 체력훈련/징계위원회 대상 0명
+
+**Frontend in branch**
+
+- 선도부 메뉴에 `공지·출력` 추가.
+- 일일 반별 공지:
+  - 날짜 선택
+  - 학년/반 필터
+  - 벌점/반성문 상태
+  - A4 인쇄
+- 주간 정산 보고:
+  - 체력훈련/징계위원회 대상만 추출
+  - 주간 raw 점수 + NET
+  - 정산기간 NET
+  - 학년/반별 묶음
+  - A4 인쇄
+- 현재 Core homeroom이 없는 학생은 `G{grade}`로 fallback하며, G9-A/B enrollment 보강 후 자동으로 분반 표기.
+- GitHub Actions CI 추가: `npm ci → typecheck → build`.
+
 ### Frontend in branch — deployment pending
 
 - 학생 명부를 DICS Core read-only roster 관점으로 변경.
