@@ -148,7 +148,7 @@ G9-A
 
 다니엘의 저울은 현재 학기의 enrollment를 통해 학년/반을 읽으며, 반별 공지와 출력에도 같은 Core 정보를 사용한다.
 
-실제 명단/학번/반 배정 행은 Supabase에만 적재하고 Git에는 넣지 않는다.
+원본 roster 파일은 Git ignore 상태로 유지하고, 실제 학생 행은 Supabase에서만 관리한다. 현재 Daniel Supabase에 존재하는 이름/학년 최소 DB를 Core bootstrap의 시작점으로 사용한다.
 
 ## 4. 점수 계산 원칙
 
@@ -517,8 +517,8 @@ core.students.id
 - [x] `core.students` 설계
 - [x] `core.academic_terms / classes / enrollments` 설계
 - [x] Daniel legacy `public.students.core_student_id` bridge migration 준비
-- [ ] 2026 Fall 전교생 roster를 Core에 적재
-- [ ] 기존 Daniel 학생 행을 Core UUID에 매핑
+- [x] 기존 Daniel Supabase 최소 학생 DB(이름/학년)를 기준으로 Core UUID bootstrap migration 준비
+- [ ] 기존 Daniel 학생 행을 운영 DB에서 Core UUID로 실제 매핑 적용
 - [ ] Study Planner 기존 학생과 Core mapping 계획 확정
 - [ ] G9-A / G9-B 포함 현재 학기 enrollment 적재
 - [x] 간단 로그인 화면 변경 준비
