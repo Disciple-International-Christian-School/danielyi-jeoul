@@ -224,6 +224,15 @@ comment on view public.v_core_current_students is
 -- exactly one core.students row before discipline-domain FK cut-over.
 -- ---------------------------------------------------------------------------
 
+-- Legacy table originally allowed only grades 1-6. During the bridge it must
+-- represent G1-G12 records until all discipline foreign keys move to Core.
+alter table public.students
+  drop constraint if exists students_grade_check;
+
+alter table public.students
+  add constraint students_grade_check
+  check (grade between 1 and 12);
+
 alter table public.students
   add column if not exists core_student_id uuid
     references core.students(id) on delete restrict;
