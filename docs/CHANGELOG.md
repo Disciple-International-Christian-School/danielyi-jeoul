@@ -720,6 +720,31 @@ Identity ≠ Role
 - 종이 벌점 시트 여러 건을 오전에 빠르게 전산화하는 흐름을 우선 최적화.
 - 사진 시트 인식은 별도 P2로 유지.
 
+### 반성문 담당범위 / 선도부장 Phase — 2026-09-25
+
+**Production DB applied**
+
+- `admins.discipline_scope` 추가.
+  - `ELEMENTARY` = G1–6
+  - `MIDDLE` = G7–9
+  - `HIGH` = G10–12
+  - `ALL` = 선도부장/legacy shared account
+- `admins.is_lead`, `admins.is_active` 추가.
+- 기존 shared SEONDO 계정은 호환을 위해 `ALL + lead + active` 유지.
+- 비활성 admin은 `private.current_admin_role()`에서 제외.
+- 정산 시작/종료 RPC는 선도부장 권한으로 제한.
+- `v_reflections.assigned_scope` 추가.
+
+**Frontend in branch**
+
+- Auth profile에 `disciplineScope / isLead / isActive` 노출.
+- 반성문 화면을 담당범위별로 필터.
+- 개인 담당 계정은 자기 학년군만 기본 표시.
+- 선도부장은 전체 학년 조회.
+- 정산 관리 메뉴/route는 선도부장만 접근.
+- 일일 공지 출력은 담당 학년군으로 제한.
+- 주간 정산 보고는 선도부장만 표시.
+
 ### Frontend in branch — deployment pending
 
 - 학생 명부를 DICS Core read-only roster 관점으로 변경.
