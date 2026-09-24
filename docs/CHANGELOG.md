@@ -609,6 +609,20 @@ Identity ≠ Role
 
 ---
 
+## In Development — GPT operations foundation
+
+작업 브랜치: `gpt/operations-foundation`
+
+- 실제 운영 요구사항을 `docs/OPERATIONS_ROADMAP.md`로 정리.
+- 학교 공통 연결키를 이름이 아닌 `student_no`로 통일하는 방향 정의.
+- 생활지도 DB에는 불필요한 생년월일/성별을 복제하지 않는 데이터 최소화 원칙 명시.
+- `students.student_no`, `students.homeroom`용 migration 추가. 실제 값은 Supabase에서만 backfill 예정.
+- 상점/벌점 원본은 분리 보존하면서 `net_penalty = negative - positive`를 계산하는 주간 view 추가.
+- 달력 월 대신 관리자가 종료하는 `settlement_periods` 모델과 정산기간 집계 view/RPC 추가.
+- 반성문 마감을 date가 아닌 `due_at`으로 확장: G7–12 당일 17:00, 재량 21:00 연장, G1–6 익일 08:20 기준.
+- 공개형 랜딩 화면을 제거하고 루트 접속 시 바로 관리자 로그인 화면으로 진입하도록 단순화.
+- 이 항목들은 아직 운영 DB/`main`에 적용하지 않은 review 단계이며, 검증 후 상태를 갱신한다.
+
 ## Change Log
 
 ### 2026-09-25 — 재학생 명단을 Supabase에 적재
