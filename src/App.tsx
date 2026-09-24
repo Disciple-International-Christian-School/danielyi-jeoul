@@ -38,10 +38,8 @@ import {
   useCreatePointItem,
   useCreatePointRecord,
   useCreatePunishment,
-  useCreateStudent,
   useDeletePointItem,
   useDeletePointRecord,
-  useDeleteStudent,
   useGetDashboard,
   useGetStudent,
   useImportPointItems,
@@ -54,12 +52,10 @@ import {
   useUpdatePointItem,
   useUpdatePointRecord,
   useUpdateReflection,
-  useUpdateStudent,
   type PointItem,
   type PointRecord,
   type Punishment,
   type Role,
-  type StudentInput,
   type StudentSummary,
 } from '@/lib/api';
 import { AuthProvider, useAuth } from '@/lib/auth';
@@ -168,59 +164,182 @@ function RoleGate({ role, children }: { role: Role; children: ReactNode }) {
 function DashboardPage() {
   const dashboard = useGetDashboard();
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<'penalty' | 'grade' | 'name'>('penalty');
+  const [sort, setSort] = useState<'net' | 'grade' | 'name'>('net');
   const [, setLocation] = useLocation();
+
   const rows = useMemo(() => {
-    const list = (dashboard.data?.students ?? []).filter((student) => student.name.includes(search));
-    return [...list].sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name, 'ko') : sort === 'grade' ? a.grade - b.grade : b.negativePoints - a.negativePoints);
+    const needle = search.trim().toLowerCase();
+    const list = (dashboard.data?.students ?? []).filter((student) =>
+      !needle
+      || student.name.toLowerCase().includes(needle)
+      || (student.studentNo ?? '').toLowerCase().includes(needle)
+      || (student.homeroom ?? '').toLowerCase().includes(needle)
+    );
+    return [...list].sort((a, b) =>
+      sort === 'name'
+        ? a.name.localeCompare(b.name, 'ko')
+        : sort === 'grade'
+          ? a.grade - b.grade || (a.homeroom ?? '').localeCompare(b.homeroom ?? '', 'ko')
+          : b.weeklyNetPenaltyPoints - a.weeklyNetPenaltyPoints
+    );
   }, [dashboard.data?.students, search, sort]);
+
   if (dashboard.isLoading) return <LoadingState />;
   if (dashboard.isError || !dashboard.data) return <ErrorState error={dashboard.error} retry={() => dashboard.refetch()} />;
+
   const counts = dashboard.data.counts;
+  const settlementLabel = dashboard.data.students.find((student) => student.settlementPeriodLabel)?.settlementPeriodLabel ?? '정산기간 미설정';
   const metrics = [
-    ['등록 학생', counts.students, '현재 학적 기준', Users],
-    ['주간 관찰 대상', counts.weeklyTargets, '이번 주 누적 기준', ShieldAlert],
-    ['미제출 반성문', counts.missingReflections, '확인과 안내 필요', BookOpenCheck],
-    ['2배 제출 대상', counts.doubleReflections, '반성문 보완 필요', AlertTriangle],
-    ['진행 중 처분', counts.activePunishments, '기숙사 운영 기준', BedDouble],
+    ['등록 학생', counts.students, 'DICS Core 현재 학적', Users],
+    ['체력훈련 대상', counts.weeklyTargets, '주 3회 또는 NET 8+', ShieldAlert],
+    ['징계위원회 대상', counts.committeeTargets, '정산기간 기준', AlertTriangle],
+    ['미제출 반성문', counts.missingReflections, '현재 마감 전 미제출', BookOpenCheck],
+    ['2배 제출 대상', counts.doubleReflections, '마감 경과', BookOpenCheck],
   ] as const;
+
   return <div>
-    <PageHeader eyebrow="오늘의 운영 현황" title="학생 생활점수, 한눈에." copy="선도부와 사생회가 같은 기준으로 판단할 수 있도록 핵심 신호를 모았습니다." action={<Link href="/points/negative" className="btn btn-primary" data-testid="link-quick-negative"><Plus size={15} /> 벌점 입력</Link>} />
-    <div className="metric-grid" style={{ marginTop: 30 }}>{metrics.map(([label, value, note, Icon], index) => <div className="card metric-card" key={label} data-testid={`card-metric-${index}`}><Icon size={17} color={index === 2 || index === 3 ? 'hsl(8 48% 49%)' : 'hsl(173 31% 42%)'} /><div className="metric-value">{value}</div><div className="metric-label">{label}</div><div className="muted" style={{ fontSize: 10, marginTop: 6 }}>{note}</div></div>)}</div>
-    <div className="section-row"><div><h2 className="section-title">학생 상태 목록</h2><p className="section-copy">누적 벌점과 자동 감지 상태를 우선 확인하세요.</p></div><div className="toolbar-right"><div className="search-box"><Search size={15} /><input className="input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="학생 이름 검색" aria-label="학생 이름 검색" data-testid="input-dashboard-search" /></div><select className="select" value={sort} onChange={(event) => setSort(event.target.value as 'penalty' | 'grade' | 'name')} aria-label="학생 정렬" data-testid="select-dashboard-sort"><option value="penalty">벌점 높은 순</option><option value="grade">학년 순</option><option value="name">이름 순</option></select></div></div>
-    <div className="card card-pad table-wrap"><table className="data-table"><thead><tr><th>학생</th><th>학년</th><th>상점</th><th>벌점</th><th>주간 / 월간</th><th>상태</th></tr></thead><tbody>{rows.map((student) => <tr key={student.id} data-testid={`row-dashboard-student-${student.id}`}><td><Link className="table-link" href={`/students/${student.id}`} data-testid={`link-dashboard-student-${student.id}`}>{student.name}</Link></td><td>{student.grade}학년</td><td className="weight-number success-text">+{student.positivePoints}</td><td className="weight-number danger-text">{student.negativePoints}</td><td className="muted">{student.weeklyPenaltyPoints} / {student.monthlyPenaltyPoints}</td><td><div className="status-list">{student.statuses.length ? student.statuses.map((status) => <span className="pill pill-warning" key={status}>{status}</span>) : <span className="pill pill-positive"><Check size={11} /> 양호</span>}</div></td></tr>)}</tbody></table>{rows.length === 0 && <EmptyState title="검색 결과가 없습니다" copy="다른 이름으로 다시 검색해 보세요." />}</div>
-    <div className="side-note" style={{ marginTop: 18 }}><strong>운영 메모</strong><br />점수는 기록보다 대화가 먼저입니다. 상태 신호를 확인한 뒤 학생의 맥락을 함께 기록해 주세요.</div>
+    <PageHeader
+      eyebrow="오늘의 운영 현황"
+      title="학생 생활점수, 한눈에."
+      copy={'주간 NET과 ' + settlementLabel + ' 누적을 기준으로 생활지도 신호를 보여줍니다.'}
+      action={<Link href="/points/negative" className="btn btn-primary" data-testid="link-quick-negative"><Plus size={15} /> 벌점 입력</Link>}
+    />
+
+    <div className="metric-grid" style={{ marginTop: 30 }}>
+      {metrics.map(([label, value, note, Icon], index) => <div className="card metric-card" key={label} data-testid={'card-metric-' + index}>
+        <Icon size={17} />
+        <div className="metric-value">{value}</div>
+        <div className="metric-label">{label}</div>
+        <div className="muted" style={{ fontSize: 10, marginTop: 6 }}>{note}</div>
+      </div>)}
+    </div>
+
+    <div className="section-row">
+      <div>
+        <h2 className="section-title">학생 상태 목록</h2>
+        <p className="section-copy">상점·벌점 원점수는 보존하고, 처벌 판단에는 벌점 - 상점 NET을 사용합니다.</p>
+      </div>
+      <div className="toolbar-right">
+        <div className="search-box"><Search size={15} /><input
+          className="input"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="이름 · 학번 · 반 검색"
+          aria-label="학생 검색"
+          data-testid="input-dashboard-search"
+        /></div>
+        <select
+          className="select"
+          value={sort}
+          onChange={(event) => setSort(event.target.value as 'net' | 'grade' | 'name')}
+          aria-label="학생 정렬"
+          data-testid="select-dashboard-sort"
+        >
+          <option value="net">주간 NET 높은 순</option>
+          <option value="grade">학년/반 순</option>
+          <option value="name">이름 순</option>
+        </select>
+      </div>
+    </div>
+
+    <div className="card card-pad table-wrap">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>학생</th>
+            <th>학년 / 반</th>
+            <th>주간 상점</th>
+            <th>주간 벌점</th>
+            <th>주간 NET</th>
+            <th>정산 NET</th>
+            <th>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((student) => <tr key={student.id} data-testid={'row-dashboard-student-' + student.id}>
+            <td>
+              <Link className="table-link" href={'/students/' + student.id} data-testid={'link-dashboard-student-' + student.id}>{student.name}</Link>
+              <div className="muted" style={{ fontSize: 10, marginTop: 3 }}>{student.studentNo ?? 'Core 매핑 대기'}</div>
+            </td>
+            <td>{student.homeroom ?? (student.grade + '학년')}</td>
+            <td className="weight-number success-text">+{student.weeklyPositivePoints}</td>
+            <td className="weight-number danger-text">{student.weeklyPenaltyPoints}</td>
+            <td className={student.weeklyNetPenaltyPoints >= 8 ? 'weight-number danger-text' : 'weight-number'}>
+              {student.weeklyNetPenaltyPoints}
+            </td>
+            <td className={student.settlementNetPenaltyPoints >= 20 ? 'weight-number danger-text' : 'weight-number'}>
+              {student.settlementNetPenaltyPoints}
+            </td>
+            <td><div className="status-list">
+              {student.statuses.length
+                ? student.statuses.map((status) => <span className="pill pill-warning" key={status}>{status}</span>)
+                : <span className="pill pill-positive"><Check size={11} /> 양호</span>}
+            </div></td>
+          </tr>)}
+        </tbody>
+      </table>
+      {rows.length === 0 && <EmptyState title="검색 결과가 없습니다" copy="다른 이름, 학번 또는 반으로 다시 검색해 보세요." />}
+    </div>
+
     <button type="button" onClick={() => setLocation('/students')} style={{ display: 'none' }} data-testid="button-dashboard-hidden-navigation" />
   </div>;
 }
 
-function StudentForm({ initial, onClose, onSaved }: { initial?: StudentSummary; onClose: () => void; onSaved: () => void }) {
-  const create = useCreateStudent();
-  const update = useUpdateStudent();
-  const [name, setName] = useState(initial?.name ?? '');
-  const [grade, setGrade] = useState(String(initial?.grade ?? 1));
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    const data: StudentInput = { name: name.trim(), grade: Number(grade) };
-    const done = { onSuccess: () => { onSaved(); onClose(); }, onError: () => undefined };
-    if (initial) update.mutate({ id: initial.id, data }, done); else create.mutate({ data }, done);
-  };
-  return <div className="modal-backdrop"><form className="modal" onSubmit={submit}><div className="modal-header"><div><div className="eyebrow">학생 정보</div><h2 className="modal-title">{initial ? '학생 정보 수정' : '학생 등록'}</h2></div><button type="button" className="btn btn-icon btn-outline" onClick={onClose} aria-label="닫기" data-testid="button-close-student-form"><X size={16} /></button></div><div className="form-grid"><div className="field full"><label htmlFor="student-name">이름</label><input id="student-name" className="input" required maxLength={40} value={name} onChange={(event) => setName(event.target.value)} data-testid="input-student-name" /></div><div className="field"><label htmlFor="student-grade">학년</label><select id="student-grade" className="select" value={grade} onChange={(event) => setGrade(event.target.value)} data-testid="select-student-grade">{[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((value) => <option key={value} value={value}>{value}학년</option>)}</select></div></div><div className="modal-actions"><button type="button" className="btn btn-outline" onClick={onClose} data-testid="button-cancel-student">취소</button><button className="btn btn-primary" disabled={create.isPending || update.isPending} data-testid="button-submit-student">{create.isPending || update.isPending ? '저장 중' : '저장하기'}</button></div></form></div>;
-}
-
 function StudentsPage() {
-  const queryClient = useQueryClient();
-  const notify = useContext(NoticeContext);
   const students = useListStudents();
-  const remove = useDeleteStudent();
   const [search, setSearch] = useState('');
-  const [editing, setEditing] = useState<StudentSummary | null | undefined>(undefined);
-  const rows = (students.data ?? []).filter((student) => student.name.includes(search));
-  const refresh = () => queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
-  const deleteStudent = (student: StudentSummary) => { if (window.confirm(`${student.name} 학생을 삭제할까요? 기록이 함께 영향을 받을 수 있습니다.`)) remove.mutate({ id: student.id }, { onSuccess: () => { refresh(); notify('학생을 삭제했습니다.'); }, onError: (error) => notify(errText(error), 'error') }); };
+  const needle = search.trim().toLowerCase();
+  const rows = (students.data ?? []).filter((student) =>
+    !needle
+    || student.name.toLowerCase().includes(needle)
+    || (student.studentNo ?? '').toLowerCase().includes(needle)
+    || (student.homeroom ?? '').toLowerCase().includes(needle)
+  );
+
   if (students.isLoading) return <LoadingState />;
   if (students.isError) return <ErrorState error={students.error} retry={() => students.refetch()} />;
-  return <div><PageHeader eyebrow="학생 관리" title="학생 명부" copy="학년과 이름을 기준으로 기본 정보를 관리합니다." action={<button className="btn btn-primary" onClick={() => setEditing(null)} data-testid="button-add-student"><Plus size={15} /> 학생 등록</button>} /><div className="section-row"><div><h2 className="section-title">전체 학생 <span className="muted">{students.data?.length ?? 0}</span></h2></div><div className="search-box"><Search size={15} /><input className="input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="이름 검색" aria-label="학생 이름 검색" data-testid="input-students-search" /></div></div><div className="card card-pad table-wrap"><table className="data-table"><thead><tr><th>이름</th><th>학년</th><th>누적 상점</th><th>누적 벌점</th><th>감지 상태</th><th aria-label="관리" /></tr></thead><tbody>{rows.map((student) => <tr key={student.id} data-testid={`row-student-${student.id}`}><td><Link href={`/students/${student.id}`} className="table-link" data-testid={`link-student-${student.id}`}>{student.name}</Link></td><td>{student.grade}학년</td><td className="success-text">{student.positivePoints}</td><td className="danger-text">{student.negativePoints}</td><td>{student.statuses.length ? student.statuses.join(', ') : '양호'}</td><td><div className="toolbar-right"><button className="btn btn-icon btn-outline" onClick={() => setEditing(student)} aria-label={`${student.name} 수정`} data-testid={`button-edit-student-${student.id}`}><Pencil size={14} /></button><button className="btn btn-icon btn-danger" onClick={() => deleteStudent(student)} aria-label={`${student.name} 삭제`} data-testid={`button-delete-student-${student.id}`}><Trash2 size={14} /></button></div></td></tr>)}</tbody></table>{rows.length === 0 && <EmptyState title="등록된 학생이 없습니다" copy="학생을 등록하면 이곳에서 생활점수와 함께 관리할 수 있습니다." />}</div>{editing !== undefined && <StudentForm initial={editing ?? undefined} onClose={() => setEditing(undefined)} onSaved={refresh} />}</div>;
+
+  return <div>
+    <PageHeader
+      eyebrow="DICS Core"
+      title="학생 명부"
+      copy="학생 원본은 DICS Core에서 관리합니다. 다니엘의 저울에서는 명부를 별도로 추가·삭제하지 않습니다."
+    />
+
+    <div className="section-row">
+      <div><h2 className="section-title">현재 학적 <span className="muted">{students.data?.length ?? 0}</span></h2></div>
+      <div className="search-box"><Search size={15} /><input
+        className="input"
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder="이름 · 학번 · 반 검색"
+        aria-label="학생 검색"
+        data-testid="input-students-search"
+      /></div>
+    </div>
+
+    <div className="card card-pad table-wrap">
+      <table className="data-table">
+        <thead><tr><th>학번</th><th>이름</th><th>학년 / 반</th><th>주간 NET</th><th>정산 NET</th><th>감지 상태</th></tr></thead>
+        <tbody>
+          {rows.map((student) => <tr key={student.id} data-testid={'row-student-' + student.id}>
+            <td className="muted">{student.studentNo ?? '매핑 대기'}</td>
+            <td><Link href={'/students/' + student.id} className="table-link" data-testid={'link-student-' + student.id}>{student.name}</Link></td>
+            <td>{student.homeroom ?? (student.grade + '학년')}</td>
+            <td>{student.weeklyNetPenaltyPoints}</td>
+            <td>{student.settlementNetPenaltyPoints}</td>
+            <td>{student.statuses.length ? student.statuses.join(', ') : '양호'}</td>
+          </tr>)}
+        </tbody>
+      </table>
+      {rows.length === 0 && <EmptyState title="학생이 없습니다" copy="DICS Core 현재 학기 명부와 legacy mapping 상태를 확인하세요." />}
+    </div>
+
+    <div className="side-note" style={{ marginTop: 18 }}>
+      <strong>명부 관리 원칙</strong><br />
+      학생 추가·학번·생년월일·성별·학년/반 변경은 DICS Core roster에서 처리하고, 이 앱은 생활지도 데이터만 관리합니다.
+    </div>
+  </div>;
 }
 
 function StudentDetailPage() {
@@ -244,7 +363,7 @@ function StudentDetailPage() {
     updateRecord.mutate({ id: record.id, data: { points: Number(nextPoints), item: record.item, recordedAt: record.recordedAt, enteredByName: record.enteredByName, reflectionSubmitted: record.reflection?.submitted ?? null } }, { onSuccess: () => { refreshDetail(); notify('점수 기록을 수정했습니다.'); }, onError: (error) => notify(errText(error), 'error') });
   };
   const toggleViolated = (punishment: Punishment) => setViolation.mutate({ id: punishment.id, violated: !punishment.violated }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetStudentQueryKey(id) }), onError: (error) => notify(errText(error), 'error') });
-  return <div><Link href="/students" className="btn btn-outline" data-testid="link-back-students"><ChevronLeft size={15} /> 학생 목록</Link><div style={{ marginTop: 25 }} className="detail-hero"><div><div className="eyebrow">학생 상세 기록</div><h1 className="heading">{student.name}</h1><p className="subheading">{student.grade}학년 · 최근 생활점수와 상태 신호</p><div className="status-list">{student.statuses.length ? student.statuses.map((status) => <span className="pill pill-warning" key={status}>{status}</span>) : <span className="pill pill-positive"><Check size={11} /> 현재 양호</span>}</div></div><div className="detail-avatar">{student.name.slice(0, 1)}</div></div><div className="metric-grid" style={{ marginTop: 28 }}><div className="card metric-card"><div className="metric-label">누적 상점</div><div className="metric-value success-text">+{student.positivePoints}</div></div><div className="card metric-card"><div className="metric-label">누적 벌점</div><div className="metric-value danger-text">{student.negativePoints}</div></div><div className="card metric-card"><div className="metric-label">주간 벌점</div><div className="metric-value">{student.weeklyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">월간 벌점</div><div className="metric-value">{student.monthlyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">기숙사 처분</div><div className="metric-value" style={{ fontSize: 14 }}>{student.punishment ?? '없음'}</div></div></div><div className="detail-grid" style={{ marginTop: 18 }}><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">점수 이력</h2><p className="section-copy">최근 기록부터 확인합니다.</p></div></div>{records.isLoading ? <div className="skeleton" style={{ height: 90, marginTop: 18 }} /> : records.isError ? <ErrorState error={records.error} retry={() => records.refetch()} /> : <div className="record-list">{(records.data ?? []).map((record) => <div className="record-row" key={record.id} data-testid={`row-record-${record.id}`}><div className="record-date">{dateLabel(record.recordedAt)}</div><div className="record-main"><div className="record-item">{record.item}</div><div className="record-meta">{record.enteredByName}{record.reflection ? ` · 반성문 ${record.reflection.status === 'SUBMITTED' ? '제출' : record.reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}` : ''}</div></div><div className={`record-points ${record.type === 'NEGATIVE' ? 'negative' : 'positive'}`}>{record.type === 'NEGATIVE' ? '-' : '+'}{record.points}<button className="btn btn-icon btn-outline" style={{ marginLeft: 8 }} onClick={() => editRecord(record)} aria-label="점수 기록 수정" data-testid={`button-edit-record-${record.id}`}><Pencil size={13} /></button><button className="btn btn-icon btn-danger" style={{ marginLeft: 6 }} onClick={() => removeRecord(record)} aria-label="점수 기록 삭제" data-testid={`button-delete-record-${record.id}`}><Trash2 size={13} /></button></div></div>)}{(records.data ?? []).length === 0 && <EmptyState title="점수 이력이 없습니다" copy="아직 등록된 생활점수가 없습니다." />}</div>}</section><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">기숙사 처분</h2><p className="section-copy">사생회가 기록한 처분입니다.</p></div></div>{student.punishments.length === 0 ? <EmptyState title="처분 이력 없음" copy="등록된 기숙사 처분이 없습니다." /> : <div className="activity-list">{student.punishments.map((punishment) => <div className="activity-row" key={punishment.id} data-testid={`row-punishment-${punishment.id}`}><div className="activity-mark"><BedDouble size={15} /></div><div><div className="activity-label">{punishment.types.join(' · ')}</div><div className="record-meta">{dateLabel(punishment.startDate)} — {dateLabel(punishment.endDate)}</div></div><button className={`pill ${punishment.violated ? 'pill-negative' : 'pill-neutral'}`} onClick={() => toggleViolated(punishment)} data-testid={`button-toggle-violation-${punishment.id}`}>{punishment.violated ? '위반 기록됨' : '위반 없음'}</button></div>)}</div>}</section></div></div>;
+  return <div><Link href="/students" className="btn btn-outline" data-testid="link-back-students"><ChevronLeft size={15} /> 학생 목록</Link><div style={{ marginTop: 25 }} className="detail-hero"><div><div className="eyebrow">학생 상세 기록</div><h1 className="heading">{student.name}</h1><p className="subheading">{student.homeroom ?? (student.grade + '학년')}{student.studentNo ? ' · ' + student.studentNo : ''} · 최근 생활점수와 상태 신호</p><div className="status-list">{student.statuses.length ? student.statuses.map((status) => <span className="pill pill-warning" key={status}>{status}</span>) : <span className="pill pill-positive"><Check size={11} /> 현재 양호</span>}</div></div><div className="detail-avatar">{student.name.slice(0, 1)}</div></div><div className="metric-grid" style={{ marginTop: 28 }}><div className="card metric-card"><div className="metric-label">주간 상점</div><div className="metric-value success-text">+{student.weeklyPositivePoints}</div></div><div className="card metric-card"><div className="metric-label">주간 벌점</div><div className="metric-value danger-text">{student.weeklyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">주간 NET</div><div className="metric-value">{student.weeklyNetPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">정산기간 NET</div><div className="metric-value">{student.settlementNetPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">체력훈련 판정 주차</div><div className="metric-value">{student.physicalTrainingWeeks}</div></div><div className="card metric-card"><div className="metric-label">기숙사 처분</div><div className="metric-value" style={{ fontSize: 14 }}>{student.punishment ?? '없음'}</div></div></div><div className="detail-grid" style={{ marginTop: 18 }}><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">점수 이력</h2><p className="section-copy">최근 기록부터 확인합니다.</p></div></div>{records.isLoading ? <div className="skeleton" style={{ height: 90, marginTop: 18 }} /> : records.isError ? <ErrorState error={records.error} retry={() => records.refetch()} /> : <div className="record-list">{(records.data ?? []).map((record) => <div className="record-row" key={record.id} data-testid={`row-record-${record.id}`}><div className="record-date">{dateLabel(record.recordedAt)}</div><div className="record-main"><div className="record-item">{record.item}</div><div className="record-meta">{record.enteredByName}{record.reflection ? ` · 반성문 ${record.reflection.status === 'SUBMITTED' ? '제출' : record.reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}` : ''}</div></div><div className={`record-points ${record.type === 'NEGATIVE' ? 'negative' : 'positive'}`}>{record.type === 'NEGATIVE' ? '-' : '+'}{record.points}<button className="btn btn-icon btn-outline" style={{ marginLeft: 8 }} onClick={() => editRecord(record)} aria-label="점수 기록 수정" data-testid={`button-edit-record-${record.id}`}><Pencil size={13} /></button><button className="btn btn-icon btn-danger" style={{ marginLeft: 6 }} onClick={() => removeRecord(record)} aria-label="점수 기록 삭제" data-testid={`button-delete-record-${record.id}`}><Trash2 size={13} /></button></div></div>)}{(records.data ?? []).length === 0 && <EmptyState title="점수 이력이 없습니다" copy="아직 등록된 생활점수가 없습니다." />}</div>}</section><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">기숙사 처분</h2><p className="section-copy">사생회가 기록한 처분입니다.</p></div></div>{student.punishments.length === 0 ? <EmptyState title="처분 이력 없음" copy="등록된 기숙사 처분이 없습니다." /> : <div className="activity-list">{student.punishments.map((punishment) => <div className="activity-row" key={punishment.id} data-testid={`row-punishment-${punishment.id}`}><div className="activity-mark"><BedDouble size={15} /></div><div><div className="activity-label">{punishment.types.join(' · ')}</div><div className="record-meta">{dateLabel(punishment.startDate)} — {dateLabel(punishment.endDate)}</div></div><button className={`pill ${punishment.violated ? 'pill-negative' : 'pill-neutral'}`} onClick={() => toggleViolated(punishment)} data-testid={`button-toggle-violation-${punishment.id}`}>{punishment.violated ? '위반 기록됨' : '위반 없음'}</button></div>)}</div>}</section></div></div>;
 }
 
 function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
