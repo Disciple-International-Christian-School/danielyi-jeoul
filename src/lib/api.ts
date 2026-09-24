@@ -18,16 +18,41 @@ export const PUNISHMENT_TYPES = ['운동금지', '간식금지', '면회금지']
 export type PunishmentType = (typeof PUNISHMENT_TYPES)[number];
 
 export interface StudentSummary {
+  /** Legacy integer route id until discipline FK cut-over. */
   id: number;
+  /** Canonical DICS Core student UUID; null until legacy mapping is complete. */
+  coreStudentId: string | null;
+  studentNo: string | null;
   name: string;
   grade: number;
+  homeroom: string | null;
   createdAt: string;
   updatedAt: string;
+
+  // Lifetime raw totals.
   positivePoints: number;
   negativePoints: number;
+
+  // Current Monday-based week.
+  weeklyPositivePoints: number;
   weeklyPenaltyPoints: number;
-  monthlyPenaltyPoints: number;
+  weeklyNetPenaltyPoints: number;
   weeklyRecordCount: number;
+  physicalTrainingRequired: boolean;
+
+  // Current admin-controlled settlement period.
+  settlementPeriodId: number | null;
+  settlementPeriodLabel: string | null;
+  settlementStartsOn: string | null;
+  settlementPositivePoints: number;
+  settlementPenaltyPoints: number;
+  settlementNetPenaltyPoints: number;
+  physicalTrainingWeeks: number;
+  committeeRequired: boolean;
+
+  /** Legacy compatibility alias. Do not use for new UI. */
+  monthlyPenaltyPoints: number;
+
   punishment: string | null;
   statuses: string[];
 }
@@ -75,6 +100,7 @@ export interface Reflection {
 export interface DashboardCounts {
   students: number;
   weeklyTargets: number;
+  committeeTargets: number;
   missingReflections: number;
   doubleReflections: number;
   activePunishments: number;
@@ -149,10 +175,36 @@ export interface PunishmentInput {
 // ---------------------------------------------------------------------------
 
 interface StudentSummaryRow {
-  id: number; name: string; grade: number; created_at: string; updated_at: string;
-  positive_points: number; negative_points: number; weekly_penalty_points: number;
-  monthly_penalty_points: number; weekly_record_count: number;
-  punishment: string | null; statuses: string[] | null;
+  id: number;
+  core_student_id: string | null;
+  student_no: string | null;
+  name: string;
+  grade: number;
+  homeroom: string | null;
+  created_at: string;
+  updated_at: string;
+
+  positive_points: number;
+  negative_points: number;
+
+  weekly_positive_points: number;
+  weekly_penalty_points: number;
+  weekly_net_penalty_points: number;
+  weekly_record_count: number;
+  physical_training_required: boolean;
+
+  settlement_period_id: number | null;
+  settlement_period_label: string | null;
+  settlement_starts_on: string | null;
+  settlement_positive_points: number;
+  settlement_penalty_points: number;
+  settlement_net_penalty_points: number;
+  physical_training_weeks: number;
+  committee_required: boolean;
+
+  monthly_penalty_points: number;
+  punishment: string | null;
+  statuses: string[] | null;
 }
 interface ReflectionRow {
   id: number; point_record_id: number; student_id: number; student_name: string;
@@ -161,8 +213,12 @@ interface ReflectionRow {
   status: ReflectionStatus;
 }
 interface DashboardCountsRow {
-  students: number; weekly_targets: number; missing_reflections: number;
-  double_reflections: number; active_punishments: number;
+  students: number;
+  weekly_targets: number;
+  committee_targets: number;
+  missing_reflections: number;
+  double_reflections: number;
+  active_punishments: number;
 }
 interface PunishmentRow {
   id: number; student_id: number; student_name: string; grade: number;
@@ -188,15 +244,33 @@ interface PointItemRow {
 function mapStudent(row: StudentSummaryRow): StudentSummary {
   return {
     id: row.id,
+    coreStudentId: row.core_student_id,
+    studentNo: row.student_no,
     name: row.name,
     grade: row.grade,
+    homeroom: row.homeroom,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+
     positivePoints: row.positive_points,
     negativePoints: row.negative_points,
+
+    weeklyPositivePoints: row.weekly_positive_points,
     weeklyPenaltyPoints: row.weekly_penalty_points,
-    monthlyPenaltyPoints: row.monthly_penalty_points,
+    weeklyNetPenaltyPoints: row.weekly_net_penalty_points,
     weeklyRecordCount: row.weekly_record_count,
+    physicalTrainingRequired: row.physical_training_required,
+
+    settlementPeriodId: row.settlement_period_id,
+    settlementPeriodLabel: row.settlement_period_label,
+    settlementStartsOn: row.settlement_starts_on,
+    settlementPositivePoints: row.settlement_positive_points,
+    settlementPenaltyPoints: row.settlement_penalty_points,
+    settlementNetPenaltyPoints: row.settlement_net_penalty_points,
+    physicalTrainingWeeks: row.physical_training_weeks,
+    committeeRequired: row.committee_required,
+
+    monthlyPenaltyPoints: row.monthly_penalty_points,
     punishment: row.punishment,
     statuses: row.statuses ?? [],
   };
@@ -296,7 +370,7 @@ export const getListPunishmentsQueryKey = () => ['punishments'] as const;
 
 async function fetchStudentSummaries(): Promise<StudentSummary[]> {
   const rows = unwrap<StudentSummaryRow[]>(
-    await supabase.from('v_student_summary').select('*').order('negative_points', { ascending: false }),
+    await supabase.from('v_student_summary').select('*').order('weekly_net_penalty_points', { ascending: false }),
   );
   return rows.map(mapStudent);
 }
@@ -318,6 +392,7 @@ export function useGetDashboard() {
         counts: {
           students: counts.students,
           weeklyTargets: counts.weekly_targets,
+          committeeTargets: counts.committee_targets,
           missingReflections: counts.missing_reflections,
           doubleReflections: counts.double_reflections,
           activePunishments: counts.active_punishments,
