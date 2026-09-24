@@ -251,19 +251,18 @@ alter table public.students
 -- This does not depend on name/grade matching and is safe for duplicate names.
 update public.students
 set core_student_id = gen_random_uuid()
-where deleted_at is null
-  and core_student_id is null;
+where core_student_id is null;
 
 -- Bootstrap Core from the minimal roster that already exists in Supabase.
 -- Name is copied because it is already operational data; student_no/auth/class
 -- can be enriched later without changing the canonical UUID.
-insert into core.students (id, name)
+insert into core.students (id, name, is_active)
 select
   ls.core_student_id,
-  ls.name
+  ls.name,
+  (ls.deleted_at is null)
 from public.students ls
-where ls.deleted_at is null
-  and ls.core_student_id is not null
+where ls.core_student_id is not null
   and not exists (
     select 1
     from core.students cs
@@ -289,14 +288,14 @@ comment on table public.students is
 comment on column public.students.core_student_id is
   'Temporary bridge to core.students during integrated-schema migration.';
 
--- Guardrail: every active legacy Daniel student must have a Core identity.
+-- Guardrail: every legacy Daniel student must have a Core identity, including
+-- inactive rows that retain historical discipline records.
 do $$
 begin
   if exists (
     select 1
     from public.students
-    where deleted_at is null
-      and core_student_id is null
+    where core_student_id is null
   ) then
     raise exception 'Core student bootstrap incomplete: unmapped Daniel students remain.';
   end if;
