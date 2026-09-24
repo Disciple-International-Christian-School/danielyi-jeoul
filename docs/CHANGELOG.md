@@ -624,6 +624,8 @@ Identity ≠ Role
 - 반성문 마감을 date가 아닌 `due_at`으로 확장: G7–12 당일 17:00, 재량 21:00 연장, G1–6 익일 08:20 기준.
 - 공개형 랜딩 화면을 제거하고 루트 접속 시 바로 관리자 로그인 화면으로 진입하도록 단순화.
 - 기존 `public.students.grade` 1–6 제한을 bridge 기간에 G1–G12로 확장.
+- Git-ignore roster 재import 대신 **기존 Daniel Supabase 최소 학생 DB를 Core bootstrap source**로 사용하도록 migration 전략 수정.
+- `student_no`는 Core에서 최종 공통 키로 유지하되 migration 초기에 없는 학생도 canonical UUID를 먼저 받을 수 있도록 nullable transition 허용.
 - 학생 명부 UI를 app-local CRUD에서 **DICS Core read-only roster**로 전환: 학생 추가/삭제는 Core에서만 처리.
 - Dashboard를 누적 벌점 중심에서 **주간 상점/벌점/NET + 열린 정산기간 NET** 중심으로 변경 준비.
 - 주간 `3회 벌점 OR NET 8+` 체력훈련 대상, 정산기간 `체력훈련 3주 OR NET 20+` 징계위원회 대상 카운트를 Dashboard에 반영.
