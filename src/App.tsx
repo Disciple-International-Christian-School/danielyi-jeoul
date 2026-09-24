@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -38,6 +38,7 @@ import {
   getListReflectionsQueryKey,
   getListStudentsQueryKey,
   getCurrentSettlementQueryKey,
+  getDepartmentMeritStatusQueryKey,
   useDailyDisciplineNotice,
   useWeeklyDisciplineReport,
   useCreatePointItem,
@@ -47,6 +48,8 @@ import {
   useCurrentSettlement,
   useDeletePointItem,
   useDeletePointRecord,
+  useDepartmentMeritStatus,
+  useEnsureWeeklyDepartmentMerits,
   useGetDashboard,
   useGetStudent,
   useExtendReflectionTo21,
@@ -182,7 +185,29 @@ function RoleGate({ role, children }: { role: Role; children: ReactNode }) {
 
 function DashboardPage() {
   const dashboard = useGetDashboard();
+  const departmentStatus = useDepartmentMeritStatus();
+  const ensureDepartmentMerits = useEnsureWeeklyDepartmentMerits();
+  const queryClient = useQueryClient();
+  const notify = useContext(NoticeContext);
+  const { admin } = useAuth();
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (admin?.role !== 'SEONDO') return;
+    ensureDepartmentMerits.mutate(undefined, {
+      onSuccess: (inserted) => {
+        queryClient.invalidateQueries({ queryKey: getDepartmentMeritStatusQueryKey() });
+        if (inserted > 0) {
+          queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
+          notify(`이번 주 부서활동 상점 ${inserted}건을 자동 반영했습니다.`);
+        }
+      },
+    });
+    // RPC is idempotent; run once per dashboard mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [admin?.role]);
+
   const [sort, setSort] = useState<'net' | 'grade' | 'name'>('net');
   const [, setLocation] = useLocation();
 
@@ -232,6 +257,13 @@ function DashboardPage() {
         <div className="muted" style={{ fontSize: 10, marginTop: 6 }}>{note}</div>
       </div>)}
     </div>
+
+    {(departmentStatus.data?.length ?? 0) > 0 && <div className="side-note" style={{ marginTop: 20 }}>
+      <strong>부서활동 자동 상점</strong>
+      <span style={{ marginLeft: 10 }}>
+        이번 주 {departmentStatus.data?.filter((row) => row.generated).length ?? 0}/{departmentStatus.data?.length ?? 0}건 반영
+      </span>
+    </div>}
 
     <div className="section-row">
       <div>
