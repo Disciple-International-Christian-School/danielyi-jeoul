@@ -242,9 +242,43 @@ alter table public.students
   add constraint students_grade_check
   check (grade between 1 and 12);
 
+-- Add the bridge column first without an FK so each existing legacy row can be
+-- assigned its canonical UUID before the matching Core row exists.
 alter table public.students
-  add column if not exists core_student_id uuid
-    references core.students(id) on delete restrict;
+  add column if not exists core_student_id uuid;
+
+-- Every active legacy Daniel student receives a stable Core UUID immediately.
+-- This does not depend on name/grade matching and is safe for duplicate names.
+update public.students
+set core_student_id = gen_random_uuid()
+where deleted_at is null
+  and core_student_id is null;
+
+-- Bootstrap Core from the minimal roster that already exists in Supabase.
+-- Name is copied because it is already operational data; student_no/auth/class
+-- can be enriched later without changing the canonical UUID.
+insert into core.students (id, name)
+select
+  ls.core_student_id,
+  ls.name
+from public.students ls
+where ls.deleted_at is null
+  and ls.core_student_id is not null
+  and not exists (
+    select 1
+    from core.students cs
+    where cs.id = ls.core_student_id
+  );
+
+-- Once every bridge UUID has a matching Core row, enforce referential integrity.
+alter table public.students
+  drop constraint if exists students_core_student_id_fkey;
+
+alter table public.students
+  add constraint students_core_student_id_fkey
+  foreign key (core_student_id)
+  references core.students(id)
+  on delete restrict;
 
 create unique index if not exists legacy_students_core_student_uq
   on public.students (core_student_id)
@@ -255,50 +289,8 @@ comment on table public.students is
 comment on column public.students.core_student_id is
   'Temporary bridge to core.students during integrated-schema migration.';
 
--- Bootstrap canonical Core identities from the minimal roster that already
--- exists in Daniel's Scale Supabase. These rows intentionally start without
--- student_no/auth links when that information is not yet available.
---
--- This is safe because the new UUID is written back to the exact legacy row;
--- no name-based cross-app matching is performed here.
-insert into core.students (name)
-select ls.name
-from public.students ls
-where ls.deleted_at is null
-  and ls.core_student_id is null;
-
--- Pair the newly inserted Core rows back to legacy rows deterministically by
--- row order within this single migration. We cannot use name alone because
--- duplicate names are possible.
-with legacy_unmapped as (
-  select
-    id,
-    row_number() over (order by id) as rn
-  from public.students
-  where deleted_at is null
-    and core_student_id is null
-),
-core_unlinked as (
-  select
-    id,
-    row_number() over (order by created_at, id) as rn
-  from core.students
-  where student_no is null
-    and auth_user_id is null
-    and id not in (
-      select core_student_id
-      from public.students
-      where core_student_id is not null
-    )
-)
-update public.students ls
-set core_student_id = cu.id
-from legacy_unmapped lu
-join core_unlinked cu on cu.rn = lu.rn
-where ls.id = lu.id;
-
--- Guardrail: every active legacy Daniel student must now have a Core identity.
-do $
+-- Guardrail: every active legacy Daniel student must have a Core identity.
+do $$
 begin
   if exists (
     select 1
@@ -308,7 +300,7 @@ begin
   ) then
     raise exception 'Core student bootstrap incomplete: unmapped Daniel students remain.';
   end if;
-end $;
+end $$;
 
 -- Existing app pages may continue to use legacy integer IDs until the final
 -- discipline cut-over. Once a row is mapped, name/grade/class come from Core.
