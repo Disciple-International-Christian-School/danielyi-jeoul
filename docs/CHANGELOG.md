@@ -689,6 +689,37 @@ Identity ≠ Role
 - 현재 Core homeroom이 없는 학생은 `G{grade}`로 fallback하며, G9-A/B enrollment 보강 후 자동으로 분반 표기.
 - GitHub Actions CI 추가: `npm ci → typecheck → build`.
 
+### 부서활동 자동 상점 Phase — 2026-09-25
+
+**Production DB applied**
+
+- `core.departments`, `core.department_memberships` 추가.
+- `discipline.department_merit_rules` 추가.
+- `point_records.source_type / source_key` 추가.
+- 주간 자동 상점은 `source_key` unique index로 중복 생성 방지.
+- `ensure_weekly_department_merits()` RPC 추가.
+- 현재 실제 부서/소속/규칙 데이터는 0건이며, 따라서 자동 생성 기록도 0건.
+- `pg_cron`은 설치하지 않고, 첫 선도부 Dashboard 접속 시 해당 주 월요일 기록을 idempotent하게 보장하는 방식으로 운영.
+- 추후 scheduler 도입 시 동일 데이터 모델/RPC를 그대로 재사용 가능.
+
+**Frontend in branch**
+
+- 선도부 Dashboard 진입 시 그 주의 부서활동 상점 누락 여부 자동 확인.
+- 신규 생성이 있을 때만 Dashboard/학생 합계 재조회 및 완료 알림.
+- 현재 규칙 데이터가 없으면 UI에 불필요한 자동상점 상태를 표시하지 않음.
+
+### 아침 벌점 연속입력 Phase — 2026-09-25
+
+- 학생 검색을 이름뿐 아니라 학번/반까지 확장.
+- 검색 결과가 한 명이면 Enter로 바로 학생 선택 가능.
+- `연속 입력 모드` 추가.
+  - 저장 후 학생만 초기화.
+  - 항목/점수/날짜/기입자는 유지.
+  - 검색창으로 자동 포커스.
+- 최근 입력 6건을 현재 세션 화면에 표시.
+- 종이 벌점 시트 여러 건을 오전에 빠르게 전산화하는 흐름을 우선 최적화.
+- 사진 시트 인식은 별도 P2로 유지.
+
 ### Frontend in branch — deployment pending
 
 - 학생 명부를 DICS Core read-only roster 관점으로 변경.
