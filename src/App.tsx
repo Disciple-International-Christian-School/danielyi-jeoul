@@ -61,11 +61,13 @@ import {
   useUpdatePointItem,
   useUpdatePointRecord,
   useUpdateReflection,
+  type DailyDisciplineNotice,
   type PointItem,
   type PointRecord,
   type Punishment,
   type Role,
   type StudentSummary,
+  type WeeklyDisciplineReport,
 } from '@/lib/api';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
@@ -79,11 +81,11 @@ const NoticeContext = createContext<(message: string, tone?: NoticeTone) => void
 
 function dateLabel(value?: string | null) {
   if (!value) return '—';
-  return new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric' }).format(new Date(value));
+  return new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric', timeZone: 'Asia/Seoul' }).format(new Date(value));
 }
 function dateTimeLabel(value?: string | null) {
   if (!value) return '—';
-  return new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+  return new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' }).format(new Date(value));
 }
 function today() {
   return new Intl.DateTimeFormat('en-CA', {
@@ -458,17 +460,27 @@ function ReportsPage() {
     return classMatches && (row.physicalTrainingRequired || row.committeeRequired);
   }), [weeklyRows, classFilter]);
 
-  const groups = useMemo(() => {
-    const source = mode === 'DAILY' ? filteredDaily : weeklyTargets;
-    const grouped = new Map<string, typeof source>();
-    source.forEach((row) => {
+  const dailyGroups = useMemo(() => {
+    const grouped = new Map<string, DailyDisciplineNotice[]>();
+    filteredDaily.forEach((row) => {
       const key = row.homeroom ?? ('G' + row.grade);
       const list = grouped.get(key) ?? [];
-      list.push(row as never);
-      grouped.set(key, list as never);
+      list.push(row);
+      grouped.set(key, list);
     });
     return Array.from(grouped.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko', { numeric: true }));
-  }, [mode, filteredDaily, weeklyTargets]);
+  }, [filteredDaily]);
+
+  const weeklyGroups = useMemo(() => {
+    const grouped = new Map<string, WeeklyDisciplineReport[]>();
+    weeklyTargets.forEach((row) => {
+      const key = row.homeroom ?? ('G' + row.grade);
+      const list = grouped.get(key) ?? [];
+      list.push(row);
+      grouped.set(key, list);
+    });
+    return Array.from(grouped.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko', { numeric: true }));
+  }, [weeklyTargets]);
 
   const resetClassIfMissing = (nextMode: 'DAILY' | 'WEEKLY') => {
     setMode(nextMode);
@@ -532,9 +544,8 @@ function ReportsPage() {
           <span>2배 제출 대상 <strong>{filteredDaily.filter((row) => row.reflectionStatus === 'DOUBLE').length}</strong>건</span>
         </div>
 
-        {groups.length === 0 ? <div className="print-empty">선택한 날짜/반의 벌점 공지 대상이 없습니다.</div> :
-          groups.map(([className, rawRows]) => {
-            const rows = rawRows as typeof filteredDaily;
+        {dailyGroups.length === 0 ? <div className="print-empty">선택한 날짜/반의 벌점 공지 대상이 없습니다.</div> :
+          dailyGroups.map(([className, rows]) => {
             return <section className="print-group" key={className}>
               <h2>{className}</h2>
               <table className="print-table">
@@ -560,9 +571,8 @@ function ReportsPage() {
           <span>징계위원회 대상 <strong>{weeklyTargets.filter((row) => row.committeeRequired).length}</strong>명</span>
         </div>
 
-        {groups.length === 0 ? <div className="print-empty">현재 주간 정산 대상자가 없습니다.</div> :
-          groups.map(([className, rawRows]) => {
-            const rows = rawRows as typeof weeklyTargets;
+        {weeklyGroups.length === 0 ? <div className="print-empty">현재 주간 정산 대상자가 없습니다.</div> :
+          weeklyGroups.map(([className, rows]) => {
             return <section className="print-group" key={className}>
               <h2>{className}</h2>
               <table className="print-table">
