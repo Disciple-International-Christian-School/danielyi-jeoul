@@ -206,16 +206,16 @@ core.classes
 core.enrollments
 ```
 
-### Step 2 — 전교생 roster import
+### Step 2 — 기존 Supabase 최소 roster에서 Core bootstrap
 
-실제 데이터는 Supabase에만 적재한다.
+Daniel's Scale 운영 Supabase에 이미 존재하는 이름/학년 최소 학생 DB를 시작점으로 사용한다.
 
-- 학번
-- 이름
-- 생년월일
-- 성별
-- 현재 학기 학년/반
-- 필요 학생의 Auth 연결
+- 각 legacy 학생 행에 canonical Core UUID를 발급
+- 같은 UUID로 `core.students` 행 생성
+- 이름/학년 파일을 Git에 다시 올리거나 seed SQL로 복제하지 않음
+- 학번/Auth/반/생년월일/성별은 확인 가능한 운영 데이터에서 단계적으로 보강
+
+즉 Core 생성의 첫 단계는 "엑셀 재import"가 아니라 **기존 운영 DB 승격**이다.
 
 ### Step 3 — Legacy bridge
 
@@ -383,6 +383,6 @@ Do not poll whole tables.
 - 반성문 시간 마감
 - 간소화된 로그인 UX
 
-다음 실제 데이터 단계는 **2026 Fall 전교생 roster를 Core에 적재하는 것**이다.
+다음 실제 데이터 단계는 **기존 Daniel Supabase 최소 학생 DB에 Core UUID bootstrap migration을 실제 적용하는 것**이다.
 
-그 뒤에야 기존 Daniel 학생 행과 SP 학생 행을 Core UUID에 안전하게 매핑한다.
+그 다음 기존 SP의 학번/Auth 정보와 G9-A/B 등 학기별 반 정보를 해당 Core 학생에 보강하고, 충분히 검증한 뒤 discipline FK를 UUID로 전환한다.
