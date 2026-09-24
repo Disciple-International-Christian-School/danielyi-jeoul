@@ -7,7 +7,7 @@ DICS 학생 상점·벌점 관리 콘솔. 관리자 전용 (선도부 / 사생�
 ## 문서
 
 - [초기 구축 기록 — Legacy](docs/LEGACY_INITIAL_BUILD.md)
-- [현재 이후 변경 이력 — Evolution Log](docs/EVOLUTION_LOG.md)
+- [현재 이후 변경 이력 — Change Log](docs/CHANGELOG.md)
 - [아키텍처](docs/architecture.md)
 - [원본 스펙 (35절)](docs/spec.md)
 
