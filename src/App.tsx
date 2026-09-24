@@ -66,7 +66,6 @@ import {
   type PointRecord,
   type Punishment,
   type Role,
-  type StudentSummary,
   type WeeklyDisciplineReport,
 } from '@/lib/api';
 import { AuthProvider, useAuth } from '@/lib/auth';
