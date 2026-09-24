@@ -623,6 +623,11 @@ Identity ≠ Role
 - 달력 월 대신 관리자가 종료하는 `settlement_periods` 모델과 정산기간 집계 view/RPC 추가.
 - 반성문 마감을 date가 아닌 `due_at`으로 확장: G7–12 당일 17:00, 재량 21:00 연장, G1–6 익일 08:20 기준.
 - 공개형 랜딩 화면을 제거하고 루트 접속 시 바로 관리자 로그인 화면으로 진입하도록 단순화.
+- 기존 `public.students.grade` 1–6 제한을 bridge 기간에 G1–G12로 확장.
+- 학생 명부 UI를 app-local CRUD에서 **DICS Core read-only roster**로 전환: 학생 추가/삭제는 Core에서만 처리.
+- Dashboard를 누적 벌점 중심에서 **주간 상점/벌점/NET + 열린 정산기간 NET** 중심으로 변경 준비.
+- 주간 `3회 벌점 OR NET 8+` 체력훈련 대상, 정산기간 `체력훈련 3주 OR NET 20+` 징계위원회 대상 카운트를 Dashboard에 반영.
+- SP의 기존 학번 로그인 + 6자리 PIN 규칙을 확인했으며, 기존 Auth UUID는 앞으로 `core.students.auth_user_id`로 연결하는 compatibility 대상으로 정의.
 - 이 항목들은 아직 운영 DB/`main`에 적용하지 않은 review 단계이며, 검증 후 상태를 갱신한다.
 
 ## Change Log
