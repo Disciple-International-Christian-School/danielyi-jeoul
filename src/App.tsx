@@ -752,6 +752,7 @@ function ReflectionsPage() {
 
 
 function ReportsPage() {
+  const { admin } = useAuth();
   const [mode, setMode] = useState<'DAILY' | 'WEEKLY'>('DAILY');
   const [noticeDate, setNoticeDate] = useState(today());
   const [classFilter, setClassFilter] = useState('ALL');
@@ -763,8 +764,15 @@ function ReportsPage() {
   const error = mode === 'DAILY' ? daily.error : weekly.error;
   const isError = mode === 'DAILY' ? daily.isError : weekly.isError;
 
-  const dailyRows = daily.data ?? [];
-  const weeklyRows = weekly.data ?? [];
+  const scopeMatchesGrade = (grade: number) =>
+    admin?.disciplineScope == null
+    || admin.disciplineScope === 'ALL'
+    || (admin.disciplineScope === 'ELEMENTARY' && grade >= 1 && grade <= 6)
+    || (admin.disciplineScope === 'MIDDLE' && grade >= 7 && grade <= 9)
+    || (admin.disciplineScope === 'HIGH' && grade >= 10 && grade <= 12);
+
+  const dailyRows = (daily.data ?? []).filter((row) => scopeMatchesGrade(row.grade));
+  const weeklyRows = admin?.isLead ? (weekly.data ?? []) : [];
 
   const classOptions = useMemo(() => {
     const labels = new Set<string>();
@@ -829,7 +837,7 @@ function ReportsPage() {
       <div className="card card-pad report-controls" style={{ marginTop: 28 }}>
         <div className="tab-row">
           <button className={'tab ' + (mode === 'DAILY' ? 'active' : '')} onClick={() => resetClassIfMissing('DAILY')} data-testid="button-report-daily">일일 반별 공지</button>
-          <button className={'tab ' + (mode === 'WEEKLY' ? 'active' : '')} onClick={() => resetClassIfMissing('WEEKLY')} data-testid="button-report-weekly">주간 정산 보고</button>
+          {admin?.isLead && <button className={'tab ' + (mode === 'WEEKLY' ? 'active' : '')} onClick={() => resetClassIfMissing('WEEKLY')} data-testid="button-report-weekly">주간 정산 보고</button>}
         </div>
 
         <div className="filter-bar" style={{ marginTop: 18 }}>
