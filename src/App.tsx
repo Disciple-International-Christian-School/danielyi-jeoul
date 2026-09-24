@@ -17,6 +17,7 @@ import {
   LogOut,
   Pencil,
   Plus,
+  Printer,
   RefreshCw,
   Search,
   ShieldAlert,
@@ -37,6 +38,8 @@ import {
   getListReflectionsQueryKey,
   getListStudentsQueryKey,
   getCurrentSettlementQueryKey,
+  useDailyDisciplineNotice,
+  useWeeklyDisciplineReport,
   useCreatePointItem,
   useCreatePointRecord,
   useCreatePunishment,
@@ -116,6 +119,7 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
     { href: '/points/negative', label: '벌점 입력', icon: ArrowDownRight, roles: ['SEONDO'] as Role[] },
     { href: '/points/positive', label: '상점 입력', icon: ArrowUpRight, roles: ['SEONDO'] as Role[] },
     { href: '/reflections', label: '반성문', icon: BookOpenCheck, roles: ['SEONDO'] as Role[] },
+    { href: '/reports', label: '공지·출력', icon: Printer, roles: ['SEONDO'] as Role[] },
     { href: '/settlement', label: '정산 관리', icon: CalendarRange, roles: ['SEONDO'] as Role[] },
     { href: '/punishments', label: '기숙사 처분', icon: BedDouble, roles: ['SASAENG'] as Role[] },
     { href: '/point-items', label: '점수 항목', icon: SlidersHorizontal, roles: ['SEONDO'] as Role[] },
@@ -420,6 +424,174 @@ function ReflectionsPage() {
   return <div><PageHeader eyebrow="반성문 관리" title="반성문 현황" copy="초등은 익일 등교, 중고등은 기본 17시·필요 시 21시 연장 기준으로 제출 상태를 확인합니다." /><div className="card card-pad" style={{ marginTop: 30 }}><div className="tab-row">{filterLabels.map(([value, label]) => <button key={value} className={`tab ${filter === value ? 'active' : ''}`} onClick={() => setFilter(value)} data-testid={`button-reflection-filter-${value.toLowerCase()}`}>{label}</button>)}</div>{rows.length === 0 ? <EmptyState title="해당 반성문이 없습니다" copy="선택한 조건에 맞는 반성문이 없습니다." /> : <div className="table-wrap"><table className="data-table"><thead><tr><th>학생</th><th>벌점 항목</th><th>벌점</th><th>입력일</th><th>제출기한</th><th>상태</th><th>조치</th></tr></thead><tbody>{rows.map((reflection) => <tr key={reflection.id} data-testid={`row-reflection-${reflection.id}`}><td><Link className="table-link" href={`/students/${reflection.studentId}`} data-testid={`link-reflection-student-${reflection.id}`}>{reflection.studentName}</Link> <span className="muted">{reflection.grade}학년</span></td><td>{reflection.item}</td><td className="weight-number danger-text">{reflection.points}</td><td className="muted">{dateLabel(reflection.recordedAt)}</td><td className="muted"><div>{dateTimeLabel(reflection.dueAt)}</div>{reflection.deadlineChangeReason && <div className="record-meta">연장 사유: {reflection.deadlineChangeReason}</div>}</td><td><span className={`pill ${reflection.status === 'SUBMITTED' ? 'pill-positive' : reflection.status === 'DOUBLE' ? 'pill-negative' : 'pill-warning'}`}>{reflection.status === 'SUBMITTED' ? '제출 완료' : reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}</span>{reflection.submittedAt && <div className="record-meta">제출 {dateTimeLabel(reflection.submittedAt)}</div>}</td><td><div className="toolbar-right"><button className="btn btn-outline" onClick={() => { update.mutate({ id: reflection.id, data: { submitted: !reflection.submitted } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() }); notify('반성문 상태를 변경했습니다.'); }, onError: (error) => notify(errText(error), 'error') }); }} data-testid={`button-toggle-reflection-${reflection.id}`}>{reflection.submitted ? '미제출로' : '제출 완료'}</button>{!reflection.submitted && reflection.grade >= 7 && <button className="btn btn-outline" onClick={() => { const reason = window.prompt('21시까지 연장하는 사유를 입력하세요.', '오후 벌점 발생'); if (reason == null) return; extend.mutate({ id: reflection.id, reason }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() }); notify('반성문 마감을 21시로 연장했습니다.'); }, onError: (error) => notify(errText(error), 'error') }); }} data-testid={`button-extend-reflection-${reflection.id}`}>21시 연장</button>}</div></td></tr>)}</tbody></table></div>}</div></div>;
 }
 
+
+function ReportsPage() {
+  const [mode, setMode] = useState<'DAILY' | 'WEEKLY'>('DAILY');
+  const [noticeDate, setNoticeDate] = useState(today());
+  const [classFilter, setClassFilter] = useState('ALL');
+
+  const daily = useDailyDisciplineNotice(noticeDate);
+  const weekly = useWeeklyDisciplineReport();
+
+  const loading = mode === 'DAILY' ? daily.isLoading : weekly.isLoading;
+  const error = mode === 'DAILY' ? daily.error : weekly.error;
+  const isError = mode === 'DAILY' ? daily.isError : weekly.isError;
+
+  const dailyRows = daily.data ?? [];
+  const weeklyRows = weekly.data ?? [];
+
+  const classOptions = useMemo(() => {
+    const labels = new Set<string>();
+    const source = mode === 'DAILY' ? dailyRows : weeklyRows;
+    source.forEach((row) => labels.add(row.homeroom ?? ('G' + row.grade)));
+    return Array.from(labels).sort((a, b) => a.localeCompare(b, 'ko', { numeric: true }));
+  }, [mode, dailyRows, weeklyRows]);
+
+  const filteredDaily = useMemo(() => dailyRows.filter((row) => {
+    const label = row.homeroom ?? ('G' + row.grade);
+    return classFilter === 'ALL' || classFilter === label;
+  }), [dailyRows, classFilter]);
+
+  const weeklyTargets = useMemo(() => weeklyRows.filter((row) => {
+    const label = row.homeroom ?? ('G' + row.grade);
+    const classMatches = classFilter === 'ALL' || classFilter === label;
+    return classMatches && (row.physicalTrainingRequired || row.committeeRequired);
+  }), [weeklyRows, classFilter]);
+
+  const groups = useMemo(() => {
+    const source = mode === 'DAILY' ? filteredDaily : weeklyTargets;
+    const grouped = new Map<string, typeof source>();
+    source.forEach((row) => {
+      const key = row.homeroom ?? ('G' + row.grade);
+      const list = grouped.get(key) ?? [];
+      list.push(row as never);
+      grouped.set(key, list as never);
+    });
+    return Array.from(grouped.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko', { numeric: true }));
+  }, [mode, filteredDaily, weeklyTargets]);
+
+  const resetClassIfMissing = (nextMode: 'DAILY' | 'WEEKLY') => {
+    setMode(nextMode);
+    setClassFilter('ALL');
+  };
+
+  if (loading) return <LoadingState />;
+  if (isError) return <ErrorState error={error} retry={() => { daily.refetch(); weekly.refetch(); }} />;
+
+  const weekStart = weeklyRows[0]?.weekStart ?? null;
+  const settlementLabel = weeklyRows.find((row) => row.settlementPeriodLabel)?.settlementPeriodLabel ?? '열린 정산기간 없음';
+
+  return <div className="report-page">
+    <div className="screen-only">
+      <PageHeader
+        eyebrow="통지 · 보고"
+        title="공지·출력"
+        copy="반별 일일 벌점 공지와 주말 체력훈련·정산 대상 명단을 같은 기준으로 출력합니다."
+        action={<button className="btn btn-primary" onClick={() => window.print()} data-testid="button-print-report"><Printer size={15} /> 인쇄</button>}
+      />
+
+      <div className="card card-pad report-controls" style={{ marginTop: 28 }}>
+        <div className="tab-row">
+          <button className={'tab ' + (mode === 'DAILY' ? 'active' : '')} onClick={() => resetClassIfMissing('DAILY')} data-testid="button-report-daily">일일 반별 공지</button>
+          <button className={'tab ' + (mode === 'WEEKLY' ? 'active' : '')} onClick={() => resetClassIfMissing('WEEKLY')} data-testid="button-report-weekly">주간 정산 보고</button>
+        </div>
+
+        <div className="filter-bar" style={{ marginTop: 18 }}>
+          {mode === 'DAILY' && <div className="field">
+            <label htmlFor="notice-date">공지 날짜</label>
+            <input id="notice-date" className="input" type="date" value={noticeDate} onChange={(event) => setNoticeDate(event.target.value)} data-testid="input-notice-date" />
+          </div>}
+          <div className="field">
+            <label htmlFor="report-class">학년 / 반</label>
+            <select id="report-class" className="select" value={classFilter} onChange={(event) => setClassFilter(event.target.value)} data-testid="select-report-class">
+              <option value="ALL">전체</option>
+              {classOptions.map((label) => <option key={label} value={label}>{label}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section className="print-sheet" data-testid="print-sheet">
+      <header className="print-header">
+        <div>
+          <div className="print-kicker">DISCIPLE INTERNATIONAL CHRISTIAN SCHOOL</div>
+          <h1>{mode === 'DAILY' ? '생활지도 일일 공지' : '주간 생활지도 정산 보고'}</h1>
+        </div>
+        <div className="print-meta">
+          {mode === 'DAILY'
+            ? <><strong>{noticeDate}</strong><span>{classFilter === 'ALL' ? '전체 반' : classFilter}</span></>
+            : <><strong>{weekStart ? dateLabel(weekStart) + ' 시작 주간' : '이번 주'}</strong><span>{settlementLabel}</span></>}
+        </div>
+      </header>
+
+      {mode === 'DAILY' ? <>
+        <div className="print-summary">
+          <span>벌점 기록 <strong>{filteredDaily.length}</strong>건</span>
+          <span>반성문 미제출 <strong>{filteredDaily.filter((row) => row.reflectionStatus === 'MISSING').length}</strong>건</span>
+          <span>2배 제출 대상 <strong>{filteredDaily.filter((row) => row.reflectionStatus === 'DOUBLE').length}</strong>건</span>
+        </div>
+
+        {groups.length === 0 ? <div className="print-empty">선택한 날짜/반의 벌점 공지 대상이 없습니다.</div> :
+          groups.map(([className, rawRows]) => {
+            const rows = rawRows as typeof filteredDaily;
+            return <section className="print-group" key={className}>
+              <h2>{className}</h2>
+              <table className="print-table">
+                <thead><tr><th style={{ width: '18%' }}>학생</th><th>벌점 사유</th><th style={{ width: '10%' }}>벌점</th><th style={{ width: '24%' }}>반성문</th></tr></thead>
+                <tbody>{rows.map((row) => <tr key={row.pointRecordId}>
+                  <td><strong>{row.studentName}</strong></td>
+                  <td>{row.item}</td>
+                  <td>{row.points}</td>
+                  <td>
+                    {row.reflectionStatus === 'SUBMITTED' ? '제출 완료'
+                      : row.reflectionStatus === 'DOUBLE' ? '2배 제출 대상'
+                      : row.reflectionStatus === 'MISSING' ? '미제출'
+                      : '—'}
+                    {row.reflectionDueAt && row.reflectionStatus !== 'SUBMITTED' && <div className="print-sub">마감 {dateTimeLabel(row.reflectionDueAt)}</div>}
+                  </td>
+                </tr>)}</tbody>
+              </table>
+            </section>;
+          })}
+      </> : <>
+        <div className="print-summary">
+          <span>체력훈련 대상 <strong>{weeklyTargets.filter((row) => row.physicalTrainingRequired).length}</strong>명</span>
+          <span>징계위원회 대상 <strong>{weeklyTargets.filter((row) => row.committeeRequired).length}</strong>명</span>
+        </div>
+
+        {groups.length === 0 ? <div className="print-empty">현재 주간 정산 대상자가 없습니다.</div> :
+          groups.map(([className, rawRows]) => {
+            const rows = rawRows as typeof weeklyTargets;
+            return <section className="print-group" key={className}>
+              <h2>{className}</h2>
+              <table className="print-table">
+                <thead><tr><th>학생</th><th>벌점 횟수</th><th>주간 상점</th><th>주간 벌점</th><th>주간 NET</th><th>정산 NET</th><th>판정</th></tr></thead>
+                <tbody>{rows.map((row) => <tr key={row.studentId}>
+                  <td><strong>{row.studentName}</strong></td>
+                  <td>{row.penaltyIncidentCount}</td>
+                  <td>+{row.weeklyPositivePoints}</td>
+                  <td>{row.weeklyPenaltyPoints}</td>
+                  <td><strong>{row.weeklyNetPenaltyPoints}</strong></td>
+                  <td>{row.settlementNetPenaltyPoints}</td>
+                  <td>
+                    {row.physicalTrainingRequired && <div>체력훈련</div>}
+                    {row.committeeRequired && <div>징계위원회</div>}
+                  </td>
+                </tr>)}</tbody>
+              </table>
+            </section>;
+          })}
+      </>}
+
+      <footer className="print-footer">
+        <span>다니엘의 저울 · DICS 생활지도</span>
+        <span>출력 시각 {new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Seoul' }).format(new Date())}</span>
+      </footer>
+    </section>
+  </div>;
+}
+
 function SettlementPage() {
   const queryClient = useQueryClient();
   const notify = useContext(NoticeContext);
@@ -683,7 +855,7 @@ function ProtectedRoutes() {
   if (loading) return <LoadingState />;
   if (!session) return <Redirect to="/sign-in" />;
   if (!admin) return <div className="app-loading"><div className="error-box"><AlertTriangle size={24} /><p>관리자 권한이 없는 계정입니다. 운영 담당자에게 문의해주세요.</p><button className="btn btn-outline" onClick={() => signOut()} data-testid="button-no-admin-sign-out"><LogOut size={14} /> 로그아웃</button></div></div>;
-  return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/settlement" component={() => <RoleGate role="SEONDO"><SettlementPage /></RoleGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
+  return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} /><Route path="/settlement" component={() => <RoleGate role="SEONDO"><SettlementPage /></RoleGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
 }
 
 function NotFoundInline() {
