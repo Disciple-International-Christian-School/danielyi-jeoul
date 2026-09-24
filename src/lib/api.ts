@@ -93,6 +93,8 @@ export interface Reflection {
   recordedAt: string;
   submitted: boolean;
   submissionDeadline: string;
+  dueAt: string;
+  deadlineChangeReason: string | null;
   submittedAt: string | null;
   status: ReflectionStatus;
 }
@@ -217,7 +219,8 @@ interface StudentSummaryRow {
 interface ReflectionRow {
   id: number; point_record_id: number; student_id: number; student_name: string;
   grade: number; item: string; points: number; recorded_at: string;
-  submitted: boolean; submission_deadline: string; submitted_at: string | null;
+  submitted: boolean; submission_deadline: string; due_at: string;
+  deadline_change_reason: string | null; submitted_at: string | null;
   status: ReflectionStatus;
 }
 interface DashboardCountsRow {
@@ -304,6 +307,8 @@ function mapReflection(row: ReflectionRow): Reflection {
     recordedAt: row.recorded_at,
     submitted: row.submitted,
     submissionDeadline: row.submission_deadline,
+    dueAt: row.due_at,
+    deadlineChangeReason: row.deadline_change_reason,
     submittedAt: row.submitted_at,
     status: row.status,
   };
@@ -637,6 +642,19 @@ export function useDeletePointRecord() {
 // ---------------------------------------------------------------------------
 // Writes — reflections
 // ---------------------------------------------------------------------------
+
+export function useExtendReflectionTo21() {
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: number; reason: string }) => {
+      const { data, error } = await supabase.rpc('extend_reflection_to_21', {
+        p_reflection_id: id,
+        p_reason: reason,
+      });
+      if (error) throw new Error(error.message);
+      return data as string;
+    },
+  });
+}
 
 export function useUpdateReflection() {
   return useMutation({
