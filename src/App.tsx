@@ -329,9 +329,8 @@ function PointItemsPage() {
 }
 
 function PublicHome() {
-  const { session, loading } = useAuth();
-  if (!loading && session) return <Redirect to="/dashboard" />;
-  return <div className="landing"><nav className="landing-nav"><Brand /><div className="toolbar-right"><span className="pill pill-neutral">인증 관리자 전용</span><Link href="/sign-in" className="btn btn-primary" data-testid="link-public-sign-in">관리자 로그인</Link></div></nav><section className="landing-hero"><div><span className="hero-kicker">학교 운영 콘솔</span><h1 className="hero-title">기록은 단단하게,<br /><em>판단은 사람답게.</em></h1><p className="hero-copy">다니엘의 저울은 선도부와 사생회가 학생의 생활 흐름을 빠르게 읽고, 필요한 대화를 놓치지 않도록 돕는 내부 운영 시스템입니다.</p><div className="hero-actions"><Link href="/sign-in" className="btn btn-primary" data-testid="link-hero-sign-in">운영 시작하기 <ArrowUpRight size={15} /></Link><a href="#principles" className="btn btn-outline" data-testid="link-public-principles">운영 원칙 보기</a></div></div><div className="hero-visual" aria-hidden="true"><div className="orb"><div className="orb-label">다니엘의<br />저울<small>학생 생활의 균형</small></div></div></div></section><section className="landing-section tinted" id="principles"><div className="landing-inner"><div className="principles"><div><div className="eyebrow">이 시스템이 필요한 이유</div><h2 className="heading" style={{ fontSize: 'clamp(32px, 5vw, 58px)' }}>좋은 기록은<br />다음 행동을 바꿉니다.</h2></div><div><div className="principle-num">01 / 함께 보는 기준</div><h3 className="principle-title">신호를 한곳에</h3><p className="principle-copy">주간·월간 누적, 반성문, 기숙사 처분을 학생별로 연결해 놓치기 쉬운 흐름을 먼저 보여줍니다.</p></div><div><div className="principle-num">02 / 분명한 책임</div><h3 className="principle-title">누가 기록했는지</h3><p className="principle-copy">기입자와 날짜를 남겨 기록의 맥락을 지키고, 이후 상담과 운영 판단이 이어지게 합니다.</p></div></div></div></section><section className="landing-section"><div className="quote-block"><div className="quote">“학생을 숫자로 줄이지 않고,<br />숫자에서 대화의 이유를 찾습니다.”</div><div className="quote-note">선도부 · 사생회 내부 운영 원칙</div></div></section><footer className="landing-footer"><span>다니엘의 저울</span><span>학생 생활점수 관리 시스템 · 관리자 전용</span></footer></div>;
+  // Internal operations tool: skip the former marketing-style landing page.
+  return <LoginPage />;
 }
 
 function LoginPage() {
