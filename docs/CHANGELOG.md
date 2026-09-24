@@ -745,6 +745,24 @@ Identity ≠ Role
 - 일일 공지 출력은 담당 학년군으로 제한.
 - 주간 정산 보고는 선도부장만 표시.
 
+### Auth provenance / Audit Phase — 2026-09-25
+
+**Production DB applied**
+
+- `point_records / reflection_records / punishments`에 `created_by / updated_by` Auth UUID 추가.
+- INSERT/UPDATE 시 서버 trigger가 `auth.uid()`를 자동 기록.
+- 기존 기록은 작성자를 추정하지 않고 null 유지.
+- `discipline.audit_logs` append-only 감사 로그 추가.
+  - point records
+  - reflection records
+  - punishments
+  - settlement periods
+  의 INSERT/UPDATE/DELETE before/after를 기록.
+- 기존 public RPC 시그니처는 유지하면서 role validation과 fixed `search_path` 적용.
+- 향후 개인 admin 계정 전환 시 별도 schema 변경 없이 실제 작성자/수정자 추적 가능.
+- Supabase security advisor 확인 결과 신규 경고 없음.
+- 기존 Auth의 leaked-password protection 비활성 경고는 학생 6자리 PIN 정책 검토 전까지 보류.
+
 ### Frontend in branch — deployment pending
 
 - 학생 명부를 DICS Core read-only roster 관점으로 변경.
