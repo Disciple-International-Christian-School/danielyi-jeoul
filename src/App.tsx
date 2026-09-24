@@ -6,6 +6,7 @@ import {
   ArrowUpRight,
   BedDouble,
   BookOpenCheck,
+  CalendarRange,
   Check,
   ChevronLeft,
   CircleHelp,
@@ -35,9 +36,12 @@ import {
   getListPunishmentsQueryKey,
   getListReflectionsQueryKey,
   getListStudentsQueryKey,
+  getCurrentSettlementQueryKey,
   useCreatePointItem,
   useCreatePointRecord,
   useCreatePunishment,
+  useCloseSettlementPeriod,
+  useCurrentSettlement,
   useDeletePointItem,
   useDeletePointRecord,
   useGetDashboard,
@@ -49,6 +53,7 @@ import {
   useListReflections,
   useListStudents,
   useSetPunishmentViolation,
+  useStartSettlementPeriod,
   useUpdatePointItem,
   useUpdatePointRecord,
   useUpdateReflection,
@@ -103,6 +108,7 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
     { href: '/points/negative', label: '벌점 입력', icon: ArrowDownRight, roles: ['SEONDO'] as Role[] },
     { href: '/points/positive', label: '상점 입력', icon: ArrowUpRight, roles: ['SEONDO'] as Role[] },
     { href: '/reflections', label: '반성문', icon: BookOpenCheck, roles: ['SEONDO'] as Role[] },
+    { href: '/settlement', label: '정산 관리', icon: CalendarRange, roles: ['SEONDO'] as Role[] },
     { href: '/punishments', label: '기숙사 처분', icon: BedDouble, roles: ['SASAENG'] as Role[] },
     { href: '/point-items', label: '점수 항목', icon: SlidersHorizontal, roles: ['SEONDO'] as Role[] },
   ];
@@ -405,6 +411,191 @@ function ReflectionsPage() {
   return <div><PageHeader eyebrow="반성문 관리" title="반성문 현황" copy="벌점 기록과 연결된 당일 반성문 제출 상태를 확인합니다." /><div className="card card-pad" style={{ marginTop: 30 }}><div className="tab-row">{filterLabels.map(([value, label]) => <button key={value} className={`tab ${filter === value ? 'active' : ''}`} onClick={() => setFilter(value)} data-testid={`button-reflection-filter-${value.toLowerCase()}`}>{label}</button>)}</div>{rows.length === 0 ? <EmptyState title="해당 반성문이 없습니다" copy="선택한 조건에 맞는 반성문이 없습니다." /> : <div className="table-wrap"><table className="data-table"><thead><tr><th>학생</th><th>벌점 항목</th><th>벌점</th><th>입력일</th><th>제출기한</th><th>상태</th><th>제출 여부</th></tr></thead><tbody>{rows.map((reflection) => <tr key={reflection.id} data-testid={`row-reflection-${reflection.id}`}><td><Link className="table-link" href={`/students/${reflection.studentId}`} data-testid={`link-reflection-student-${reflection.id}`}>{reflection.studentName}</Link> <span className="muted">{reflection.grade}학년</span></td><td>{reflection.item}</td><td className="weight-number danger-text">{reflection.points}</td><td className="muted">{dateLabel(reflection.recordedAt)}</td><td className="muted">{dateLabel(reflection.submissionDeadline)}</td><td><span className={`pill ${reflection.status === 'SUBMITTED' ? 'pill-positive' : reflection.status === 'DOUBLE' ? 'pill-negative' : 'pill-warning'}`}>{reflection.status === 'SUBMITTED' ? '제출 완료' : reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}</span>{reflection.submittedAt && <div className="record-meta">제출 {dateTimeLabel(reflection.submittedAt)}</div>}</td><td><button className="btn btn-outline" onClick={() => { update.mutate({ id: reflection.id, data: { submitted: !reflection.submitted } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() }); notify('반성문 상태를 변경했습니다.'); }, onError: (error) => notify(errText(error), 'error') }); }} data-testid={`button-toggle-reflection-${reflection.id}`}>{reflection.submitted ? '미제출로' : '제출 완료'}</button></td></tr>)}</tbody></table></div>}</div></div>;
 }
 
+function SettlementPage() {
+  const queryClient = useQueryClient();
+  const notify = useContext(NoticeContext);
+  const current = useCurrentSettlement();
+  const start = useStartSettlementPeriod();
+  const close = useCloseSettlementPeriod();
+
+  const [startsOn, setStartsOn] = useState(today());
+  const [label, setLabel] = useState('');
+  const [endDate, setEndDate] = useState(today());
+  const [openNext, setOpenNext] = useState(true);
+  const [nextLabel, setNextLabel] = useState('');
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: getCurrentSettlementQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
+  };
+
+  if (current.isLoading) return <LoadingState />;
+  if (current.isError) return <ErrorState error={current.error} retry={() => current.refetch()} />;
+
+  const period = current.data;
+
+  const submitStart = (event: FormEvent) => {
+    event.preventDefault();
+    const cleanLabel = label.trim() || (startsOn + ' 시작 정산');
+    start.mutate(
+      { startsOn, label: cleanLabel },
+      {
+        onSuccess: () => {
+          refresh();
+          setLabel('');
+          notify('정산기간을 시작했습니다.');
+        },
+        onError: (error) => notify(errText(error), 'error'),
+      },
+    );
+  };
+
+  const submitClose = (event: FormEvent) => {
+    event.preventDefault();
+    if (!period) return;
+
+    const message = openNext
+      ? endDate + '까지 현재 정산을 종료하고 다음날부터 새 정산기간을 시작할까요?'
+      : endDate + '까지 현재 정산만 종료할까요? 다음 기간은 자동 시작되지 않습니다.';
+
+    if (!window.confirm(message)) return;
+
+    close.mutate(
+      {
+        periodId: period.id,
+        endDate,
+        openNext,
+        nextLabel: nextLabel.trim() || null,
+      },
+      {
+        onSuccess: () => {
+          refresh();
+          setNextLabel('');
+          notify(openNext ? '정산을 종료하고 다음 기간을 시작했습니다.' : '정산기간을 종료했습니다.');
+        },
+        onError: (error) => notify(errText(error), 'error'),
+      },
+    );
+  };
+
+  return <div>
+    <PageHeader
+      eyebrow="귀가 사이클"
+      title="정산 관리"
+      copy="달력 월이 아니라 실제 귀가 주기에 맞춰 누적 기간을 직접 시작하고 종료합니다."
+    />
+
+    {!period ? <div className="detail-grid" style={{ marginTop: 30 }}>
+      <form className="card card-pad" onSubmit={submitStart}>
+        <div className="eyebrow">현재 상태</div>
+        <h2 className="section-title" style={{ marginTop: 10 }}>열린 정산기간 없음</h2>
+        <p className="section-copy">첫 정산 시작일을 지정하면 그 날짜부터 상점·벌점 NET이 누적됩니다.</p>
+
+        <div className="form-grid" style={{ marginTop: 24 }}>
+          <div className="field">
+            <label htmlFor="settlement-start">시작일</label>
+            <input
+              id="settlement-start"
+              className="input"
+              type="date"
+              required
+              value={startsOn}
+              onChange={(event) => setStartsOn(event.target.value)}
+              data-testid="input-settlement-start"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="settlement-label">기간 이름</label>
+            <input
+              id="settlement-label"
+              className="input"
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+              placeholder="예: 9월 2차 귀가 전"
+              data-testid="input-settlement-label"
+            />
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-primary" disabled={start.isPending} data-testid="button-start-settlement">
+            {start.isPending ? '시작 중' : '정산 시작'}
+          </button>
+        </div>
+      </form>
+
+      <section className="card card-pad">
+        <div className="eyebrow">판정 기준</div>
+        <h2 className="section-title" style={{ marginTop: 10 }}>관리자가 종료할 때까지 누적</h2>
+        <div className="activity-list" style={{ marginTop: 20 }}>
+          <div className="activity-row"><div className="activity-mark"><ShieldAlert size={15} /></div><div><div className="activity-label">주간 체력훈련</div><div className="record-meta">벌점 발생 3회 이상 또는 주간 NET 8점 이상</div></div></div>
+          <div className="activity-row"><div className="activity-mark"><AlertTriangle size={15} /></div><div><div className="activity-label">징계위원회</div><div className="record-meta">정산기간 내 체력훈련 판정 3주 이상 또는 NET 20점 이상</div></div></div>
+        </div>
+      </section>
+    </div> : <div className="detail-grid" style={{ marginTop: 30 }}>
+      <section className="card card-pad">
+        <div className="eyebrow">진행 중</div>
+        <h2 className="section-title" style={{ marginTop: 10 }}>{period.label}</h2>
+        <p className="subheading" style={{ marginTop: 10 }}>{dateLabel(period.startsOn)}부터 현재까지 누적 중</p>
+
+        <div className="side-note" style={{ marginTop: 22 }}>
+          이 기간을 종료하지 않으면 다음 주 점수도 그대로 같은 정산기간에 누적됩니다.
+        </div>
+      </section>
+
+      <form className="card card-pad" onSubmit={submitClose}>
+        <div className="eyebrow">정산 종료</div>
+        <h2 className="section-title" style={{ marginTop: 10 }}>귀가 일정에 맞춰 종료</h2>
+
+        <div className="form-grid" style={{ marginTop: 24 }}>
+          <div className="field">
+            <label htmlFor="settlement-end">종료일</label>
+            <input
+              id="settlement-end"
+              className="input"
+              type="date"
+              min={period.startsOn}
+              required
+              value={endDate}
+              onChange={(event) => setEndDate(event.target.value)}
+              data-testid="input-settlement-end"
+            />
+          </div>
+
+          <label className="check-row field full">
+            <input
+              type="checkbox"
+              checked={openNext}
+              onChange={(event) => setOpenNext(event.target.checked)}
+              data-testid="checkbox-open-next-settlement"
+            />
+            종료 다음날부터 새 정산기간 자동 시작
+          </label>
+
+          {openNext && <div className="field full">
+            <label htmlFor="next-settlement-label">다음 기간 이름 <span className="muted">선택</span></label>
+            <input
+              id="next-settlement-label"
+              className="input"
+              value={nextLabel}
+              onChange={(event) => setNextLabel(event.target.value)}
+              placeholder="비우면 시작일 기준 자동 생성"
+              data-testid="input-next-settlement-label"
+            />
+          </div>}
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-primary" disabled={close.isPending} data-testid="button-close-settlement">
+            {close.isPending ? '처리 중' : '현재 정산 종료'}
+          </button>
+        </div>
+      </form>
+    </div>}
+  </div>;
+}
+
 function PunishmentsPage() {
   const queryClient = useQueryClient();
   const notify = useContext(NoticeContext);
@@ -483,7 +674,7 @@ function ProtectedRoutes() {
   if (loading) return <LoadingState />;
   if (!session) return <Redirect to="/sign-in" />;
   if (!admin) return <div className="app-loading"><div className="error-box"><AlertTriangle size={24} /><p>관리자 권한이 없는 계정입니다. 운영 담당자에게 문의해주세요.</p><button className="btn btn-outline" onClick={() => signOut()} data-testid="button-no-admin-sign-out"><LogOut size={14} /> 로그아웃</button></div></div>;
-  return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
+  return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/settlement" component={() => <RoleGate role="SEONDO"><SettlementPage /></RoleGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
 }
 
 function NotFoundInline() {
