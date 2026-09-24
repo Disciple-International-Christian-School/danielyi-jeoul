@@ -121,6 +121,47 @@ export interface SettlementPeriod {
   createdAt: string;
 }
 
+export interface DailyDisciplineNotice {
+  pointRecordId: number;
+  recordedAt: string;
+  studentId: number;
+  coreStudentId: string | null;
+  studentNo: string | null;
+  studentName: string;
+  grade: number;
+  homeroom: string | null;
+  item: string;
+  points: number;
+  reflectionId: number | null;
+  reflectionSubmitted: boolean | null;
+  reflectionDueAt: string | null;
+  reflectionStatus: ReflectionStatus | null;
+}
+
+export interface WeeklyDisciplineReport {
+  weekStart: string;
+  studentId: number;
+  coreStudentId: string | null;
+  studentNo: string | null;
+  studentName: string;
+  grade: number;
+  homeroom: string | null;
+  weeklyPositivePoints: number;
+  weeklyPenaltyPoints: number;
+  weeklyNetPenaltyPoints: number;
+  penaltyIncidentCount: number;
+  physicalTrainingRequired: boolean;
+  settlementPeriodId: number | null;
+  settlementPeriodLabel: string | null;
+  settlementStartsOn: string | null;
+  settlementPositivePoints: number;
+  settlementPenaltyPoints: number;
+  settlementNetPenaltyPoints: number;
+  physicalTrainingWeeks: number;
+  committeeRequired: boolean;
+  statuses: string[];
+}
+
 export interface Punishment {
   id: number;
   studentId: number;
@@ -239,6 +280,47 @@ interface SettlementPeriodRow {
   ends_on: string | null;
   created_at: string;
 }
+
+interface DailyDisciplineNoticeRow {
+  point_record_id: number;
+  recorded_at: string;
+  student_id: number;
+  core_student_id: string | null;
+  student_no: string | null;
+  student_name: string;
+  grade: number;
+  homeroom: string | null;
+  item: string;
+  points: number;
+  reflection_id: number | null;
+  reflection_submitted: boolean | null;
+  reflection_due_at: string | null;
+  reflection_status: ReflectionStatus | null;
+}
+
+interface WeeklyDisciplineReportRow {
+  week_start: string;
+  student_id: number;
+  core_student_id: string | null;
+  student_no: string | null;
+  student_name: string;
+  grade: number;
+  homeroom: string | null;
+  weekly_positive_points: number;
+  weekly_penalty_points: number;
+  weekly_net_penalty_points: number;
+  penalty_incident_count: number;
+  physical_training_required: boolean;
+  settlement_period_id: number | null;
+  settlement_period_label: string | null;
+  settlement_starts_on: string | null;
+  settlement_positive_points: number;
+  settlement_penalty_points: number;
+  settlement_net_penalty_points: number;
+  physical_training_weeks: number;
+  committee_required: boolean;
+  statuses: string[] | null;
+}
 interface PunishmentRow {
   id: number; student_id: number; student_name: string; grade: number;
   types: string[] | null; start_date: string; end_date: string;
@@ -311,6 +393,51 @@ function mapReflection(row: ReflectionRow): Reflection {
     deadlineChangeReason: row.deadline_change_reason,
     submittedAt: row.submitted_at,
     status: row.status,
+  };
+}
+
+function mapDailyDisciplineNotice(row: DailyDisciplineNoticeRow): DailyDisciplineNotice {
+  return {
+    pointRecordId: row.point_record_id,
+    recordedAt: row.recorded_at,
+    studentId: row.student_id,
+    coreStudentId: row.core_student_id,
+    studentNo: row.student_no,
+    studentName: row.student_name,
+    grade: row.grade,
+    homeroom: row.homeroom,
+    item: row.item,
+    points: row.points,
+    reflectionId: row.reflection_id,
+    reflectionSubmitted: row.reflection_submitted,
+    reflectionDueAt: row.reflection_due_at,
+    reflectionStatus: row.reflection_status,
+  };
+}
+
+function mapWeeklyDisciplineReport(row: WeeklyDisciplineReportRow): WeeklyDisciplineReport {
+  return {
+    weekStart: row.week_start,
+    studentId: row.student_id,
+    coreStudentId: row.core_student_id,
+    studentNo: row.student_no,
+    studentName: row.student_name,
+    grade: row.grade,
+    homeroom: row.homeroom,
+    weeklyPositivePoints: row.weekly_positive_points,
+    weeklyPenaltyPoints: row.weekly_penalty_points,
+    weeklyNetPenaltyPoints: row.weekly_net_penalty_points,
+    penaltyIncidentCount: row.penalty_incident_count,
+    physicalTrainingRequired: row.physical_training_required,
+    settlementPeriodId: row.settlement_period_id,
+    settlementPeriodLabel: row.settlement_period_label,
+    settlementStartsOn: row.settlement_starts_on,
+    settlementPositivePoints: row.settlement_positive_points,
+    settlementPenaltyPoints: row.settlement_penalty_points,
+    settlementNetPenaltyPoints: row.settlement_net_penalty_points,
+    physicalTrainingWeeks: row.physical_training_weeks,
+    committeeRequired: row.committee_required,
+    statuses: row.statuses ?? [],
   };
 }
 
@@ -395,6 +522,8 @@ export const getListPointItemsQueryKey = (params?: { type?: PointType; includeIn
 export const getListReflectionsQueryKey = () => ['reflections'] as const;
 export const getListPunishmentsQueryKey = () => ['punishments'] as const;
 export const getCurrentSettlementQueryKey = () => ['settlement', 'current'] as const;
+export const getDailyDisciplineNoticeQueryKey = (recordedAt: string) => ['reports', 'daily-notice', recordedAt] as const;
+export const getWeeklyDisciplineReportQueryKey = () => ['reports', 'weekly'] as const;
 
 // ---------------------------------------------------------------------------
 // Reads
@@ -504,6 +633,42 @@ export function useListPunishments() {
         await supabase.from('v_punishments').select('*').order('created_at', { ascending: false }),
       );
       return rows.map(mapPunishment);
+    },
+  });
+}
+
+export function useDailyDisciplineNotice(recordedAt: string) {
+  return useQuery({
+    queryKey: getDailyDisciplineNoticeQueryKey(recordedAt),
+    queryFn: async (): Promise<DailyDisciplineNotice[]> => {
+      const rows = unwrap<DailyDisciplineNoticeRow[]>(
+        await supabase
+          .from('v_daily_discipline_notice')
+          .select('*')
+          .eq('recorded_at', recordedAt)
+          .order('grade', { ascending: true })
+          .order('homeroom', { ascending: true, nullsFirst: false })
+          .order('student_name', { ascending: true }),
+      );
+      return rows.map(mapDailyDisciplineNotice);
+    },
+    enabled: Boolean(recordedAt),
+  });
+}
+
+export function useWeeklyDisciplineReport() {
+  return useQuery({
+    queryKey: getWeeklyDisciplineReportQueryKey(),
+    queryFn: async (): Promise<WeeklyDisciplineReport[]> => {
+      const rows = unwrap<WeeklyDisciplineReportRow[]>(
+        await supabase
+          .from('v_weekly_discipline_report')
+          .select('*')
+          .order('grade', { ascending: true })
+          .order('homeroom', { ascending: true, nullsFirst: false })
+          .order('student_name', { ascending: true }),
+      );
+      return rows.map(mapWeeklyDisciplineReport);
     },
   });
 }
