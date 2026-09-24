@@ -1,4 +1,11 @@
 -- 2026-09-25
+-- NOTE ON STUDENT IDENTITY
+-- The current production discipline tables still use the legacy integer
+-- public.students.id. v_discipline_students bridges those rows to the canonical
+-- core.students UUID. This migration therefore calculates operational scores
+-- without duplicating student master fields. A later cut-over will change
+-- discipline-domain FKs to core.students.id directly.
+
 -- Operational scoring foundation:
 -- 1) raw merit/demerit totals remain separate;
 -- 2) punishment decisions may use derived NET penalty = negative - positive;
@@ -84,14 +91,14 @@ with period_students as (
     sp.starts_on,
     coalesce(sp.ends_on, private.kst_today()) as effective_end,
     sp.ends_on,
-    s.id as student_id,
+    s.legacy_student_id as student_id,
+    s.core_student_id,
     s.student_no,
     s.name as student_name,
     s.grade,
     s.homeroom
   from public.settlement_periods sp
-  cross join public.students s
-  where s.deleted_at is null
+  cross join public.v_discipline_students s
 ),
 period_totals as (
   select
@@ -140,6 +147,7 @@ select
   ps.effective_end,
   (ps.ends_on is null) as is_open,
   ps.student_id,
+  ps.core_student_id,
   ps.student_no,
   ps.student_name,
   ps.grade,
