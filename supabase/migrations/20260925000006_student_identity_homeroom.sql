@@ -25,8 +25,10 @@ create schema if not exists discipline;
 create table if not exists core.students (
   id uuid primary key default gen_random_uuid(),
 
-  -- Human-facing school identifier. This is stable across DICS apps.
-  student_no text not null unique,
+  -- Human-facing school identifier. This becomes the stable cross-app lookup
+  -- key once assigned. During migration, existing Daniel rows may not have a
+  -- student number yet, so it is intentionally nullable.
+  student_no text,
 
   -- Authentication is optional. Elementary students or students who have not
   -- yet been provisioned can exist in the directory without an auth account.
@@ -44,8 +46,11 @@ create table if not exists core.students (
   updated_at timestamptz not null default now(),
 
   check (
-    char_length(btrim(student_no)) between 1 and 20
-    and student_no = btrim(student_no)
+    student_no is null
+    or (
+      char_length(btrim(student_no)) between 1 and 20
+      and student_no = btrim(student_no)
+    )
   )
 );
 
@@ -54,7 +59,7 @@ comment on table core.students is
 comment on column core.students.id is
   'Canonical student_id used by Study Planner, Discipline, Computer Lab, Assessment, and future DICS apps.';
 comment on column core.students.student_no is
-  'School-wide human-facing student number. Stable cross-app lookup key.';
+  'School-wide human-facing student number. Nullable during legacy migration; must be unique once assigned.';
 comment on column core.students.auth_user_id is
   'Optional login account. Student identity and authentication identity are intentionally separate.';
 comment on column core.students.birth_date is
@@ -69,8 +74,12 @@ create index if not exists core_students_auth_user_idx
   on core.students (auth_user_id)
   where auth_user_id is not null;
 
-create index if not exists core_students_active_idx
+create unique index if not exists core_students_student_no_uq
   on core.students (student_no)
+  where student_no is not null;
+
+create index if not exists core_students_active_idx
+  on core.students (id)
   where is_active;
 
 drop trigger if exists core_students_touch_updated_at on core.students;
@@ -245,6 +254,61 @@ comment on table public.students is
   'LEGACY compatibility table for Daniel''s Scale. Canonical student data lives in core.students.';
 comment on column public.students.core_student_id is
   'Temporary bridge to core.students during integrated-schema migration.';
+
+-- Bootstrap canonical Core identities from the minimal roster that already
+-- exists in Daniel's Scale Supabase. These rows intentionally start without
+-- student_no/auth links when that information is not yet available.
+--
+-- This is safe because the new UUID is written back to the exact legacy row;
+-- no name-based cross-app matching is performed here.
+insert into core.students (name)
+select ls.name
+from public.students ls
+where ls.deleted_at is null
+  and ls.core_student_id is null;
+
+-- Pair the newly inserted Core rows back to legacy rows deterministically by
+-- row order within this single migration. We cannot use name alone because
+-- duplicate names are possible.
+with legacy_unmapped as (
+  select
+    id,
+    row_number() over (order by id) as rn
+  from public.students
+  where deleted_at is null
+    and core_student_id is null
+),
+core_unlinked as (
+  select
+    id,
+    row_number() over (order by created_at, id) as rn
+  from core.students
+  where student_no is null
+    and auth_user_id is null
+    and id not in (
+      select core_student_id
+      from public.students
+      where core_student_id is not null
+    )
+)
+update public.students ls
+set core_student_id = cu.id
+from legacy_unmapped lu
+join core_unlinked cu on cu.rn = lu.rn
+where ls.id = lu.id;
+
+-- Guardrail: every active legacy Daniel student must now have a Core identity.
+do $
+begin
+  if exists (
+    select 1
+    from public.students
+    where deleted_at is null
+      and core_student_id is null
+  ) then
+    raise exception 'Core student bootstrap incomplete: unmapped Daniel students remain.';
+  end if;
+end $;
 
 -- Existing app pages may continue to use legacy integer IDs until the final
 -- discipline cut-over. Once a row is mapped, name/grade/class come from Core.
