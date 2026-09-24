@@ -611,6 +611,20 @@ Identity ≠ Role
 
 ## Change Log
 
+### 2026-09-25 — 재학생 명단을 Supabase에 적재
+
+Git에는 이름 목록을 넣지 않았다. 행 데이터는 Supabase에만 있다. 다음 세션은 이 절과 원격 마이그레이션 이력으로 재구성한다.
+
+- 출처: `docs/student-roster-26Fall.xlsx`의 재학생 구간. 자퇴·졸업 구간은 넣지 않음.
+- 저장 컬럼: `students.name`, `students.grade`만. 주민번호·주소·연락처·학부모명은 적재하지 않음.
+- 학년 체크를 1–6에서 1–12로 변경. Git 마이그레이션 `supabase/migrations/20260925000005_grade_1_to_12.sql`. 학생 등록 화면 선택지도 1–12.
+- 가상 seed 4명(홍길동, 김민지, 이준호, 박서연, id ≤ 4)은 soft delete. 홍길동의 데모 벌점 기록은 그 행에 남김.
+- `docs/G9-student-roster.xlsx`는 9학년 반 배정표. 반(A/B)은 컬럼이 없어 DB에 없음.
+- 반 명단에만 있던 이름 1건은 전체 명단의 오타였다. 검토 후 그 행만 soft delete. 본명은 전체 명단 9학년에 이미 있었음. 생활점수 기록은 없었음.
+- 적재 후 활성 학생 175명. 학년별 10, 7, 9, 9, 14, 15, 19, 19, 31, 21, 16, 5 (1학년부터 12학년).
+- 원격에만 있는 마이그레이션: `import_fall_2026_enrolled_roster`, 그리고 오타 행 soft delete 1건. 이름 SQL은 리포에 없음.
+- `부서활동_가산점.xlsx`는 넣지 않음.
+
 ### 2026-09-21
 
 - Version Changes 문서 최초 생성
