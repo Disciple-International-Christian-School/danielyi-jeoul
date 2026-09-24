@@ -111,6 +111,14 @@ export interface Dashboard {
   students: StudentSummary[];
 }
 
+export interface SettlementPeriod {
+  id: number;
+  label: string;
+  startsOn: string;
+  endsOn: string | null;
+  createdAt: string;
+}
+
 export interface Punishment {
   id: number;
   studentId: number;
@@ -220,6 +228,14 @@ interface DashboardCountsRow {
   double_reflections: number;
   active_punishments: number;
 }
+
+interface SettlementPeriodRow {
+  id: number;
+  label: string;
+  starts_on: string;
+  ends_on: string | null;
+  created_at: string;
+}
 interface PunishmentRow {
   id: number; student_id: number; student_name: string; grade: number;
   types: string[] | null; start_date: string; end_date: string;
@@ -293,6 +309,16 @@ function mapReflection(row: ReflectionRow): Reflection {
   };
 }
 
+function mapSettlementPeriod(row: SettlementPeriodRow): SettlementPeriod {
+  return {
+    id: row.id,
+    label: row.label,
+    startsOn: row.starts_on,
+    endsOn: row.ends_on,
+    createdAt: row.created_at,
+  };
+}
+
 function mapPunishment(row: PunishmentRow): Punishment {
   return {
     id: row.id,
@@ -363,6 +389,7 @@ export const getListPointItemsQueryKey = (params?: { type?: PointType; includeIn
   ['point-items', params ?? {}] as const;
 export const getListReflectionsQueryKey = () => ['reflections'] as const;
 export const getListPunishmentsQueryKey = () => ['punishments'] as const;
+export const getCurrentSettlementQueryKey = () => ['settlement', 'current'] as const;
 
 // ---------------------------------------------------------------------------
 // Reads
@@ -472,6 +499,58 @@ export function useListPunishments() {
         await supabase.from('v_punishments').select('*').order('created_at', { ascending: false }),
       );
       return rows.map(mapPunishment);
+    },
+  });
+}
+
+export function useCurrentSettlement() {
+  return useQuery({
+    queryKey: getCurrentSettlementQueryKey(),
+    queryFn: async (): Promise<SettlementPeriod | null> => {
+      const { data, error } = await supabase
+        .from('v_current_settlement')
+        .select('id,label,starts_on,ends_on,created_at')
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data ? mapSettlementPeriod(data as SettlementPeriodRow) : null;
+    },
+  });
+}
+
+export function useStartSettlementPeriod() {
+  return useMutation({
+    mutationFn: async ({ startsOn, label }: { startsOn: string; label: string }) => {
+      const { data, error } = await supabase.rpc('start_settlement_period', {
+        p_starts_on: startsOn,
+        p_label: label,
+      });
+      if (error) throw new Error(error.message);
+      return data as number;
+    },
+  });
+}
+
+export function useCloseSettlementPeriod() {
+  return useMutation({
+    mutationFn: async ({
+      periodId,
+      endDate,
+      openNext = true,
+      nextLabel = null,
+    }: {
+      periodId: number;
+      endDate: string;
+      openNext?: boolean;
+      nextLabel?: string | null;
+    }) => {
+      const { data, error } = await supabase.rpc('close_settlement_period', {
+        p_period_id: periodId,
+        p_end_date: endDate,
+        p_open_next: openNext,
+        p_next_label: nextLabel,
+      });
+      if (error) throw new Error(error.message);
+      return data as number | null;
     },
   });
 }
