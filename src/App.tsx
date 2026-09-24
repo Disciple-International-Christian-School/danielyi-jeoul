@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -423,6 +423,8 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
   const students = useListStudents();
   const items = useListPointItems({ type, includeInactive: false });
   const create = useCreatePointRecord();
+  const searchRef = useRef<HTMLInputElement>(null);
+
   const [studentId, setStudentId] = useState('');
   const [itemId, setItemId] = useState('');
   const [points, setPoints] = useState('');
@@ -430,17 +432,213 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
   const [recordedAt, setRecordedAt] = useState(today());
   const [reflectionSubmitted, setReflectionSubmitted] = useState(false);
   const [search, setSearch] = useState('');
+  const [continuousMode, setContinuousMode] = useState(type === 'NEGATIVE');
+  const [recentEntries, setRecentEntries] = useState<Array<{ student: string; item: string; points: number }>>([]);
+
   const negative = type === 'NEGATIVE';
-  const filteredStudents = (students.data ?? []).filter((student) => student.name.includes(search));
+  const needle = search.trim().toLowerCase();
+  const filteredStudents = (students.data ?? []).filter((student) =>
+    !needle
+    || student.name.toLowerCase().includes(needle)
+    || (student.studentNo ?? '').toLowerCase().includes(needle)
+    || (student.homeroom ?? '').toLowerCase().includes(needle)
+  ).slice(0, 40);
+
+  const selectedStudent = (students.data ?? []).find((student) => String(student.id) === studentId);
   const selectedItem = (items.data ?? []).find((item) => String(item.id) === itemId);
+
+  const resetForNextStudent = () => {
+    setStudentId('');
+    setSearch('');
+    setReflectionSubmitted(false);
+    window.setTimeout(() => searchRef.current?.focus(), 0);
+  };
+
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!studentId || !enteredByName.trim()) return;
-    create.mutate({ data: { studentId: Number(studentId), type, item: selectedItem?.name ?? '수기 입력', points: Number(points), recordedAt, enteredByName: enteredByName.trim(), reflectionSubmitted: negative ? reflectionSubmitted : null } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() }); queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); setStudentId(''); setItemId(''); setPoints(''); setReflectionSubmitted(false); notify(`${negative ? '벌점' : '상점'}을 기록했습니다.`); }, onError: (error) => notify(errText(error), 'error') });
+    if (!studentId || !enteredByName.trim() || !points) return;
+
+    const itemName = selectedItem?.name ?? '수기 입력';
+    const pointValue = Number(points);
+    const studentName = selectedStudent?.name ?? '학생';
+
+    create.mutate({
+      data: {
+        studentId: Number(studentId),
+        type,
+        item: itemName,
+        points: pointValue,
+        recordedAt,
+        enteredByName: enteredByName.trim(),
+        reflectionSubmitted: negative ? reflectionSubmitted : null,
+      },
+    }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() });
+
+        setRecentEntries((current) => [
+          { student: studentName, item: itemName, points: pointValue },
+          ...current,
+        ].slice(0, 6));
+
+        resetForNextStudent();
+
+        if (!continuousMode) {
+          setItemId('');
+          setPoints('');
+        }
+
+        notify(studentName + ' · ' + (negative ? '벌점' : '상점') + ' ' + pointValue + '점 기록 완료');
+      },
+      onError: (error) => notify(errText(error), 'error'),
+    });
   };
+
+  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' && !studentId && filteredStudents.length === 1) {
+      event.preventDefault();
+      setStudentId(String(filteredStudents[0].id));
+    }
+  };
+
   if (students.isLoading || items.isLoading) return <LoadingState />;
   if (students.isError || items.isError) return <ErrorState error={students.error ?? items.error} retry={() => { students.refetch(); items.refetch(); }} />;
-  return <div><PageHeader eyebrow={negative ? '생활지도 기록' : '긍정 기록'} title={negative ? '벌점 입력' : '상점 입력'} copy={negative ? '사실과 대화를 바탕으로 오늘의 벌점을 기록합니다.' : '학생의 좋은 행동을 놓치지 않고 상점으로 남깁니다.'} /><div className="detail-grid" style={{ marginTop: 30 }}><form className="card card-pad" onSubmit={submit}><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">새 기록</h2><p className="section-copy">필수 항목을 모두 입력해 주세요.</p></div><span className={`pill ${negative ? 'pill-negative' : 'pill-positive'}`}>{negative ? '벌점' : '상점'}</span></div><div className="form-grid" style={{ marginTop: 25 }}><div className="field full"><label htmlFor="entry-student">학생 검색</label><div className="search-box"><Search size={15} /><input id="entry-student" className="input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="이름을 입력해 목록을 좁혀보세요" data-testid="input-point-student-search" /></div><select className="select" value={studentId} onChange={(event) => setStudentId(event.target.value)} required data-testid="select-point-student"><option value="">학생 선택</option>{filteredStudents.map((student) => <option key={student.id} value={student.id}>{student.name} · {student.grade}학년</option>)}</select></div><div className="field full"><label htmlFor="entry-item">점수 항목</label><select id="entry-item" className="select" value={itemId} onChange={(event) => { setItemId(event.target.value); const selected = (items.data ?? []).find((item) => String(item.id) === event.target.value); if (selected?.fixedPoints != null) setPoints(String(selected.fixedPoints)); }} data-testid="select-point-item"><option value="">항목 선택 또는 수기 입력</option>{(items.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}{item.fixedPoints != null ? ` · ${item.fixedPoints}점` : ''}</option>)}</select></div><div className="field"><label htmlFor="entry-points">점수</label><input id="entry-points" className="input" type="number" min="1" max="100" required value={points} onChange={(event) => setPoints(event.target.value)} data-testid="input-point-value" /></div><div className="field"><label htmlFor="entry-date">기록일</label><input id="entry-date" className="input" type="date" required value={recordedAt} onChange={(event) => setRecordedAt(event.target.value)} data-testid="input-point-date" /></div><div className="field full"><label htmlFor="entry-by">기입자</label><input id="entry-by" className="input" required maxLength={40} value={enteredByName} onChange={(event) => setEnteredByName(event.target.value)} placeholder="실제 기입자 이름" data-testid="input-point-entered-by" /></div>{negative && <label className="check-row field full"><input type="checkbox" checked={reflectionSubmitted} onChange={(event) => setReflectionSubmitted(event.target.checked)} data-testid="checkbox-reflection-submitted" /> 같은 날 반성문 제출 완료</label>}</div><div className="modal-actions"><button className="btn btn-primary" disabled={create.isPending || !studentId} data-testid="button-submit-point">{create.isPending ? '저장 중' : `${negative ? '벌점' : '상점'} 기록하기`}</button></div></form><div className="card card-pad"><div className="eyebrow">입력 원칙</div><h2 className="section-title" style={{ marginTop: 10 }}>{negative ? '기록은 구체적으로' : '좋은 행동을 보이게'}</h2><p className="subheading" style={{ marginTop: 12 }}>{negative ? '학생이 무엇을 어겼는지 항목과 기입자 이름을 분명히 남겨야 이후 상담과 반성문 안내가 흔들리지 않습니다.' : '작은 개선도 기록할수록 학생과 생활지도 담당자가 성장의 흐름을 함께 확인할 수 있습니다.'}</p><div className="side-note" style={{ marginTop: 24 }}>선택한 항목에 고정 점수가 있으면 점수가 자동으로 채워집니다. 수기 입력은 항목 없이도 가능합니다.</div></div></div></div>;
+
+  return <div>
+    <PageHeader
+      eyebrow={negative ? '생활지도 기록' : '긍정 기록'}
+      title={negative ? '벌점 입력' : '상점 입력'}
+      copy={negative ? '아침 종이 시트도 빠르게 옮길 수 있도록 연속 입력에 최적화했습니다.' : '학생의 좋은 행동을 놓치지 않고 상점으로 남깁니다.'}
+    />
+
+    <div className="detail-grid" style={{ marginTop: 30 }}>
+      <form className="card card-pad" onSubmit={submit}>
+        <div className="section-row" style={{ margin: 0 }}>
+          <div>
+            <h2 className="section-title">새 기록</h2>
+            <p className="section-copy">{continuousMode ? '저장 후 학생만 비우고 같은 조건으로 계속 입력합니다.' : '한 건씩 입력합니다.'}</p>
+          </div>
+          <span className={'pill ' + (negative ? 'pill-negative' : 'pill-positive')}>{negative ? '벌점' : '상점'}</span>
+        </div>
+
+        <div className="form-grid" style={{ marginTop: 25 }}>
+          <div className="field full">
+            <label htmlFor="entry-student">학생 검색</label>
+            <div className="search-box">
+              <Search size={15} />
+              <input
+                ref={searchRef}
+                id="entry-student"
+                className="input"
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  if (studentId) setStudentId('');
+                }}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="이름 · 학번 · 반 검색"
+                autoComplete="off"
+                data-testid="input-point-student-search"
+              />
+            </div>
+            <select
+              className="select"
+              value={studentId}
+              onChange={(event) => setStudentId(event.target.value)}
+              required
+              data-testid="select-point-student"
+            >
+              <option value="">학생 선택</option>
+              {filteredStudents.map((student) => <option key={student.id} value={student.id}>
+                {student.name + ' · ' + (student.homeroom ?? (student.grade + '학년')) + (student.studentNo ? ' · ' + student.studentNo : '')}
+              </option>)}
+            </select>
+            {needle && filteredStudents.length === 1 && !studentId && <div className="record-meta">Enter를 누르면 {filteredStudents[0].name} 학생을 바로 선택합니다.</div>}
+          </div>
+
+          <div className="field full">
+            <label htmlFor="entry-item">점수 항목</label>
+            <select
+              id="entry-item"
+              className="select"
+              value={itemId}
+              onChange={(event) => {
+                setItemId(event.target.value);
+                const selected = (items.data ?? []).find((item) => String(item.id) === event.target.value);
+                if (selected?.fixedPoints != null) setPoints(String(selected.fixedPoints));
+              }}
+              data-testid="select-point-item"
+            >
+              <option value="">항목 선택 또는 수기 입력</option>
+              {(items.data ?? []).map((item) => <option key={item.id} value={item.id}>
+                {item.name + (item.fixedPoints != null ? ' · ' + item.fixedPoints + '점' : '')}
+              </option>)}
+            </select>
+          </div>
+
+          <div className="field">
+            <label htmlFor="entry-points">점수</label>
+            <input id="entry-points" className="input" type="number" min="1" max="100" required value={points} onChange={(event) => setPoints(event.target.value)} data-testid="input-point-value" />
+          </div>
+
+          <div className="field">
+            <label htmlFor="entry-date">기록일</label>
+            <input id="entry-date" className="input" type="date" required value={recordedAt} onChange={(event) => setRecordedAt(event.target.value)} data-testid="input-point-date" />
+          </div>
+
+          <div className="field full">
+            <label htmlFor="entry-by">기입자</label>
+            <input id="entry-by" className="input" required maxLength={40} value={enteredByName} onChange={(event) => setEnteredByName(event.target.value)} placeholder="실제 기입자 이름" data-testid="input-point-entered-by" />
+          </div>
+
+          <label className="check-row field full">
+            <input type="checkbox" checked={continuousMode} onChange={(event) => setContinuousMode(event.target.checked)} data-testid="checkbox-continuous-entry" />
+            연속 입력 모드 — 저장 후 항목·점수·날짜·기입자를 유지
+          </label>
+
+          {negative && <label className="check-row field full">
+            <input type="checkbox" checked={reflectionSubmitted} onChange={(event) => setReflectionSubmitted(event.target.checked)} data-testid="checkbox-reflection-submitted" />
+            같은 날 반성문 제출 완료
+          </label>}
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-primary" disabled={create.isPending || !studentId || !points} data-testid="button-submit-point">
+            {create.isPending ? '저장 중' : (negative ? '벌점' : '상점') + ' 기록 + 다음 학생'}
+          </button>
+        </div>
+      </form>
+
+      <div>
+        <div className="card card-pad">
+          <div className="eyebrow">빠른 입력</div>
+          <h2 className="section-title" style={{ marginTop: 10 }}>{negative ? '아침 종이 시트 처리' : '반복 상점 처리'}</h2>
+          <p className="subheading" style={{ marginTop: 12 }}>
+            같은 사유가 반복되면 항목과 점수는 그대로 두고 학생 이름만 검색해서 연속 저장하세요.
+          </p>
+          <div className="side-note" style={{ marginTop: 24 }}>
+            검색 결과가 한 명뿐이면 Enter로 바로 선택할 수 있습니다. 저장 후에는 학생 검색창으로 포커스가 돌아옵니다.
+          </div>
+        </div>
+
+        {recentEntries.length > 0 && <div className="card card-pad" style={{ marginTop: 18 }}>
+          <div className="eyebrow">이번 입력 세션</div>
+          <h2 className="section-title" style={{ marginTop: 10 }}>최근 저장</h2>
+          <div className="activity-list" style={{ marginTop: 16 }}>
+            {recentEntries.map((entry, index) => <div className="activity-row" key={index}>
+              <div className="activity-mark"><Check size={15} /></div>
+              <div>
+                <div className="activity-label">{entry.student}</div>
+                <div className="record-meta">{entry.item + ' · ' + (negative ? '-' : '+') + entry.points + '점'}</div>
+              </div>
+            </div>)}
+          </div>
+        </div>}
+      </div>
+    </div>
+  </div>;
 }
 
 function ReflectionsPage() {
