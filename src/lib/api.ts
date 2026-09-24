@@ -138,6 +138,23 @@ export interface DailyDisciplineNotice {
   reflectionStatus: ReflectionStatus | null;
 }
 
+export interface DepartmentMeritStatus {
+  weekStart: string;
+  departmentId: string;
+  departmentCode: string;
+  departmentName: string;
+  membershipId: string;
+  coreStudentId: string;
+  studentNo: string | null;
+  studentName: string;
+  grade: number | null;
+  homeroom: string | null;
+  points: number;
+  itemLabel: string;
+  pointRecordId: number | null;
+  generated: boolean;
+}
+
 export interface WeeklyDisciplineReport {
   weekStart: string;
   studentId: number;
@@ -298,6 +315,23 @@ interface DailyDisciplineNoticeRow {
   reflection_status: ReflectionStatus | null;
 }
 
+interface DepartmentMeritStatusRow {
+  week_start: string;
+  department_id: string;
+  department_code: string;
+  department_name: string;
+  membership_id: string;
+  core_student_id: string;
+  student_no: string | null;
+  student_name: string;
+  grade: number | null;
+  homeroom: string | null;
+  points: number;
+  item_label: string;
+  point_record_id: number | null;
+  generated: boolean;
+}
+
 interface WeeklyDisciplineReportRow {
   week_start: string;
   student_id: number;
@@ -393,6 +427,25 @@ function mapReflection(row: ReflectionRow): Reflection {
     deadlineChangeReason: row.deadline_change_reason,
     submittedAt: row.submitted_at,
     status: row.status,
+  };
+}
+
+function mapDepartmentMeritStatus(row: DepartmentMeritStatusRow): DepartmentMeritStatus {
+  return {
+    weekStart: row.week_start,
+    departmentId: row.department_id,
+    departmentCode: row.department_code,
+    departmentName: row.department_name,
+    membershipId: row.membership_id,
+    coreStudentId: row.core_student_id,
+    studentNo: row.student_no,
+    studentName: row.student_name,
+    grade: row.grade,
+    homeroom: row.homeroom,
+    points: row.points,
+    itemLabel: row.item_label,
+    pointRecordId: row.point_record_id,
+    generated: row.generated,
   };
 }
 
@@ -524,6 +577,7 @@ export const getListPunishmentsQueryKey = () => ['punishments'] as const;
 export const getCurrentSettlementQueryKey = () => ['settlement', 'current'] as const;
 export const getDailyDisciplineNoticeQueryKey = (recordedAt: string) => ['reports', 'daily-notice', recordedAt] as const;
 export const getWeeklyDisciplineReportQueryKey = () => ['reports', 'weekly'] as const;
+export const getDepartmentMeritStatusQueryKey = () => ['department-merits', 'current-week'] as const;
 
 // ---------------------------------------------------------------------------
 // Reads
@@ -633,6 +687,32 @@ export function useListPunishments() {
         await supabase.from('v_punishments').select('*').order('created_at', { ascending: false }),
       );
       return rows.map(mapPunishment);
+    },
+  });
+}
+
+export function useDepartmentMeritStatus() {
+  return useQuery({
+    queryKey: getDepartmentMeritStatusQueryKey(),
+    queryFn: async (): Promise<DepartmentMeritStatus[]> => {
+      const rows = unwrap<DepartmentMeritStatusRow[]>(
+        await supabase
+          .from('v_department_merit_status')
+          .select('*')
+          .order('department_name', { ascending: true })
+          .order('student_name', { ascending: true }),
+      );
+      return rows.map(mapDepartmentMeritStatus);
+    },
+  });
+}
+
+export function useEnsureWeeklyDepartmentMerits() {
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('ensure_weekly_department_merits');
+      if (error) throw new Error(error.message);
+      return data as number;
     },
   });
 }
