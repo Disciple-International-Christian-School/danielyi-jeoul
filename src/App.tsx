@@ -81,7 +81,14 @@ function dateTimeLabel(value?: string | null) {
   if (!value) return '—';
   return new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 }
-function today() { return new Date().toISOString().slice(0, 10); }
+function today() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
 function errText(error: unknown) { return error instanceof Error ? error.message : '요청을 처리하지 못했습니다.'; }
 
 function Brand() {
