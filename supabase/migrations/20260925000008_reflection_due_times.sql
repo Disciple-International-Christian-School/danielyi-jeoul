@@ -30,7 +30,8 @@ comment on column public.reflection_records.deadline_change_reason is
 create or replace function private.create_reflection_for_penalty()
 returns trigger
 language plpgsql
-as $$
+set search_path = ''
+as $
 declare
   v_grade int;
   v_due_at timestamptz;
