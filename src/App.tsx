@@ -65,6 +65,7 @@ import {
   useUpdatePointRecord,
   useUpdateReflection,
   type DailyDisciplineNotice,
+  type DisciplineScope,
   type PointItem,
   type PointRecord,
   type Punishment,
@@ -118,15 +119,15 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
   const [, setLocation] = useLocation();
   const [notice, setNotice] = useState<{ message: string; tone: NoticeTone } | null>(null);
   const nav = [
-    { href: '/dashboard', label: '대시보드', icon: LayoutDashboard, roles: ['SEONDO', 'SASAENG'] as Role[] },
-    { href: '/students', label: '학생 관리', icon: Users, roles: ['SEONDO'] as Role[] },
-    { href: '/points/negative', label: '벌점 입력', icon: ArrowDownRight, roles: ['SEONDO'] as Role[] },
-    { href: '/points/positive', label: '상점 입력', icon: ArrowUpRight, roles: ['SEONDO'] as Role[] },
-    { href: '/reflections', label: '반성문', icon: BookOpenCheck, roles: ['SEONDO'] as Role[] },
-    { href: '/reports', label: '공지·출력', icon: Printer, roles: ['SEONDO'] as Role[] },
-    { href: '/settlement', label: '정산 관리', icon: CalendarRange, roles: ['SEONDO'] as Role[] },
-    { href: '/punishments', label: '기숙사 처분', icon: BedDouble, roles: ['SASAENG'] as Role[] },
-    { href: '/point-items', label: '점수 항목', icon: SlidersHorizontal, roles: ['SEONDO'] as Role[] },
+    { href: '/dashboard', label: '대시보드', icon: LayoutDashboard, roles: ['SEONDO', 'SASAENG'] as Role[], leadOnly: false },
+    { href: '/students', label: '학생 관리', icon: Users, roles: ['SEONDO'] as Role[], leadOnly: false },
+    { href: '/points/negative', label: '벌점 입력', icon: ArrowDownRight, roles: ['SEONDO'] as Role[], leadOnly: false },
+    { href: '/points/positive', label: '상점 입력', icon: ArrowUpRight, roles: ['SEONDO'] as Role[], leadOnly: false },
+    { href: '/reflections', label: '반성문', icon: BookOpenCheck, roles: ['SEONDO'] as Role[], leadOnly: false },
+    { href: '/reports', label: '공지·출력', icon: Printer, roles: ['SEONDO'] as Role[], leadOnly: false },
+    { href: '/settlement', label: '정산 관리', icon: CalendarRange, roles: ['SEONDO'] as Role[], leadOnly: true },
+    { href: '/punishments', label: '기숙사 처분', icon: BedDouble, roles: ['SASAENG'] as Role[], leadOnly: false },
+    { href: '/point-items', label: '점수 항목', icon: SlidersHorizontal, roles: ['SEONDO'] as Role[], leadOnly: false },
   ];
   const title = nav.find((item) => location.startsWith(item.href))?.label ?? '대시보드';
   const displayName = admin?.displayName ?? '관리자';
@@ -137,7 +138,7 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
       <Brand />
       <div className="nav-label">운영 메뉴</div>
       <nav className="nav-list" aria-label="주요 메뉴">
-        {nav.filter((item) => item.roles.includes(role)).map((item) => {
+        {nav.filter((item) => item.roles.includes(role) && (!item.leadOnly || admin?.isLead)).map((item) => {
           const Icon = item.icon;
           return <Link key={item.href} href={item.href} className={`nav-link ${location.startsWith(item.href) ? 'active' : ''}`} data-testid={`link-nav-${item.href.slice(1).replace('/', '-')}`}>
             <Icon size={16} strokeWidth={1.7} /><span>{item.label}</span>
@@ -180,6 +181,13 @@ function RoleGate({ role, children }: { role: Role; children: ReactNode }) {
   const { admin, loading } = useAuth();
   if (loading) return <LoadingState />;
   if (admin?.role !== role) return <Redirect to="/dashboard" />;
+  return <>{children}</>;
+}
+
+function LeadGate({ children }: { children: ReactNode }) {
+  const { admin, loading } = useAuth();
+  if (loading) return <LoadingState />;
+  if (admin?.role !== 'SEONDO' || !admin.isLead) return <Redirect to="/dashboard" />;
   return <>{children}</>;
 }
 
@@ -644,15 +652,102 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 function ReflectionsPage() {
   const queryClient = useQueryClient();
   const notify = useContext(NoticeContext);
+  const { admin } = useAuth();
   const [filter, setFilter] = useState<'ALL' | 'SUBMITTED' | 'MISSING' | 'DOUBLE'>('ALL');
+  const [scopeFilter, setScopeFilter] = useState<DisciplineScope>(admin?.disciplineScope ?? 'ALL');
   const reflections = useListReflections();
   const update = useUpdateReflection();
   const extend = useExtendReflectionTo21();
+
   if (reflections.isLoading) return <LoadingState />;
   if (reflections.isError) return <ErrorState error={reflections.error} retry={() => reflections.refetch()} />;
+
   const filterLabels = [['ALL', '전체'], ['SUBMITTED', '제출 완료'], ['MISSING', '미제출'], ['DOUBLE', '2배 제출 대상']] as const;
-  const rows = (reflections.data ?? []).filter((reflection) => filter === 'ALL' || reflection.status === filter);
-  return <div><PageHeader eyebrow="반성문 관리" title="반성문 현황" copy="초등은 익일 등교, 중고등은 기본 17시·필요 시 21시 연장 기준으로 제출 상태를 확인합니다." /><div className="card card-pad" style={{ marginTop: 30 }}><div className="tab-row">{filterLabels.map(([value, label]) => <button key={value} className={`tab ${filter === value ? 'active' : ''}`} onClick={() => setFilter(value)} data-testid={`button-reflection-filter-${value.toLowerCase()}`}>{label}</button>)}</div>{rows.length === 0 ? <EmptyState title="해당 반성문이 없습니다" copy="선택한 조건에 맞는 반성문이 없습니다." /> : <div className="table-wrap"><table className="data-table"><thead><tr><th>학생</th><th>벌점 항목</th><th>벌점</th><th>입력일</th><th>제출기한</th><th>상태</th><th>조치</th></tr></thead><tbody>{rows.map((reflection) => <tr key={reflection.id} data-testid={`row-reflection-${reflection.id}`}><td><Link className="table-link" href={`/students/${reflection.studentId}`} data-testid={`link-reflection-student-${reflection.id}`}>{reflection.studentName}</Link> <span className="muted">{reflection.grade}학년</span></td><td>{reflection.item}</td><td className="weight-number danger-text">{reflection.points}</td><td className="muted">{dateLabel(reflection.recordedAt)}</td><td className="muted"><div>{dateTimeLabel(reflection.dueAt)}</div>{reflection.deadlineChangeReason && <div className="record-meta">연장 사유: {reflection.deadlineChangeReason}</div>}</td><td><span className={`pill ${reflection.status === 'SUBMITTED' ? 'pill-positive' : reflection.status === 'DOUBLE' ? 'pill-negative' : 'pill-warning'}`}>{reflection.status === 'SUBMITTED' ? '제출 완료' : reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}</span>{reflection.submittedAt && <div className="record-meta">제출 {dateTimeLabel(reflection.submittedAt)}</div>}</td><td><div className="toolbar-right"><button className="btn btn-outline" onClick={() => { update.mutate({ id: reflection.id, data: { submitted: !reflection.submitted } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() }); notify('반성문 상태를 변경했습니다.'); }, onError: (error) => notify(errText(error), 'error') }); }} data-testid={`button-toggle-reflection-${reflection.id}`}>{reflection.submitted ? '미제출로' : '제출 완료'}</button>{!reflection.submitted && reflection.grade >= 7 && <button className="btn btn-outline" onClick={() => { const reason = window.prompt('21시까지 연장하는 사유를 입력하세요.', '오후 벌점 발생'); if (reason == null) return; extend.mutate({ id: reflection.id, reason }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() }); notify('반성문 마감을 21시로 연장했습니다.'); }, onError: (error) => notify(errText(error), 'error') }); }} data-testid={`button-extend-reflection-${reflection.id}`}>21시 연장</button>}</div></td></tr>)}</tbody></table></div>}</div></div>;
+  const scopeLabels: Array<[DisciplineScope, string]> = [
+    ['ALL', '전체 학년'],
+    ['ELEMENTARY', '초등 G1–6'],
+    ['MIDDLE', '중등 G7–9'],
+    ['HIGH', '고등 G10–12'],
+  ];
+  const allowedScopeLabels = admin?.disciplineScope === 'ALL'
+    ? scopeLabels
+    : scopeLabels.filter(([value]) => value === admin?.disciplineScope);
+
+  const rows = (reflections.data ?? []).filter((reflection) =>
+    (filter === 'ALL' || reflection.status === filter)
+    && (scopeFilter === 'ALL' || reflection.assignedScope === scopeFilter)
+  );
+
+  return <div>
+    <PageHeader
+      eyebrow="반성문 관리"
+      title="반성문 현황"
+      copy="초등은 익일 등교, 중고등은 기본 17시·필요 시 21시 연장 기준으로 담당 범위별 제출 상태를 확인합니다."
+    />
+
+    <div className="card card-pad" style={{ marginTop: 30 }}>
+      <div className="section-row" style={{ marginTop: 0 }}>
+        <div>
+          <div className="eyebrow">담당 범위</div>
+          <div className="tab-row" style={{ marginTop: 10 }}>
+            {allowedScopeLabels.map(([value, label]) => <button
+              key={value}
+              className={'tab ' + (scopeFilter === value ? 'active' : '')}
+              onClick={() => setScopeFilter(value)}
+              data-testid={'button-reflection-scope-' + value.toLowerCase()}
+            >{label}</button>)}
+          </div>
+        </div>
+        {admin?.isLead && <span className="pill pill-positive">선도부장 · 전체 조회</span>}
+      </div>
+
+      <div className="tab-row" style={{ marginTop: 18 }}>
+        {filterLabels.map(([value, label]) => <button
+          key={value}
+          className={'tab ' + (filter === value ? 'active' : '')}
+          onClick={() => setFilter(value)}
+          data-testid={'button-reflection-filter-' + value.toLowerCase()}
+        >{label}</button>)}
+      </div>
+
+      {rows.length === 0 ? <EmptyState title="해당 반성문이 없습니다" copy="선택한 담당 범위와 상태에 맞는 반성문이 없습니다." /> : <div className="table-wrap">
+        <table className="data-table">
+          <thead><tr><th>학생</th><th>담당</th><th>벌점 항목</th><th>벌점</th><th>입력일</th><th>제출기한</th><th>상태</th><th>조치</th></tr></thead>
+          <tbody>{rows.map((reflection) => <tr key={reflection.id} data-testid={'row-reflection-' + reflection.id}>
+            <td><Link className="table-link" href={'/students/' + reflection.studentId} data-testid={'link-reflection-student-' + reflection.id}>{reflection.studentName}</Link> <span className="muted">{reflection.grade}학년</span></td>
+            <td className="muted">{reflection.assignedScope === 'ELEMENTARY' ? '초등' : reflection.assignedScope === 'MIDDLE' ? '중등' : '고등'}</td>
+            <td>{reflection.item}</td>
+            <td className="weight-number danger-text">{reflection.points}</td>
+            <td className="muted">{dateLabel(reflection.recordedAt)}</td>
+            <td className="muted"><div>{dateTimeLabel(reflection.dueAt)}</div>{reflection.deadlineChangeReason && <div className="record-meta">연장 사유: {reflection.deadlineChangeReason}</div>}</td>
+            <td><span className={'pill ' + (reflection.status === 'SUBMITTED' ? 'pill-positive' : reflection.status === 'DOUBLE' ? 'pill-negative' : 'pill-warning')}>{reflection.status === 'SUBMITTED' ? '제출 완료' : reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}</span>{reflection.submittedAt && <div className="record-meta">제출 {dateTimeLabel(reflection.submittedAt)}</div>}</td>
+            <td><div className="toolbar-right">
+              <button className="btn btn-outline" onClick={() => {
+                update.mutate({ id: reflection.id, data: { submitted: !reflection.submitted } }, {
+                  onSuccess: () => {
+                    queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() });
+                    notify('반성문 상태를 변경했습니다.');
+                  },
+                  onError: (error) => notify(errText(error), 'error'),
+                });
+              }} data-testid={'button-toggle-reflection-' + reflection.id}>{reflection.submitted ? '미제출로' : '제출 완료'}</button>
+              {!reflection.submitted && reflection.grade >= 7 && <button className="btn btn-outline" onClick={() => {
+                const reason = window.prompt('21시까지 연장하는 사유를 입력하세요.', '오후 벌점 발생');
+                if (reason == null) return;
+                extend.mutate({ id: reflection.id, reason }, {
+                  onSuccess: () => {
+                    queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() });
+                    notify('반성문 마감을 21시로 연장했습니다.');
+                  },
+                  onError: (error) => notify(errText(error), 'error'),
+                });
+              }} data-testid={'button-extend-reflection-' + reflection.id}>21시 연장</button>}
+            </div></td>
+          </tr>)}</tbody>
+        </table>
+      </div>}
+    </div>
+  </div>;
 }
 
 
@@ -1094,7 +1189,7 @@ function ProtectedRoutes() {
   if (loading) return <LoadingState />;
   if (!session) return <Redirect to="/sign-in" />;
   if (!admin) return <div className="app-loading"><div className="error-box"><AlertTriangle size={24} /><p>관리자 권한이 없는 계정입니다. 운영 담당자에게 문의해주세요.</p><button className="btn btn-outline" onClick={() => signOut()} data-testid="button-no-admin-sign-out"><LogOut size={14} /> 로그아웃</button></div></div>;
-  return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} /><Route path="/settlement" component={() => <RoleGate role="SEONDO"><SettlementPage /></RoleGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
+  return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} /><Route path="/settlement" component={() => <LeadGate><SettlementPage /></LeadGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
 }
 
 function NotFoundInline() {
