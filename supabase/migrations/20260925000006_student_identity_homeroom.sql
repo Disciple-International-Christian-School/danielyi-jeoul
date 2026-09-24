@@ -132,6 +132,59 @@ create index if not exists core_enrollments_class_idx
   on core.enrollments (class_id, student_id);
 
 -- ---------------------------------------------------------------------------
+-- Core RLS
+--
+-- This repository currently knows Daniel's Scale admin identities through
+-- public.admins. That is a transitional authorization source. When DICS Core
+-- gains school-wide staff/role tables, these policies can switch to that shared
+-- role service without changing the canonical student IDs.
+-- ---------------------------------------------------------------------------
+
+alter table core.students enable row level security;
+alter table core.academic_terms enable row level security;
+alter table core.classes enable row level security;
+alter table core.enrollments enable row level security;
+
+drop policy if exists core_students_read_self_or_discipline_admin on core.students;
+create policy core_students_read_self_or_discipline_admin on core.students
+  for select to authenticated
+  using (
+    auth_user_id = (select auth.uid())
+    or private.current_admin_role() is not null
+  );
+
+drop policy if exists core_terms_read_authenticated on core.academic_terms;
+create policy core_terms_read_authenticated on core.academic_terms
+  for select to authenticated
+  using (true);
+
+drop policy if exists core_classes_read_authenticated on core.classes;
+create policy core_classes_read_authenticated on core.classes
+  for select to authenticated
+  using (true);
+
+drop policy if exists core_enrollments_read_self_or_discipline_admin on core.enrollments;
+create policy core_enrollments_read_self_or_discipline_admin on core.enrollments
+  for select to authenticated
+  using (
+    private.current_admin_role() is not null
+    or student_id = (
+      select s.id
+      from core.students s
+      where s.auth_user_id = (select auth.uid())
+      limit 1
+    )
+  );
+
+-- No INSERT/UPDATE/DELETE policies are created for authenticated users yet.
+-- Roster provisioning is an administrative operation executed through trusted
+-- migration/import tooling, not from a student browser.
+
+grant usage on schema core to authenticated;
+grant select on core.students, core.academic_terms, core.classes, core.enrollments
+  to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- Current-student projection
 --
 -- Public is used as the app-facing API schema. The underlying master remains in
