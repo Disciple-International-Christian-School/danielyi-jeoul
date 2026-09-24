@@ -7,7 +7,7 @@ Student merit/demerit (상점·벌점) management console for DICS. Admin-only �
 **Repo:** https://github.com/shualoalumin/danielyi-jeoul
 **Supabase:** DICS org, project `daniels-scale` (`jgrzsfomcwfiukkaqtos`, ap-northeast-2)
 
-Initial build history: [LEGACY_INITIAL_BUILD.md](./LEGACY_INITIAL_BUILD.md). Ongoing changes: [EVOLUTION_LOG.md](./EVOLUTION_LOG.md). Business rules: [spec.md](./spec.md).
+Initial build history: [LEGACY_INITIAL_BUILD.md](./LEGACY_INITIAL_BUILD.md). Ongoing changes: [CHANGELOG.md](./CHANGELOG.md). Business rules: [spec.md](./spec.md).
 
 ---
 
@@ -119,7 +119,7 @@ supabase/
   seed.dev.sql          # fictional students/items only
 docs/
   LEGACY_INITIAL_BUILD.md # frozen initial build history (Lovable/Replit/Cursor)
-  EVOLUTION_LOG.md        # active change/evolution log from 2026-09-21 onward
+  CHANGELOG.md        # active change/improvement log from 2026-09-21 onward
   architecture.md         # this file
   spec.md                 # original 35-section spec
 _replit/                # gitignored: school.ts + drizzle schema only
