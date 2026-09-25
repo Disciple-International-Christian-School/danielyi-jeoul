@@ -856,6 +856,48 @@ Identity ≠ Role
 - source 위치 확인 후 department console로 이동.
 - corrected branch CI 통과.
 
+### Personal admin accounts — 2026-09-25
+
+**Production DB applied**
+
+- `admins.login_id` 추가 및 기존 공유계정 login ID backfill.
+- `must_change_password`, `last_password_changed_at`, `provisioned_by` 추가.
+- admin roster read를 self 또는 active SEONDO lead로 제한.
+- lead-only `register_admin_profile(...)`, `update_admin_profile(...)`.
+- 마지막 활성 SEONDO lead 제거 방지.
+- lead는 항상 discipline scope `ALL`.
+- admin profile 변경도 append-only audit trail에 포함.
+- client에서 password-complete flag를 직접 내리는 RPC 제거.
+
+**Edge Functions deployed**
+
+- `provision-admin-account`
+  - JWT required
+  - lead 확인
+  - server-side Auth Admin createUser
+  - cryptographically random temporary password
+  - profile 실패 시 Auth user compensating delete
+- `change-admin-password`
+  - JWT required
+  - 실제 Auth password 변경 성공 후에만 first-login flag 해제
+
+**Frontend in branch**
+
+- lead-only 관리자 계정 console.
+- 개인계정 생성 / 역할 / 담당범위 / 활성상태 관리.
+- 임시 로그인정보 one-time display.
+- 신규 계정 첫 로그인 password change 강제.
+- 비활성 admin 운영화면 접근 차단.
+- 기존 공유계정은 transition fallback으로 유지.
+
+**Current operational state**
+
+- admin profiles 2
+- active admins 2
+- active leads 1
+- newly provisioned personal staff accounts 0
+- must-change-password accounts 0
+
 ### Frontend in branch — deployment pending
 
 - 학생 명부를 DICS Core read-only roster 관점으로 변경.
