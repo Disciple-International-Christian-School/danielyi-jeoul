@@ -830,6 +830,32 @@ Identity ≠ Role
 - 두 Supabase 프로젝트 간 distributed transaction 부재를 idempotent rerun으로 대응.
 - CI에 migration runner syntax check 추가.
 
+### Department merit administration — 2026-09-25
+
+**Production DB applied**
+
+- lead-only 부서 생성 / 주간 상점 rule 관리 RPC.
+- lead-only 학생 부서 소속 시작/종료 RPC.
+- 소속은 starts_on / ends_on 이력으로 보존.
+- 규칙 변경은 effective date 기반 version history 유지.
+- 부서 read scope를 SEONDO로 제한, write는 lead-only.
+- 현재 실제 운영 데이터는 departments 0 / memberships 0 / rules 0 / generated records 0.
+
+**Frontend in branch**
+
+- 선도부장 전용 `부서 상점` 메뉴.
+- 부서 생성·수정·활성/중지.
+- 이름/학번/반 검색 후 학생 소속 관리.
+- 이번 주 자동상점 generated / expected 상태 표시.
+- `이번 주 반영` 버튼으로 idempotent merit generation 실행.
+- 실제 학생 부서 명단은 Supabase에만 저장하며 Git에는 포함하지 않음.
+
+**Quality**
+
+- UI 위치 오류가 CI에서 실패로 감지됨.
+- source 위치 확인 후 department console로 이동.
+- corrected branch CI 통과.
+
 ### Frontend in branch — deployment pending
 
 - 학생 명부를 DICS Core read-only roster 관점으로 변경.
