@@ -73,6 +73,7 @@ export interface PointRecordReflection {
 export interface PointRecord {
   id: number;
   studentId: number;
+  coreStudentId: string;
   studentName: string;
   type: PointType;
   item: string;
@@ -292,6 +293,7 @@ export interface WeeklyDisciplineReport {
 export interface Punishment {
   id: number;
   studentId: number;
+  coreStudentId: string;
   studentName: string;
   grade: number;
   types: string[];
@@ -324,7 +326,7 @@ export interface PointItemInput {
 }
 export interface PointItemImportRow { name: string; fixedPoints: number | null; }
 export interface PointRecordInput {
-  studentId: number;
+  coreStudentId: string;
   type: PointType;
   item: string;
   points: number;
@@ -341,7 +343,7 @@ export interface PointRecordUpdateInput {
   reflectionSubmitted?: boolean | null;
 }
 export interface PunishmentInput {
-  studentId: number;
+  coreStudentId: string;
   types: string[];
   startDate: string;
   endDate: string;
@@ -568,12 +570,12 @@ interface WeeklyDisciplineReportRow {
   statuses: string[] | null;
 }
 interface PunishmentRow {
-  id: number; student_id: number; student_name: string; grade: number;
+  id: number; student_id: number; core_student_id: string; student_name: string; grade: number;
   types: string[] | null; start_date: string; end_date: string;
   entered_by_name: string; violated: boolean; created_at: string;
 }
 interface PointRecordRow {
-  id: number; student_id: number; student_name: string; type: PointType;
+  id: number; student_id: number; core_student_id: string; student_name: string; type: PointType;
   item: string; points: number; recorded_at: string; entered_by_name: string;
   created_at: string; reflection_id: number | null;
   reflection_submitted: boolean | null; reflection_deadline: string | null;
@@ -838,6 +840,7 @@ function mapPunishment(row: PunishmentRow): Punishment {
   return {
     id: row.id,
     studentId: row.student_id,
+    coreStudentId: row.core_student_id,
     studentName: row.student_name,
     grade: row.grade,
     types: row.types ?? [],
@@ -853,6 +856,7 @@ function mapPointRecord(row: PointRecordRow): PointRecord {
   return {
     id: row.id,
     studentId: row.student_id,
+    coreStudentId: row.core_student_id,
     studentName: row.student_name,
     type: row.type,
     item: row.item,
@@ -1479,8 +1483,8 @@ export function useDeleteStudent() {
 export function useCreatePointRecord() {
   return useMutation({
     mutationFn: async ({ data }: { data: PointRecordInput }) => {
-      const { data: id, error } = await supabase.rpc('create_point_record', {
-        p_student_id: data.studentId,
+      const { data: id, error } = await supabase.rpc('create_point_record_core', {
+        p_core_student_id: data.coreStudentId,
         p_type: data.type,
         p_item: data.item,
         p_points: data.points,
@@ -1555,8 +1559,8 @@ export function useUpdateReflection() {
 export function useCreatePunishment() {
   return useMutation({
     mutationFn: async ({ data }: { data: PunishmentInput }) => {
-      const { error } = await supabase.rpc('create_punishment', {
-        p_student_id: data.studentId,
+      const { error } = await supabase.rpc('create_punishment_core', {
+        p_core_student_id: data.coreStudentId,
         p_types: data.types,
         p_start_date: data.startDate,
         p_end_date: data.endDate,
