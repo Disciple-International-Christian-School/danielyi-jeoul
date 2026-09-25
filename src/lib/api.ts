@@ -162,6 +162,28 @@ export interface DailyDisciplineNotice {
   reflectionStatus: ReflectionStatus | null;
 }
 
+export interface AdminAccount {
+  id: number;
+  loginId: string;
+  displayName: string;
+  role: Role;
+  disciplineScope: DisciplineScope | null;
+  isLead: boolean;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  lastPasswordChangedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  isSelf: boolean;
+}
+
+export interface ProvisionedAdminCredential {
+  adminId: number;
+  loginId: string;
+  temporaryPassword: string;
+  mustChangePassword: boolean;
+}
+
 export interface DisciplineAuditLog {
   id: number;
   actorUserId: string | null;
@@ -452,6 +474,21 @@ interface DailyDisciplineNoticeRow {
   reflection_status: ReflectionStatus | null;
 }
 
+interface AdminAccountRow {
+  id: number;
+  login_id: string;
+  display_name: string;
+  role: Role;
+  discipline_scope: DisciplineScope | null;
+  is_lead: boolean;
+  is_active: boolean;
+  must_change_password: boolean;
+  last_password_changed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  is_self: boolean;
+}
+
 interface DisciplineAuditLogRow {
   id: number;
   actor_user_id: string | null;
@@ -603,6 +640,23 @@ function mapReflection(row: ReflectionRow): Reflection {
     submittedAt: row.submitted_at,
     status: row.status,
     assignedScope: row.assigned_scope,
+  };
+}
+
+function mapAdminAccount(row: AdminAccountRow): AdminAccount {
+  return {
+    id: row.id,
+    loginId: row.login_id,
+    displayName: row.display_name,
+    role: row.role,
+    disciplineScope: row.discipline_scope,
+    isLead: row.is_lead,
+    isActive: row.is_active,
+    mustChangePassword: row.must_change_password,
+    lastPasswordChangedAt: row.last_password_changed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    isSelf: row.is_self,
   };
 }
 
@@ -859,6 +913,7 @@ export const getDepartmentMembersQueryKey = () => ['department-merits', 'members
 export const getCoreMigrationReadinessQueryKey = () => ['core', 'migration-readiness'] as const;
 export const getCoreStudentReadinessQueryKey = () => ['core', 'student-readiness'] as const;
 export const getDisciplineAuditLogsQueryKey = () => ['audit-logs', 'discipline'] as const;
+export const getAdminAccountsQueryKey = () => ['admin-accounts'] as const;
 export const getCoreSetupStatusQueryKey = () => ['core-setup', 'status'] as const;
 export const getGrade9AssignmentsQueryKey = () => ['core-setup', 'grade9'] as const;
 
@@ -970,6 +1025,87 @@ export function useListPunishments() {
         await supabase.from('v_punishments').select('*').order('created_at', { ascending: false }),
       );
       return rows.map(mapPunishment);
+    },
+  });
+}
+
+export function useAdminAccounts() {
+  return useQuery({
+    queryKey: getAdminAccountsQueryKey(),
+    queryFn: async (): Promise<AdminAccount[]> => {
+      const rows = unwrap<AdminAccountRow[]>(
+        await supabase
+          .from('v_admin_accounts')
+          .select('*')
+          .order('is_active', { ascending: false })
+          .order('display_name', { ascending: true }),
+      );
+      return rows.map(mapAdminAccount);
+    },
+  });
+}
+
+export function useProvisionAdminAccount() {
+  return useMutation({
+    mutationFn: async ({
+      loginId,
+      displayName,
+      role,
+      disciplineScope,
+      isLead,
+    }: {
+      loginId: string;
+      displayName: string;
+      role: Role;
+      disciplineScope: DisciplineScope | null;
+      isLead: boolean;
+    }): Promise<ProvisionedAdminCredential> => {
+      const { data, error } = await supabase.functions.invoke('provision-admin-account', {
+        body: { loginId, displayName, role, disciplineScope, isLead },
+      });
+      if (error) throw new Error(error.message);
+      if (!data || typeof data !== 'object') throw new Error('계정 생성 응답을 확인할 수 없습니다.');
+      if ('error' in data && data.error) throw new Error(String(data.error));
+      return data as ProvisionedAdminCredential;
+    },
+  });
+}
+
+export function useUpdateAdminProfile() {
+  return useMutation({
+    mutationFn: async ({
+      adminId,
+      displayName,
+      role,
+      disciplineScope,
+      isLead,
+      isActive,
+    }: {
+      adminId: number;
+      displayName: string;
+      role: Role;
+      disciplineScope: DisciplineScope | null;
+      isLead: boolean;
+      isActive: boolean;
+    }) => {
+      const { error } = await supabase.rpc('update_admin_profile', {
+        p_admin_id: adminId,
+        p_display_name: displayName,
+        p_role: role,
+        p_scope: disciplineScope,
+        p_is_lead: isLead,
+        p_is_active: isActive,
+      });
+      if (error) throw new Error(error.message);
+    },
+  });
+}
+
+export function useMarkAdminPasswordChanged() {
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('mark_admin_password_changed');
+      if (error) throw new Error(error.message);
     },
   });
 }
