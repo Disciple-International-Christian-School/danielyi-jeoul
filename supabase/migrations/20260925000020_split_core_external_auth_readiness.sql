@@ -19,7 +19,7 @@ select
   (select count(*) from core.students)::int as core_total,
   (select count(*) from active_students)::int as active_students,
   (select count(*) from active_students where student_no is not null)::int as student_no_assigned,
-  (select count(*) from active_students where auth_user_id is not null)::int as core_auth_linked,
+  (select count(*) from active_students where auth_user_id is not null)::int as auth_linked,
   (
     select count(distinct eai.student_id)
     from core.external_auth_identities eai
@@ -62,7 +62,7 @@ select
   cs.name,
   ls.grade,
   (cs.student_no is not null) as has_student_no,
-  (cs.auth_user_id is not null) as has_core_auth_link,
+  (cs.auth_user_id is not null) as has_auth_link,
   (ea.student_id is not null) as has_external_auth_link,
   (e.student_id is not null) as has_current_enrollment,
   c.label as homeroom,
