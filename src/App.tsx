@@ -38,12 +38,16 @@ import {
   getListReflectionsQueryKey,
   getListStudentsQueryKey,
   getCurrentSettlementQueryKey,
+  getCoreMigrationReadinessQueryKey,
+  getCoreStudentReadinessQueryKey,
   getCoreSetupStatusQueryKey,
   getDepartmentMeritStatusQueryKey,
   getGrade9AssignmentsQueryKey,
   useDailyDisciplineNotice,
   useWeeklyDisciplineReport,
   useAssignCurrentGrade9Section,
+  useCoreMigrationReadiness,
+  useCoreStudentReadiness,
   useCoreSetupStatus,
   useCreatePointItem,
   useCreatePointRecord,
@@ -1131,6 +1135,8 @@ function CoreSetupPage() {
   const queryClient = useQueryClient();
   const notify = useContext(NoticeContext);
   const status = useCoreSetupStatus();
+  const readiness = useCoreMigrationReadiness();
+  const studentReadiness = useCoreStudentReadiness();
   const grade9 = useGrade9Assignments();
   const initializeTerm = useInitializeCurrentAcademicTerm();
   const assignGrade9 = useAssignCurrentGrade9Section();
@@ -1143,6 +1149,8 @@ function CoreSetupPage() {
 
   const refreshCore = () => {
     queryClient.invalidateQueries({ queryKey: getCoreSetupStatusQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getCoreMigrationReadinessQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getCoreStudentReadinessQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGrade9AssignmentsQueryKey() });
     queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
@@ -1186,12 +1194,21 @@ function CoreSetupPage() {
     });
   };
 
-  if (status.isLoading || grade9.isLoading) return <LoadingState />;
-  if (status.isError || grade9.isError) {
-    return <ErrorState error={status.error ?? grade9.error} retry={() => { status.refetch(); grade9.refetch(); }} />;
+  if (status.isLoading || readiness.isLoading || studentReadiness.isLoading || grade9.isLoading) return <LoadingState />;
+  if (status.isError || readiness.isError || studentReadiness.isError || grade9.isError) {
+    return <ErrorState
+      error={status.error ?? readiness.error ?? studentReadiness.error ?? grade9.error}
+      retry={() => { status.refetch(); readiness.refetch(); studentReadiness.refetch(); grade9.refetch(); }}
+    />;
   }
 
   const current = status.data;
+  const core = readiness.data;
+  const readinessRows = studentReadiness.data ?? [];
+  const readyStudents = readinessRows.filter((row) => row.readinessStatus === 'READY').length;
+  const partialStudents = readinessRows.filter((row) => row.readinessStatus === 'PARTIAL').length;
+  const coreOnlyStudents = readinessRows.filter((row) => row.readinessStatus === 'CORE_ONLY').length;
+  const pendingRows = readinessRows.filter((row) => row.readinessStatus !== 'READY');
   const needle = search.trim().toLowerCase();
   const grade9Rows = (grade9.data ?? []).filter((row) =>
     !needle || row.studentName.toLowerCase().includes(needle)
@@ -1201,8 +1218,44 @@ function CoreSetupPage() {
     <PageHeader
       eyebrow="DICS Core provisioning"
       title="Core 설정"
-      copy="현재 학기와 반 배정을 안전하게 초기화하는 선도부장 전용 provisioning 화면입니다. 장기적으로는 별도 Core Admin으로 분리합니다."
+      copy="학생 Identity·학번·Auth·학기/반 연결 상태를 수치로 추적하고, 검증된 정보만 단계적으로 보강합니다."
     />
+
+    {core && <div className="metric-grid" style={{ marginTop: 28 }}>
+      <div className="card metric-card">
+        <div className="metric-label">Core Identity</div>
+        <div className="metric-value">{core.danielBridgeCount}/{core.activeStudents}</div>
+        <div className="muted" style={{ fontSize: 10 }}>Daniel 활성 학생 연결</div>
+      </div>
+      <div className="card metric-card">
+        <div className="metric-label">학번 연결</div>
+        <div className="metric-value">{core.studentNoAssigned}/{core.activeStudents}</div>
+        <div className="muted" style={{ fontSize: 10 }}>SP / 학교 공통 student_no</div>
+      </div>
+      <div className="card metric-card">
+        <div className="metric-label">Auth 연결</div>
+        <div className="metric-value">{core.authLinked}/{core.activeStudents}</div>
+        <div className="muted" style={{ fontSize: 10 }}>기존 학생 로그인 계정</div>
+      </div>
+      <div className="card metric-card">
+        <div className="metric-label">현재 학적</div>
+        <div className="metric-value">{core.currentEnrollmentCount}/{core.activeStudents}</div>
+        <div className="muted" style={{ fontSize: 10 }}>current-term enrollment</div>
+      </div>
+      <div className="card metric-card">
+        <div className="metric-label">완전 READY</div>
+        <div className={readyStudents === core.activeStudents ? 'metric-value success-text' : 'metric-value'}>{readyStudents}</div>
+        <div className="muted" style={{ fontSize: 10 }}>학번 + Auth + 현재 학적</div>
+      </div>
+    </div>}
+
+    <div className="side-note" style={{ marginTop: 18 }}>
+      <strong>현재 전환 상태</strong>
+      <span style={{ marginLeft: 10 }}>READY {readyStudents} · PARTIAL {partialStudents} · CORE ONLY {coreOnlyStudents}</span>
+      <div style={{ marginTop: 5 }}>
+        Core UUID는 학생 identity의 시작점이고, 학번·Auth·현재 학적까지 연결되어야 통합 플랫폼 기준 READY가 됩니다.
+      </div>
+    </div>
 
     {!current ? <div className="detail-grid" style={{ marginTop: 30 }}>
       <form className="card card-pad" onSubmit={submitTerm}>
@@ -1278,6 +1331,32 @@ function CoreSetupPage() {
                 <td>{row.homeroom ?? <span className="pill pill-warning">미배정</span>}</td>
                 <td><button className={'btn ' + (row.section === 'A' ? 'btn-primary' : 'btn-outline')} disabled={assignGrade9.isPending} onClick={() => assign(row.studentId, 'A', row.studentName)} data-testid={'button-core-grade9-a-' + row.studentId}>{row.section === 'A' && <Check size={13} />} G9-A</button></td>
                 <td><button className={'btn ' + (row.section === 'B' ? 'btn-primary' : 'btn-outline')} disabled={assignGrade9.isPending} onClick={() => assign(row.studentId, 'B', row.studentName)} data-testid={'button-core-grade9-b-' + row.studentId}>{row.section === 'B' && <Check size={13} />} G9-B</button></td>
+              </tr>)}</tbody>
+            </table>
+          </div>}
+      </div>
+
+      <div className="card card-pad" style={{ marginTop: 26 }}>
+        <div className="section-row" style={{ marginTop: 0 }}>
+          <div>
+            <div className="eyebrow">Integration backlog</div>
+            <h2 className="section-title" style={{ marginTop: 8 }}>아직 Core 통합이 끝나지 않은 학생</h2>
+            <p className="section-copy">이 목록은 실데이터를 추측하기 위한 것이 아니라, 어떤 연결정보가 아직 비어 있는지 확인하기 위한 readiness 목록입니다.</p>
+          </div>
+          <span className="pill pill-warning">{pendingRows.length}명 남음</span>
+        </div>
+
+        {pendingRows.length === 0 ? <EmptyState title="Core 통합 완료" copy="활성 학생의 학번·Auth·현재 학적 연결이 모두 완료되었습니다." /> :
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead><tr><th>학생</th><th>학년/반</th><th>학번</th><th>Auth</th><th>현재 학적</th><th>상태</th></tr></thead>
+              <tbody>{pendingRows.map((row) => <tr key={row.coreStudentId}>
+                <td><strong>{row.name}</strong></td>
+                <td>{row.homeroom ?? ('G' + row.grade)}</td>
+                <td>{row.hasStudentNo ? <span className="pill pill-positive">연결</span> : <span className="pill pill-warning">미연결</span>}</td>
+                <td>{row.hasAuthLink ? <span className="pill pill-positive">연결</span> : <span className="pill pill-warning">미연결</span>}</td>
+                <td>{row.hasCurrentEnrollment ? <span className="pill pill-positive">배정</span> : <span className="pill pill-warning">미배정</span>}</td>
+                <td><span className={'pill ' + (row.readinessStatus === 'PARTIAL' ? 'pill-warning' : 'pill-neutral')}>{row.readinessStatus}</span></td>
               </tr>)}</tbody>
             </table>
           </div>}
