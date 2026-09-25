@@ -175,6 +175,30 @@ export interface DisciplineAuditLog {
   createdAt: string;
 }
 
+export interface CoreMigrationReadiness {
+  coreTotal: number;
+  activeStudents: number;
+  studentNoAssigned: number;
+  authLinked: number;
+  termCount: number;
+  currentTermCount: number;
+  classCount: number;
+  currentEnrollmentCount: number;
+  danielBridgeCount: number;
+}
+
+export interface CoreStudentReadiness {
+  coreStudentId: string;
+  studentNo: string | null;
+  name: string;
+  grade: number;
+  hasStudentNo: boolean;
+  hasAuthLink: boolean;
+  hasCurrentEnrollment: boolean;
+  homeroom: string | null;
+  readinessStatus: 'READY' | 'PARTIAL' | 'CORE_ONLY';
+}
+
 export interface DepartmentMeritStatus {
   weekStart: string;
   departmentId: string;
@@ -358,6 +382,30 @@ interface SettlementPeriodRow {
   created_at: string;
 }
 
+interface CoreMigrationReadinessRow {
+  core_total: number;
+  active_students: number;
+  student_no_assigned: number;
+  auth_linked: number;
+  term_count: number;
+  current_term_count: number;
+  class_count: number;
+  current_enrollment_count: number;
+  daniel_bridge_count: number;
+}
+
+interface CoreStudentReadinessRow {
+  core_student_id: string;
+  student_no: string | null;
+  name: string;
+  grade: number;
+  has_student_no: boolean;
+  has_auth_link: boolean;
+  has_current_enrollment: boolean;
+  homeroom: string | null;
+  readiness_status: 'READY' | 'PARTIAL' | 'CORE_ONLY';
+}
+
 interface DailyDisciplineNoticeRow {
   point_record_id: number;
   recorded_at: string;
@@ -516,6 +564,34 @@ function mapDisciplineAuditLog(row: DisciplineAuditLogRow): DisciplineAuditLog {
     beforeData: row.before_data,
     afterData: row.after_data,
     createdAt: row.created_at,
+  };
+}
+
+function mapCoreMigrationReadiness(row: CoreMigrationReadinessRow): CoreMigrationReadiness {
+  return {
+    coreTotal: row.core_total,
+    activeStudents: row.active_students,
+    studentNoAssigned: row.student_no_assigned,
+    authLinked: row.auth_linked,
+    termCount: row.term_count,
+    currentTermCount: row.current_term_count,
+    classCount: row.class_count,
+    currentEnrollmentCount: row.current_enrollment_count,
+    danielBridgeCount: row.daniel_bridge_count,
+  };
+}
+
+function mapCoreStudentReadiness(row: CoreStudentReadinessRow): CoreStudentReadiness {
+  return {
+    coreStudentId: row.core_student_id,
+    studentNo: row.student_no,
+    name: row.name,
+    grade: row.grade,
+    hasStudentNo: row.has_student_no,
+    hasAuthLink: row.has_auth_link,
+    hasCurrentEnrollment: row.has_current_enrollment,
+    homeroom: row.homeroom,
+    readinessStatus: row.readiness_status,
   };
 }
 
@@ -693,6 +769,8 @@ export const getCurrentSettlementQueryKey = () => ['settlement', 'current'] as c
 export const getDailyDisciplineNoticeQueryKey = (recordedAt: string) => ['reports', 'daily-notice', recordedAt] as const;
 export const getWeeklyDisciplineReportQueryKey = () => ['reports', 'weekly'] as const;
 export const getDepartmentMeritStatusQueryKey = () => ['department-merits', 'current-week'] as const;
+export const getCoreMigrationReadinessQueryKey = () => ['core', 'migration-readiness'] as const;
+export const getCoreStudentReadinessQueryKey = () => ['core', 'student-readiness'] as const;
 export const getDisciplineAuditLogsQueryKey = () => ['audit-logs', 'discipline'] as const;
 export const getCoreSetupStatusQueryKey = () => ['core-setup', 'status'] as const;
 export const getGrade9AssignmentsQueryKey = () => ['core-setup', 'grade9'] as const;
@@ -821,6 +899,34 @@ export function useDisciplineAuditLogs() {
           .limit(200),
       );
       return rows.map(mapDisciplineAuditLog);
+    },
+  });
+}
+
+export function useCoreMigrationReadiness() {
+  return useQuery({
+    queryKey: getCoreMigrationReadinessQueryKey(),
+    queryFn: async (): Promise<CoreMigrationReadiness> => {
+      const row = unwrap<CoreMigrationReadinessRow>(
+        await supabase.from('v_core_migration_readiness').select('*').single(),
+      );
+      return mapCoreMigrationReadiness(row);
+    },
+  });
+}
+
+export function useCoreStudentReadiness() {
+  return useQuery({
+    queryKey: getCoreStudentReadinessQueryKey(),
+    queryFn: async (): Promise<CoreStudentReadiness[]> => {
+      const rows = unwrap<CoreStudentReadinessRow[]>(
+        await supabase
+          .from('v_core_student_readiness')
+          .select('*')
+          .order('grade', { ascending: true })
+          .order('name', { ascending: true }),
+      );
+      return rows.map(mapCoreStudentReadiness);
     },
   });
 }
