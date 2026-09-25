@@ -115,6 +115,28 @@ export interface Dashboard {
   students: StudentSummary[];
 }
 
+export interface CoreSetupStatus {
+  termId: string;
+  termCode: string;
+  termName: string;
+  startsOn: string;
+  endsOn: string;
+  classCount: number;
+  enrollmentCount: number;
+  grade9Total: number;
+  grade9Assigned: number;
+  grade9Pending: number;
+}
+
+export interface Grade9Assignment {
+  studentId: number;
+  coreStudentId: string;
+  studentName: string;
+  grade: number;
+  section: string | null;
+  homeroom: string | null;
+}
+
 export interface SettlementPeriod {
   id: number;
   label: string;
@@ -304,6 +326,28 @@ interface DashboardCountsRow {
   missing_reflections: number;
   double_reflections: number;
   active_punishments: number;
+}
+
+interface CoreSetupStatusRow {
+  term_id: string;
+  term_code: string;
+  term_name: string;
+  starts_on: string;
+  ends_on: string;
+  class_count: number;
+  enrollment_count: number;
+  grade9_total: number;
+  grade9_assigned: number;
+  grade9_pending: number;
+}
+
+interface Grade9AssignmentRow {
+  student_id: number;
+  core_student_id: string;
+  student_name: string;
+  grade: number;
+  section: string | null;
+  homeroom: string | null;
 }
 
 interface SettlementPeriodRow {
@@ -539,6 +583,32 @@ function mapWeeklyDisciplineReport(row: WeeklyDisciplineReportRow): WeeklyDiscip
   };
 }
 
+function mapCoreSetupStatus(row: CoreSetupStatusRow): CoreSetupStatus {
+  return {
+    termId: row.term_id,
+    termCode: row.term_code,
+    termName: row.term_name,
+    startsOn: row.starts_on,
+    endsOn: row.ends_on,
+    classCount: row.class_count,
+    enrollmentCount: row.enrollment_count,
+    grade9Total: row.grade9_total,
+    grade9Assigned: row.grade9_assigned,
+    grade9Pending: row.grade9_pending,
+  };
+}
+
+function mapGrade9Assignment(row: Grade9AssignmentRow): Grade9Assignment {
+  return {
+    studentId: row.student_id,
+    coreStudentId: row.core_student_id,
+    studentName: row.student_name,
+    grade: row.grade,
+    section: row.section,
+    homeroom: row.homeroom,
+  };
+}
+
 function mapSettlementPeriod(row: SettlementPeriodRow): SettlementPeriod {
   return {
     id: row.id,
@@ -624,6 +694,8 @@ export const getDailyDisciplineNoticeQueryKey = (recordedAt: string) => ['report
 export const getWeeklyDisciplineReportQueryKey = () => ['reports', 'weekly'] as const;
 export const getDepartmentMeritStatusQueryKey = () => ['department-merits', 'current-week'] as const;
 export const getDisciplineAuditLogsQueryKey = () => ['audit-logs', 'discipline'] as const;
+export const getCoreSetupStatusQueryKey = () => ['core-setup', 'status'] as const;
+export const getGrade9AssignmentsQueryKey = () => ['core-setup', 'grade9'] as const;
 
 // ---------------------------------------------------------------------------
 // Reads
@@ -811,6 +883,77 @@ export function useWeeklyDisciplineReport() {
           .order('student_name', { ascending: true }),
       );
       return rows.map(mapWeeklyDisciplineReport);
+    },
+  });
+}
+
+export function useCoreSetupStatus() {
+  return useQuery({
+    queryKey: getCoreSetupStatusQueryKey(),
+    queryFn: async (): Promise<CoreSetupStatus | null> => {
+      const { data, error } = await supabase
+        .from('v_core_setup_status')
+        .select('*')
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data ? mapCoreSetupStatus(data as CoreSetupStatusRow) : null;
+    },
+  });
+}
+
+export function useGrade9Assignments() {
+  return useQuery({
+    queryKey: getGrade9AssignmentsQueryKey(),
+    queryFn: async (): Promise<Grade9Assignment[]> => {
+      const rows = unwrap<Grade9AssignmentRow[]>(
+        await supabase
+          .from('v_grade9_current_assignments')
+          .select('*')
+          .order('student_name', { ascending: true }),
+      );
+      return rows.map(mapGrade9Assignment);
+    },
+  });
+}
+
+export function useInitializeCurrentAcademicTerm() {
+  return useMutation({
+    mutationFn: async ({
+      code,
+      name,
+      startsOn,
+      endsOn,
+    }: {
+      code: string;
+      name: string;
+      startsOn: string;
+      endsOn: string;
+    }) => {
+      const { data, error } = await supabase.rpc('initialize_current_academic_term', {
+        p_code: code,
+        p_name: name,
+        p_starts_on: startsOn,
+        p_ends_on: endsOn,
+      });
+      if (error) throw new Error(error.message);
+      return data as {
+        term_id: string;
+        classes_created: number;
+        enrollments_created: number;
+        grade9_pending: number;
+      };
+    },
+  });
+}
+
+export function useAssignCurrentGrade9Section() {
+  return useMutation({
+    mutationFn: async ({ studentId, section }: { studentId: number; section: 'A' | 'B' }) => {
+      const { error } = await supabase.rpc('assign_current_grade9_section', {
+        p_student_id: studentId,
+        p_section: section,
+      });
+      if (error) throw new Error(error.message);
     },
   });
 }
