@@ -30,6 +30,7 @@
 | D-017 | ACCEPTED | 외부 Auth mapping 값은 Git/Issue/채팅 handoff 대신 secure migration path로 이동 | Auth UUID·student_no 매핑은 운영 identity data이며 공개 개발 기록과 분리해야 함 |
 | D-018 | ACCEPTED | 공유 관리자 계정은 즉시 삭제하지 않고 개인계정으로 staged transition | 운영 연속성을 보존하면서 audit actor를 개인화하기 위함 |
 | D-019 | ACCEPTED | 개인계정 Auth 생성과 첫 비밀번호 변경 완료 처리는 Edge Function에서 수행 | service credential을 브라우저에 노출하지 않고 실제 Auth 변경 성공을 server-side에서 검증해야 함 |
+| D-020 | TRANSITION | discipline student FK는 dual-key 후 Core UUID write-first로 전환 | 운영 중인 legacy integer 관계를 즉시 제거하지 않고 canonical identity로 안전하게 이동 |
 
 ---
 
@@ -327,3 +328,39 @@ provision-admin-account
 ```
 
 Edge Function에서만 Auth Admin API를 호출한다.
+
+
+---
+
+## D-020 — Discipline Student FK Cut-over Strategy
+
+선택:
+
+```text
+Phase 1
+legacy integer + Core UUID dual-key
+
+Phase 2
+new writes accept Core UUID
+
+Phase 3
+reads/routes move to Core UUID
+
+Phase 4
+legacy integer dependency 제거
+```
+
+배제:
+
+```text
+한 migration에서 모든 integer FK를 즉시 UUID로 교체
+```
+
+이유:
+
+- reflection / weekly / settlement / punishment business rule이 이미 운영 중
+- 기존 route와 query contract 보존 필요
+- record history 손실 없이 단계별 검증 가능
+- 각 phase마다 mismatch=0을 완료선으로 설정 가능
+
+dual-key trigger는 두 identity가 서로 다른 학생을 가리키는 상태를 허용하지 않는다.
