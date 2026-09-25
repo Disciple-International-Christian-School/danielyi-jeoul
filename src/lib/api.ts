@@ -180,6 +180,7 @@ export interface CoreMigrationReadiness {
   activeStudents: number;
   studentNoAssigned: number;
   authLinked: number;
+  externalAuthLinked: number;
   termCount: number;
   currentTermCount: number;
   classCount: number;
@@ -194,6 +195,7 @@ export interface CoreStudentReadiness {
   grade: number;
   hasStudentNo: boolean;
   hasAuthLink: boolean;
+  hasExternalAuthLink: boolean;
   hasCurrentEnrollment: boolean;
   homeroom: string | null;
   readinessStatus: 'READY' | 'PARTIAL' | 'CORE_ONLY';
@@ -388,6 +390,7 @@ interface CoreMigrationReadinessRow {
   student_no_assigned: number;
   auth_linked: number;
   term_count: number;
+  external_auth_linked: number;
   current_term_count: number;
   class_count: number;
   current_enrollment_count: number;
@@ -402,6 +405,7 @@ interface CoreStudentReadinessRow {
   has_student_no: boolean;
   has_auth_link: boolean;
   has_current_enrollment: boolean;
+  has_external_auth_link: boolean;
   homeroom: string | null;
   readiness_status: 'READY' | 'PARTIAL' | 'CORE_ONLY';
 }
@@ -573,6 +577,7 @@ function mapCoreMigrationReadiness(row: CoreMigrationReadinessRow): CoreMigratio
     activeStudents: row.active_students,
     studentNoAssigned: row.student_no_assigned,
     authLinked: row.auth_linked,
+    externalAuthLinked: row.external_auth_linked,
     termCount: row.term_count,
     currentTermCount: row.current_term_count,
     classCount: row.class_count,
@@ -589,6 +594,7 @@ function mapCoreStudentReadiness(row: CoreStudentReadinessRow): CoreStudentReadi
     grade: row.grade,
     hasStudentNo: row.has_student_no,
     hasAuthLink: row.has_auth_link,
+    hasExternalAuthLink: row.has_external_auth_link,
     hasCurrentEnrollment: row.has_current_enrollment,
     homeroom: row.homeroom,
     readinessStatus: row.readiness_status,
