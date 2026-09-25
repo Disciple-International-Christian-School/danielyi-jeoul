@@ -57,7 +57,8 @@ core.students
 
 - `core.students.id` = 학교 전체에서 사용하는 canonical `student_id` UUID
 - `student_no` = 사람이 확인하는 학교 공통 학번
-- `auth_user_id` = 로그인 계정 연결값이며 학생 ID 자체가 아님
+- `auth_user_id` = **DICS Core 프로젝트 내부** 로그인 계정 연결값이며 학생 ID 자체가 아님
+- 외부/legacy Supabase 프로젝트의 Auth UUID는 `core.external_auth_identities`에 별도 보존
 - 이름으로 앱 간 학생을 연결하지 않음
 - 각 앱에 별도 `students` master table을 새로 만들지 않음
 
@@ -79,7 +80,10 @@ core.students.id
       └─ Study Planner records
 
 core.students.auth_user_id
-      └─ auth.users.id
+      └─ DICS Core auth.users.id
+
+core.external_auth_identities
+      └─ SP 등 외부 프로젝트의 legacy Auth UUID
 ```
 
 다니엘의 저울의 기존 `public.students`는 전환 기간 동안만 legacy compatibility table로 유지하고, `core_student_id`로 Core 행에 연결한 뒤 최종적으로 discipline FK를 UUID로 교체한다.
@@ -468,7 +472,8 @@ DB 통합을 먼 미래 과제로 미루지 않고, **지금부터 모든 신규
 - `core.classes`
 - `core.enrollments`
 - 공통 학번
-- optional `auth_user_id`
+- optional Core-local `auth_user_id`
+- external/legacy Auth bridge
 
 ### Phase B — Legacy Mapping
 
@@ -480,7 +485,7 @@ core_student_id
 core.students.id (uuid)
 ```
 
-Study Planner의 기존 Auth UUID 기반 학생 행도 같은 Core 학생에 매핑한다.
+Study Planner의 기존 Auth UUID 기반 학생 행도 같은 Core 학생에 매핑하되, 외부 프로젝트 Auth UUID는 `core.external_auth_identities`에 보존한다. Core-local `auth_user_id`는 Auth consolidation 이후 별도로 provision한다.
 
 ### Phase C — Domain FK Cut-over
 
