@@ -2271,3 +2271,150 @@ Core UUID가 없는 학생은 submit 자체를 막고 오류를 표시한다.
 이미 canonical Core UUID를 입력 identity로 사용한다.
 
 legacy integer ID는 아직 read/route compatibility를 위해 남아 있다.
+
+
+---
+
+# 42. Discipline 기록 자체를 Core Identity에 연결
+
+통합 초기에는 화면의 학생 목록만 Core student와 bridge되어 있었다.
+
+즉 UI에서는:
+
+    core_student_id
+
+를 볼 수 있었지만 실제 생활지도 원본 기록은 여전히:
+
+    public.students.id (integer)
+
+만 저장했다.
+
+통합 플랫폼 관점에서는 이것이 마지막 legacy boundary 중 하나였다.
+
+## Dual-key 적용
+
+다음 컬럼을 추가했다.
+
+    point_records.core_student_id
+    punishments.core_student_id
+
+기존 기록은 legacy student bridge를 사용해 backfill했다.
+
+적용 직후 production 상태:
+
+    point_records total       1
+    Core linked               1
+    mismatch                  0
+
+    punishments total         0
+    Core linked               0
+    mismatch                  0
+
+즉 기존 운영기록 손실 없이 canonical UUID가 병행 저장됐다.
+
+---
+
+# 43. DB가 두 Identity의 일치를 강제한다
+
+단순히 Core UUID 컬럼을 추가하는 것만으로는 충분하지 않다.
+
+legacy student_id와 core_student_id가 서로 다른 학생을 가리키면
+조용한 data corruption이 된다.
+
+따라서 trigger:
+
+    private.sync_discipline_core_student_id()
+
+를 추가했다.
+
+insert/update 시:
+
+1. legacy student row에서 canonical Core UUID 조회
+2. core_student_id가 비어 있으면 자동 채움
+3. 값이 이미 있으면 legacy mapping과 비교
+4. 다르면 exception
+
+즉 migration 기간 동안:
+
+    old ID
+    new ID
+
+가 동시에 존재하지만 의미상 반드시 같은 학생이다.
+
+---
+
+# 44. 새 write path는 Core UUID가 출발점
+
+Dual-key 적용 후 다음 단계는 frontend가 계속 integer student_id를 보내지 않게 하는 것이었다.
+
+새 RPC:
+
+    create_point_record_core(core_student_id, ...)
+    create_punishment_core(core_student_id, ...)
+
+를 추가했다.
+
+이 wrapper는 Core UUID를 받아 transition 기간에만 legacy integer ID를 해석한 뒤,
+기존 business-rule RPC를 호출한다.
+
+중요한 이유:
+
+- 기존 벌점/상점/반성문 rule을 복제하지 않는다.
+- canonical UUID가 새 write request의 source identity가 된다.
+- legacy integer는 내부 compatibility detail로 내려간다.
+
+Frontend의 새 점수/처분 생성도 이 Core UUID RPC로 전환했다.
+
+학생 상세 route 같은 read compatibility는 아직 integer ID를 유지한다.
+
+---
+
+# 45. Rollback 기반 live verification
+
+production DB에 migration을 적용한 뒤 실제 record를 남기지 않는 rollback test를 실행했다.
+
+인증된 SEONDO context를 임시 설정하고:
+
+    create_point_record_core(...)
+
+호출 후 확인:
+
+    record created           true
+    Core UUID present        true
+    Core ↔ legacy match      true
+
+그 뒤 transaction을 rollback했다.
+
+따라서 test evidence는 얻되
+실제 학생 상벌점에는 테스트 record가 남지 않았다.
+
+Frontend 전환 후 GitHub Actions:
+
+    typecheck SUCCESS
+    build SUCCESS
+
+현재 새 discipline write는 canonical Core UUID를 기준으로 출발한다.
+
+---
+
+# 46. 아직 legacy integer FK를 제거하지 않는 이유
+
+현재 point/punishment 원본 record는 Core UUID를 모두 갖지만,
+다음 영역은 아직 legacy integer를 사용한다.
+
+- student detail route
+- 일부 기존 views / aggregation
+- 기존 RPC 내부 signature
+- historical compatibility
+
+따라서 지금 바로 integer student_id를 drop하지 않는다.
+
+최종 cut-over 조건은:
+
+    모든 기존 record Core UUID linked
+    mismatch = 0
+    신규 write Core UUID only
+    주요 read path Core UUID 기반
+    rollback / report 결과 동일
+
+을 모두 충족한 뒤다.
