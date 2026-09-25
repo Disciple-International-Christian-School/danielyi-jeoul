@@ -1101,11 +1101,16 @@ export function useUpdateAdminProfile() {
   });
 }
 
-export function useMarkAdminPasswordChanged() {
+export function useChangeAdminPassword() {
   return useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.rpc('mark_admin_password_changed');
+    mutationFn: async (password: string) => {
+      const { data, error } = await supabase.functions.invoke('change-admin-password', {
+        body: { password },
+      });
       if (error) throw new Error(error.message);
+      if (!data || typeof data !== 'object') throw new Error('비밀번호 변경 응답을 확인할 수 없습니다.');
+      if ('error' in data && data.error) throw new Error(String(data.error));
+      return data as { ok: boolean; passwordChanged: boolean };
     },
   });
 }
