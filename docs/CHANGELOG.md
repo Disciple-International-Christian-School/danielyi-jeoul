@@ -774,8 +774,9 @@ Identity ≠ Role
   - active 175
   - Daniel bridge 175
   - current-term enrollment 144
-  - student_no linked 0
-  - Auth linked 0
+  - student_no linked 28
+  - Core-local Auth linked 0
+  - external/legacy Auth linked 0
 - 병렬 세션에서 live DB에 먼저 적용된 current-term/audit 구조를 Git migration으로 reconciliation.
 - `study_planner` shadow target schema 생성.
   - 실제 SP data는 아직 0건.
@@ -797,6 +798,37 @@ Identity ≠ Role
 - 병렬 DB drift 발견/복구, readiness 계측, Study Planner shadow schema까지 서사 기록.
 - `docs/SP_CORE_MIGRATION_RUNBOOK.md` 추가.
 - Claude/GPT coordination Issue에 live SP aggregate inventory 요청.
+
+### Secure cross-project identity migration — 2026-09-25
+
+**Production DB applied**
+
+- Core-local Auth와 외부/legacy Auth namespace를 명시적으로 분리.
+- `core.external_auth_identities`를 version-controlled migration으로 reconciliation.
+- `public.link_external_auth_identity(...)` lead-only guarded RPC 추가.
+  - student_no 존재 검증
+  - external identity의 다른 학생 재할당 거부
+  - 동일 source에서 한 학생의 다른 identity 충돌 거부
+  - 동일 mapping 재실행 시 idempotent verification
+- Core admin SECURITY DEFINER RPC의 anonymous EXECUTE 권한 제거.
+- `v_external_auth_mapping_status` PII-free aggregate progress view 추가.
+- Study Planner staff도 external Auth namespace를 분리:
+  - domain staff UUID
+  - optional Core-local Auth
+  - external staff identity bridge
+- lead-only Study Planner target inventory 추가.
+- Study Planner shadow FK advisor 지적 10개 인덱스 보강.
+
+**Migration tooling**
+
+- `scripts/migrate-sp-external-identities.mjs` 추가.
+- 기본 DRY RUN, 명시적 `--apply`에서만 write.
+- 이름/이메일/PIN/DOB를 읽거나 출력하지 않음.
+- SP/Core student_no exact match만 사용.
+- known test/developer login ID 명시 제외.
+- conflicting identity/bridge 발견 시 write 전 hard stop.
+- 두 Supabase 프로젝트 간 distributed transaction 부재를 idempotent rerun으로 대응.
+- CI에 migration runner syntax check 추가.
 
 ### Frontend in branch — deployment pending
 
