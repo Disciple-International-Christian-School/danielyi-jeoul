@@ -1867,12 +1867,113 @@ function LoginPage() {
   return <div className="landing" style={{ display: 'grid', placeItems: 'center', minHeight: '100dvh', padding: 20 }}><div style={{ width: '100%', maxWidth: 460 }}><div style={{ textAlign: 'center', marginBottom: 24 }}><Brand /><p className="subheading">관리자 계정으로 운영 콘솔에 들어갑니다.</p></div><form className="card card-pad" onSubmit={submit}><div className="eyebrow">관리자 로그인</div><h1 className="modal-title" style={{ marginTop: 8 }}>다니엘의 저울</h1><p className="section-copy" style={{ marginTop: 6 }}>승인된 운영 담당자만 로그인할 수 있습니다.</p><div className="form-grid" style={{ marginTop: 22 }}><div className="field full"><label htmlFor="login-id">아이디</label><input id="login-id" className="input" required autoComplete="username" value={loginId} onChange={(event) => setLoginId(event.target.value)} data-testid="input-login-id" /></div><div className="field full"><label htmlFor="login-password">비밀번호</label><input id="login-password" className="input" type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} data-testid="input-login-password" /></div></div>{error && <p className="danger-text" style={{ fontSize: 12, marginTop: 14 }} role="alert" data-testid="text-login-error">{error}</p>}<div className="modal-actions"><button className="btn btn-primary" style={{ width: '100%' }} disabled={pending} data-testid="button-submit-login">{pending ? '로그인 중' : '로그인'}</button></div></form></div></div>;
 }
 
+function ChangePasswordPage() {
+  const { admin, refreshAdmin, signOut } = useAuth();
+  const [, setLocation] = useLocation();
+  const markChanged = useMarkAdminPasswordChanged();
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+
+  const strong = password.length >= 12
+    && /[A-Z]/.test(password)
+    && /[a-z]/.test(password)
+    && /[0-9]/.test(password)
+    && /[^A-Za-z0-9]/.test(password);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError('');
+
+    if (!strong) {
+      setError('12자 이상이며 영문 대·소문자, 숫자, 특수문자를 모두 포함해주세요.');
+      return;
+    }
+    if (password !== confirm) {
+      setError('새 비밀번호 확인이 일치하지 않습니다.');
+      return;
+    }
+
+    setPending(true);
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    if (updateError) {
+      setError(updateError.message);
+      setPending(false);
+      return;
+    }
+
+    try {
+      await markChanged.mutateAsync();
+      await refreshAdmin();
+      setLocation('/dashboard');
+    } catch (markError) {
+      setError('비밀번호는 변경됐지만 계정 상태 갱신에 실패했습니다. 다시 로그인 후 재시도해주세요. ' + errText(markError));
+      setPending(false);
+    }
+  };
+
+  return <div className="landing" style={{ display: 'grid', placeItems: 'center', minHeight: '100dvh', padding: 20 }}>
+    <div style={{ width: '100%', maxWidth: 500 }}>
+      <div style={{ textAlign: 'center', marginBottom: 24 }}>
+        <Brand />
+        <p className="subheading">개인 관리자 계정 첫 로그인</p>
+      </div>
+      <form className="card card-pad" onSubmit={submit}>
+        <div className="eyebrow">보안 설정</div>
+        <h1 className="modal-title" style={{ marginTop: 8 }}>새 비밀번호를 설정해주세요</h1>
+        <p className="section-copy" style={{ marginTop: 8 }}>
+          {admin?.displayName ?? '관리자'} 계정은 임시 비밀번호로 생성되었습니다. 생활지도 기록이 개인 계정에 귀속되므로 첫 사용 전에 비밀번호를 변경합니다.
+        </p>
+
+        <div className="form-grid" style={{ marginTop: 22 }}>
+          <div className="field full">
+            <label htmlFor="new-admin-password">새 비밀번호</label>
+            <input
+              id="new-admin-password"
+              className="input"
+              type="password"
+              autoComplete="new-password"
+              required
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            <span className="muted" style={{ fontSize: 11 }}>12자 이상 · 대문자 · 소문자 · 숫자 · 특수문자 포함</span>
+          </div>
+          <div className="field full">
+            <label htmlFor="confirm-admin-password">새 비밀번호 확인</label>
+            <input
+              id="confirm-admin-password"
+              className="input"
+              type="password"
+              autoComplete="new-password"
+              required
+              value={confirm}
+              onChange={(event) => setConfirm(event.target.value)}
+            />
+          </div>
+        </div>
+
+        {error && <p className="danger-text" style={{ fontSize: 12, marginTop: 14 }} role="alert">{error}</p>}
+
+        <div className="modal-actions">
+          <button type="button" className="btn btn-outline" onClick={() => signOut()}>로그아웃</button>
+          <button className="btn btn-primary" disabled={pending || !strong || password !== confirm}>
+            {pending ? '변경 중' : '비밀번호 변경 후 시작'}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>;
+}
+
 function ProtectedRoutes() {
   const { session, admin, loading, signOut } = useAuth();
   if (loading) return <LoadingState />;
   if (!session) return <Redirect to="/sign-in" />;
   if (!admin) return <div className="app-loading"><div className="error-box"><AlertTriangle size={24} /><p>관리자 권한이 없는 계정입니다. 운영 담당자에게 문의해주세요.</p><button className="btn btn-outline" onClick={() => signOut()} data-testid="button-no-admin-sign-out"><LogOut size={14} /> 로그아웃</button></div></div>;
-  return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} /><Route path="/settlement" component={() => <LeadGate><SettlementPage /></LeadGate>} /><Route path="/audit" component={() => <LeadGate><AuditLogPage /></LeadGate>} /><Route path="/core-setup" component={() => <LeadGate><CoreSetupPage /></LeadGate>} /><Route path="/department-merits" component={() => <LeadGate><DepartmentMeritAdminPage /></LeadGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
+  if (admin.mustChangePassword) return <ChangePasswordPage />;
+  return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} /><Route path="/settlement" component={() => <LeadGate><SettlementPage /></LeadGate>} /><Route path="/audit" component={() => <LeadGate><AuditLogPage /></LeadGate>} /><Route path="/admins" component={() => <LeadGate><AdminAccountsPage /></LeadGate>} /><Route path="/core-setup" component={() => <LeadGate><CoreSetupPage /></LeadGate>} /><Route path="/department-merits" component={() => <LeadGate><DepartmentMeritAdminPage /></LeadGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
 }
 
 function NotFoundInline() {
