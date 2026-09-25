@@ -42,6 +42,8 @@ import {
   getCoreStudentReadinessQueryKey,
   getCoreSetupStatusQueryKey,
   getDepartmentMeritStatusQueryKey,
+  getDepartmentMeritAdminQueryKey,
+  getDepartmentMembersQueryKey,
   getGrade9AssignmentsQueryKey,
   useDailyDisciplineNotice,
   useWeeklyDisciplineReport,
@@ -49,6 +51,7 @@ import {
   useCoreMigrationReadiness,
   useCoreStudentReadiness,
   useCoreSetupStatus,
+  useCreateDepartmentWithMeritRule,
   useCreatePointItem,
   useCreatePointRecord,
   useCreatePunishment,
@@ -57,6 +60,8 @@ import {
   useDeletePointItem,
   useDeletePointRecord,
   useDisciplineAuditLogs,
+  useDepartmentCurrentMembers,
+  useDepartmentMeritAdmin,
   useDepartmentMeritStatus,
   useEnsureWeeklyDepartmentMerits,
   useGetDashboard,
@@ -70,6 +75,8 @@ import {
   useListPunishments,
   useListReflections,
   useListStudents,
+  useSetDepartmentActive,
+  useSetDepartmentStudentMembership,
   useSetPunishmentViolation,
   useStartSettlementPeriod,
   useUpdatePointItem,
@@ -109,6 +116,17 @@ function today() {
     day: '2-digit',
   }).format(new Date());
 }
+function currentWeekMonday() {
+  const value = new Date(today() + 'T12:00:00+09:00');
+  const offset = (value.getUTCDay() + 6) % 7;
+  value.setUTCDate(value.getUTCDate() - offset);
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(value);
+}
 function errText(error: unknown) { return error instanceof Error ? error.message : '요청을 처리하지 못했습니다.'; }
 
 function Brand() {
@@ -139,6 +157,7 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
     { href: '/settlement', label: '정산 관리', icon: CalendarRange, roles: ['SEONDO'] as Role[], leadOnly: true },
     { href: '/audit', label: '감사 로그', icon: Database, roles: ['SEONDO'] as Role[], leadOnly: true },
     { href: '/core-setup', label: 'Core 설정', icon: Users, roles: ['SEONDO'] as Role[], leadOnly: true },
+    { href: '/department-merits', label: '부서 상점', icon: ArrowUpRight, roles: ['SEONDO'] as Role[], leadOnly: true },
     { href: '/punishments', label: '기숙사 처분', icon: BedDouble, roles: ['SASAENG'] as Role[], leadOnly: false },
     { href: '/point-items', label: '점수 항목', icon: SlidersHorizontal, roles: ['SEONDO'] as Role[], leadOnly: false },
   ];
@@ -1473,6 +1492,294 @@ function PunishmentsPage() {
   return <div><PageHeader eyebrow="사생회 운영" title="기숙사 처분" copy="수동 처분과 위반 여부를 같은 화면에서 기록합니다." /><div className="detail-grid" style={{ marginTop: 30 }}><form className="card card-pad" onSubmit={submit}><h2 className="section-title">처분 등록</h2><p className="section-copy">한 번에 최대 두 가지 처분을 선택할 수 있습니다.</p><div className="form-grid" style={{ marginTop: 24 }}><div className="field full"><label htmlFor="punishment-student">학생</label><select id="punishment-student" className="select" required value={studentId} onChange={(event) => setStudentId(event.target.value)} data-testid="select-punishment-student"><option value="">학생 선택</option>{(students.data ?? []).map((student) => <option key={student.id} value={student.id}>{student.name} · {student.grade}학년</option>)}</select></div><div className="field full"><label>처분 유형 <span className="muted">({types.length}/2)</span></label><div className="filter-bar">{PUNISHMENT_TYPES.map((value) => <button type="button" key={value} className={`btn ${types.includes(value) ? 'btn-primary' : 'btn-outline'}`} onClick={() => toggleType(value)} data-testid={`button-punishment-type-${value}`}>{types.includes(value) && <Check size={13} />}{value}</button>)}</div></div><div className="field"><label htmlFor="punishment-start">시작일</label><input id="punishment-start" className="input" type="date" required value={startDate} onChange={(event) => setStartDate(event.target.value)} data-testid="input-punishment-start" /></div><div className="field"><label htmlFor="punishment-end">종료일</label><input id="punishment-end" className="input" type="date" required value={endDate} onChange={(event) => setEndDate(event.target.value)} data-testid="input-punishment-end" /></div><div className="side-note field full">기록자 <strong>{admin?.displayName ?? '로그인 관리자'}</strong> · 인증된 계정으로 자동 기록됩니다.</div></div><div className="modal-actions"><button className="btn btn-primary" disabled={create.isPending || !studentId || types.length === 0} data-testid="button-submit-punishment">{create.isPending ? '저장 중' : '처분 등록'}</button></div></form><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">최근 처분</h2><p className="section-copy">위반 시 규정에 따라 상태를 갱신합니다.</p></div></div>{punishments.data?.length === 0 ? <EmptyState title="처분 기록이 없습니다" copy="등록된 기숙사 처분이 없습니다." /> : <div className="activity-list">{punishments.data?.map((punishment) => <div className="activity-row" key={punishment.id} data-testid={`row-manual-punishment-${punishment.id}`}><div className="activity-mark"><BedDouble size={15} /></div><div style={{ minWidth: 0 }}><div className="activity-label">{punishment.studentName} · {punishment.types.join(' · ')}</div><div className="record-meta">{dateLabel(punishment.startDate)} — {dateLabel(punishment.endDate)} · {punishment.enteredByName}</div></div><button className={`pill ${punishment.violated ? 'pill-negative' : 'pill-neutral'}`} onClick={() => setViolation.mutate({ id: punishment.id, violated: !punishment.violated }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListPunishmentsQueryKey() }), onError: (error) => notify(errText(error), 'error') })} data-testid={`button-punishment-violation-${punishment.id}`}>{punishment.violated ? '위반 기록됨' : '위반 없음'}</button></div>)}</div>}</section></div></div>;
 }
 
+function DepartmentMeritAdminPage() {
+  const queryClient = useQueryClient();
+  const notify = useContext(NoticeContext);
+  const departments = useDepartmentMeritAdmin();
+  const members = useDepartmentCurrentMembers();
+  const students = useCoreStudentReadiness();
+  const saveRule = useCreateDepartmentWithMeritRule();
+  const setMembership = useSetDepartmentStudentMembership();
+  const setDepartmentActive = useSetDepartmentActive();
+
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentId, setStudentId] = useState('');
+  const [membershipDate, setMembershipDate] = useState(currentWeekMonday());
+  const [form, setForm] = useState({
+    code: '',
+    name: '',
+    points: '1',
+    itemLabel: '부서활동 주간 상점',
+    effectiveFrom: currentWeekMonday(),
+  });
+
+  const departmentRows = departments.data ?? [];
+  const selectedDepartment = departmentRows.find((row) => row.departmentId === selectedDepartmentId) ?? null;
+
+  useEffect(() => {
+    if (!selectedDepartmentId && departmentRows.length > 0) {
+      setSelectedDepartmentId(departmentRows[0].departmentId);
+    }
+  }, [departmentRows, selectedDepartmentId]);
+
+  useEffect(() => {
+    if (!selectedDepartment) return;
+    setForm({
+      code: selectedDepartment.code,
+      name: selectedDepartment.name,
+      points: String(selectedDepartment.points ?? 1),
+      itemLabel: selectedDepartment.itemLabel ?? '부서활동 주간 상점',
+      effectiveFrom: selectedDepartment.effectiveFrom ?? currentWeekMonday(),
+    });
+  }, [selectedDepartment?.departmentId]);
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: getDepartmentMeritAdminQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getDepartmentMembersQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getDepartmentMeritStatusQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+  };
+
+  const currentMembers = (members.data ?? []).filter((row) => row.departmentId === selectedDepartmentId);
+  const memberIds = new Set(currentMembers.map((row) => row.coreStudentId));
+  const needle = studentSearch.trim().toLowerCase();
+  const candidates = (students.data ?? []).filter((row) =>
+    !memberIds.has(row.coreStudentId)
+    && (
+      !needle
+      || row.name.toLowerCase().includes(needle)
+      || (row.studentNo ?? '').toLowerCase().includes(needle)
+      || (row.homeroom ?? '').toLowerCase().includes(needle)
+    )
+  ).slice(0, 50);
+
+  const resetNewDepartment = () => {
+    setSelectedDepartmentId('');
+    setForm({
+      code: '',
+      name: '',
+      points: '1',
+      itemLabel: '부서활동 주간 상점',
+      effectiveFrom: currentWeekMonday(),
+    });
+  };
+
+  const submitDepartment = (event: FormEvent) => {
+    event.preventDefault();
+    const points = Number(form.points);
+    if (!form.code.trim() || !form.name.trim() || !form.itemLabel.trim() || !Number.isFinite(points)) return;
+
+    saveRule.mutate({
+      code: form.code.trim(),
+      name: form.name.trim(),
+      points,
+      itemLabel: form.itemLabel.trim(),
+      effectiveFrom: form.effectiveFrom,
+    }, {
+      onSuccess: (departmentId) => {
+        refresh();
+        setSelectedDepartmentId(departmentId);
+        notify('부서와 주간 상점 규칙을 저장했습니다.');
+      },
+      onError: (error) => notify(errText(error), 'error'),
+    });
+  };
+
+  const addMember = () => {
+    if (!selectedDepartmentId || !studentId) return;
+    setMembership.mutate({
+      departmentId: selectedDepartmentId,
+      studentId,
+      active: true,
+      effectiveOn: membershipDate,
+    }, {
+      onSuccess: () => {
+        refresh();
+        setStudentId('');
+        setStudentSearch('');
+        notify('부서 소속 학생을 추가했습니다.');
+      },
+      onError: (error) => notify(errText(error), 'error'),
+    });
+  };
+
+  const removeMember = (coreStudentId: string) => {
+    if (!selectedDepartmentId) return;
+    if (!window.confirm('이 학생의 현재 부서 소속을 종료할까요? 과거 상점 기록은 유지됩니다.')) return;
+
+    setMembership.mutate({
+      departmentId: selectedDepartmentId,
+      studentId: coreStudentId,
+      active: false,
+      effectiveOn: today(),
+    }, {
+      onSuccess: () => {
+        refresh();
+        notify('부서 소속을 종료했습니다.');
+      },
+      onError: (error) => notify(errText(error), 'error'),
+    });
+  };
+
+  if (departments.isLoading || members.isLoading || students.isLoading) return <LoadingState />;
+  if (departments.isError || members.isError || students.isError) {
+    return <ErrorState
+      error={departments.error ?? members.error ?? students.error}
+      retry={() => { departments.refetch(); members.refetch(); students.refetch(); }}
+    />;
+  }
+
+  return <div>
+    <PageHeader
+      eyebrow="주간 자동 상점"
+      title="부서 상점 관리"
+      copy="실제 부서활동 명단과 주간 상점 규칙을 운영 DB에서 관리합니다. Git에는 학생 소속 데이터가 저장되지 않습니다."
+      action={<button className="btn btn-primary" onClick={resetNewDepartment} data-testid="button-new-department"><Plus size={15} /> 새 부서</button>}
+    />
+
+    <div className="detail-grid" style={{ marginTop: 30 }}>
+      <section className="card card-pad">
+        <div className="section-row" style={{ marginTop: 0 }}>
+          <div>
+            <div className="eyebrow">Departments</div>
+            <h2 className="section-title" style={{ marginTop: 8 }}>부서 목록</h2>
+          </div>
+          <span className="pill pill-positive">{departmentRows.filter((row) => row.isActive).length}개 활성</span>
+        </div>
+
+        {departmentRows.length === 0 ? <EmptyState title="등록된 부서가 없습니다" copy="새 부서를 만들고 주간 상점 규칙을 지정하세요." /> :
+          <div className="activity-list">
+            {departmentRows.map((row) => <button
+              type="button"
+              key={row.departmentId}
+              className={'activity-row department-row-button ' + (selectedDepartmentId === row.departmentId ? 'selected' : '')}
+              onClick={() => setSelectedDepartmentId(row.departmentId)}
+              data-testid={'button-department-' + row.departmentId}
+            >
+              <div className="activity-mark"><ArrowUpRight size={15} /></div>
+              <div style={{ textAlign: 'left', minWidth: 0, flex: 1 }}>
+                <div className="activity-label">{row.name}</div>
+                <div className="record-meta">
+                  {row.code} · {row.points != null ? '+' + row.points + '점/주' : '규칙 없음'} · 현재 {row.currentMemberCount}명
+                </div>
+              </div>
+              <span className={'pill ' + (row.isActive ? 'pill-positive' : 'pill-neutral')}>{row.isActive ? '활성' : '중지'}</span>
+            </button>)}
+          </div>}
+      </section>
+
+      <form className="card card-pad" onSubmit={submitDepartment}>
+        <div className="eyebrow">{selectedDepartment ? 'Rule version' : 'New department'}</div>
+        <h2 className="section-title" style={{ marginTop: 8 }}>{selectedDepartment ? '부서 / 상점 규칙 수정' : '새 부서 만들기'}</h2>
+        <p className="section-copy">점수를 변경하면 이전 규칙은 이력으로 남고 새 effective date부터 새 규칙이 적용됩니다.</p>
+
+        <div className="form-grid" style={{ marginTop: 22 }}>
+          <div className="field">
+            <label htmlFor="dept-code">부서 코드</label>
+            <input id="dept-code" className="input" required maxLength={40} value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })} placeholder="예: MEDIA" />
+          </div>
+          <div className="field">
+            <label htmlFor="dept-name">부서명</label>
+            <input id="dept-name" className="input" required maxLength={80} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+          </div>
+          <div className="field">
+            <label htmlFor="dept-points">주간 상점</label>
+            <input id="dept-points" className="input" type="number" min="1" max="20" required value={form.points} onChange={(event) => setForm({ ...form, points: event.target.value })} />
+          </div>
+          <div className="field">
+            <label htmlFor="dept-effective">적용 시작일</label>
+            <input id="dept-effective" className="input" type="date" required value={form.effectiveFrom} onChange={(event) => setForm({ ...form, effectiveFrom: event.target.value })} />
+          </div>
+          <div className="field full">
+            <label htmlFor="dept-item-label">상점 기록명</label>
+            <input id="dept-item-label" className="input" required maxLength={120} value={form.itemLabel} onChange={(event) => setForm({ ...form, itemLabel: event.target.value })} />
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          {selectedDepartment && <button
+            type="button"
+            className="btn btn-outline"
+            disabled={setDepartmentActive.isPending}
+            onClick={() => setDepartmentActive.mutate({
+              departmentId: selectedDepartment.departmentId,
+              active: !selectedDepartment.isActive,
+            }, {
+              onSuccess: () => {
+                refresh();
+                notify(selectedDepartment.isActive ? '부서를 중지했습니다.' : '부서를 다시 활성화했습니다.');
+              },
+              onError: (error) => notify(errText(error), 'error'),
+            })}
+          >{selectedDepartment.isActive ? '부서 중지' : '부서 활성화'}</button>}
+          <button className="btn btn-primary" disabled={saveRule.isPending}>규칙 저장</button>
+        </div>
+      </form>
+    </div>
+
+    <section className="card card-pad" style={{ marginTop: 26 }}>
+      <div className="section-row" style={{ marginTop: 0 }}>
+        <div>
+          <div className="eyebrow">Membership</div>
+          <h2 className="section-title" style={{ marginTop: 8 }}>{selectedDepartment ? selectedDepartment.name + ' 소속 학생' : '부서를 먼저 선택하세요'}</h2>
+          <p className="section-copy">소속 이력은 삭제하지 않고 시작일/종료일로 보존합니다.</p>
+        </div>
+        {selectedDepartment && <span className="pill pill-positive">{currentMembers.length}명</span>}
+      </div>
+
+      {selectedDepartment ? <>
+        <div className="form-grid" style={{ marginTop: 20 }}>
+          <div className="field full">
+            <label htmlFor="dept-student-search">학생 검색</label>
+            <div className="search-box"><Search size={15} /><input
+              id="dept-student-search"
+              className="input"
+              value={studentSearch}
+              onChange={(event) => { setStudentSearch(event.target.value); setStudentId(''); }}
+              placeholder="이름 · 학번 · 반"
+            /></div>
+            <select className="select" value={studentId} onChange={(event) => setStudentId(event.target.value)}>
+              <option value="">추가할 학생 선택</option>
+              {candidates.map((row) => <option key={row.coreStudentId} value={row.coreStudentId}>
+                {row.name + ' · ' + (row.homeroom ?? ('G' + row.grade)) + (row.studentNo ? ' · ' + row.studentNo : '')}
+              </option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="membership-date">소속 시작일</label>
+            <input id="membership-date" className="input" type="date" value={membershipDate} onChange={(event) => setMembershipDate(event.target.value)} />
+          </div>
+          <div className="field" style={{ justifyContent: 'end' }}>
+            <label>&nbsp;</label>
+            <button type="button" className="btn btn-primary" disabled={!studentId || setMembership.isPending} onClick={addMember}>
+              <Plus size={14} /> 학생 추가
+            </button>
+          </div>
+        </div>
+
+        <div className="side-note" style={{ marginTop: 16 }}>
+          이번 주 월요일({dateLabel(currentWeekMonday())}) 이전/당일부터 유효한 소속만 이번 주 자동 상점 대상이 됩니다. 이미 생성된 과거 상점은 소속 종료 시 삭제하지 않습니다.
+        </div>
+
+        {currentMembers.length === 0 ? <EmptyState title="현재 소속 학생이 없습니다" copy="학생을 추가하면 주간 자동 상점 대상에 포함됩니다." /> :
+          <div className="table-wrap" style={{ marginTop: 18 }}>
+            <table className="data-table">
+              <thead><tr><th>학생</th><th>학년/반</th><th>학번</th><th>시작일</th><th>관리</th></tr></thead>
+              <tbody>{currentMembers.map((row) => <tr key={row.membershipId}>
+                <td><strong>{row.studentName}</strong></td>
+                <td>{row.homeroom ?? (row.grade ? 'G' + row.grade : '—')}</td>
+                <td className="muted">{row.studentNo ?? '미발급'}</td>
+                <td>{dateLabel(row.startsOn)}</td>
+                <td><button type="button" className="btn btn-outline" onClick={() => removeMember(row.coreStudentId)}>소속 종료</button></td>
+              </tr>)}</tbody>
+            </table>
+          </div>}
+      </> : <EmptyState title="부서 선택 필요" copy="왼쪽에서 부서를 선택하거나 새 부서를 만드세요." />}
+    </section>
+  </div>;
+}
+
 function PointItemsPage() {
   const queryClient = useQueryClient();
   const notify = useContext(NoticeContext);
@@ -1532,7 +1839,7 @@ function ProtectedRoutes() {
   if (loading) return <LoadingState />;
   if (!session) return <Redirect to="/sign-in" />;
   if (!admin) return <div className="app-loading"><div className="error-box"><AlertTriangle size={24} /><p>관리자 권한이 없는 계정입니다. 운영 담당자에게 문의해주세요.</p><button className="btn btn-outline" onClick={() => signOut()} data-testid="button-no-admin-sign-out"><LogOut size={14} /> 로그아웃</button></div></div>;
-  return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} /><Route path="/settlement" component={() => <LeadGate><SettlementPage /></LeadGate>} /><Route path="/audit" component={() => <LeadGate><AuditLogPage /></LeadGate>} /><Route path="/core-setup" component={() => <LeadGate><CoreSetupPage /></LeadGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
+  return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} /><Route path="/settlement" component={() => <LeadGate><SettlementPage /></LeadGate>} /><Route path="/audit" component={() => <LeadGate><AuditLogPage /></LeadGate>} /><Route path="/core-setup" component={() => <LeadGate><CoreSetupPage /></LeadGate>} /><Route path="/department-merits" component={() => <LeadGate><DepartmentMeritAdminPage /></LeadGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
 }
 
 function NotFoundInline() {
