@@ -1504,3 +1504,267 @@ computer_lab.*
 > **DICS Core가 더 이상 미래 계획이 아니라 여러 domain이 실제로 공존하는 중앙 데이터 플랫폼의 형태를 갖추기 시작했다.**
 
 다음 단계의 핵심은 schema 생성이 아니라 **identity와 운영 데이터를 정확히 연결하는 것**이다.
+
+
+---
+
+# 27. 학생뿐 아니라 교사 Auth도 외부 namespace였다
+
+Study Planner target schema를 처음 만들 때 학생 identity는 Core UUID로 분리했지만,
+교사 profile은 기존 SP schema의 습관을 따라 Auth UUID를 PK로 둘 수 있었다.
+
+그러나 같은 원칙을 다시 적용하면 교사도 예외가 아니다.
+
+현재 SP의 교사 Auth UUID 역시:
+
+    legacy SP Supabase project
+
+에 속한다.
+
+따라서 Core project의 auth.users FK로 직접 사용할 수 없다.
+
+## 수정된 staff target
+
+    study_planner.staff.id
+    = domain staff profile UUID
+
+    study_planner.staff.auth_user_id
+    = optional DICS Core LOCAL Auth UUID
+
+    study_planner.external_staff_identities
+    = legacy/external staff Auth bridge
+
+학생 identity에서 발견한 namespace 문제를 교사 identity까지 일반화한 것이다.
+
+중요한 점은 실제 SP staff/comment data가 아직 target에 들어오기 전 구조를 수정했다는 점이다.
+
+이미 데이터가 들어간 뒤 PK semantics를 바꾸는 것보다,
+shadow target 단계에서 오류를 발견하는 편이 훨씬 안전했다.
+
+---
+
+# 28. Security Advisor가 “논리적으로 막혀 있음”과 “노출 자체가 없음”의 차이를 보여주다
+
+Core provisioning과 외부 identity 연결 RPC는 모두 함수 내부에서:
+
+    private.current_admin_is_lead()
+
+를 검사하도록 작성돼 있었다.
+
+따라서 anonymous 사용자가 실제 작업을 성공시키기는 어려웠다.
+
+하지만 Supabase Security Advisor는 별도의 문제를 지적했다.
+
+    SECURITY DEFINER function
+    + default PUBLIC EXECUTE
+
+조합 때문에 anonymous role이 RPC endpoint를 호출할 수 있는 상태였다.
+
+## 판단
+
+“호출하면 내부 권한검사에서 실패한다”와
+“호출권한 자체가 없다”는 동일한 보안 수준이 아니다.
+
+따라서 Core admin 계열 함수에 대해:
+
+    REVOKE EXECUTE FROM PUBLIC
+    REVOKE EXECUTE FROM anon
+    GRANT EXECUTE TO authenticated
+
+를 명시했다.
+
+대상:
+
+- current academic term 초기화
+- G9-A/B 배정
+- external Auth identity 연결
+
+재검사 결과 이 세 함수의 anon 경고는 사라졌다.
+
+남은 anonymous SECURITY DEFINER 경고는 Computer Lab의 dics_device_rpc 하나였는데,
+이 함수는 server-key/session 기반 별도 domain 설계이므로
+Daniel/Core lane에서 임의 변경하지 않았다.
+
+## 교훈
+
+보안 경계는:
+
+    UI에서 버튼을 숨김
+    < 함수 내부 role check
+    < DB privilege + 함수 role check
+
+순으로 더 명확해진다.
+
+Advisor는 “코드가 논리적으로 안전해 보이는가”가 아니라
+실제 DB privilege surface를 별도로 검증하는 역할을 했다.
+
+---
+
+# 29. 28/29 student_no reconciliation 이후 — Auth는 따로 이동한다
+
+SP pilot 29명 가운데 검증된 28명의 student_no가 Core에 들어간 뒤 readiness는:
+
+    active Core students        175
+    student_no linked            28
+    current enrollment          144
+    Core-local Auth linked        0
+    external Auth linked          0
+
+가 되었다.
+
+이 수치가 중요한 이유는 student_no와 Auth migration을 하나의 작업으로 뭉개지 않았기 때문이다.
+
+    human identifier
+    ≠ external login identity
+    ≠ Core-local login identity
+
+를 별도 단계로 다룬다.
+
+따라서 Core readiness 화면도 Auth를:
+
+    Core Auth
+    External Auth
+
+두 축으로 분리했다.
+
+기존 SP Auth가 연결되어도 Core-local Auth count는 0으로 남을 수 있고,
+그 상태 자체가 migration reality를 정확하게 표현한다.
+
+---
+
+# 30. Cross-project identity migration을 수작업 복사에서 repeatable tooling으로 전환
+
+외부 SP Auth identity를 Core로 가져오려면 실제로는 다음 민감한 관계를 다뤄야 한다.
+
+    SP auth UUID
+    ↔ student_no
+    ↔ Core student UUID
+
+이 값을 GitHub Issue나 PR comment로 옮기는 방식은 사용하지 않기로 했다.
+
+대신 두 Supabase 프로젝트에 직접 연결하는 one-time migration runner를 작성했다.
+
+    scripts/migrate-sp-external-identities.mjs
+
+## 기본 동작
+
+명시적인 --apply가 없으면 무조건 DRY RUN이다.
+
+읽는 필드도 최소화했다.
+
+SP:
+
+    id
+    student_no
+    core_student_id
+
+Core:
+
+    id
+    student_no
+
+이름, 이메일, PIN, DOB는 읽지 않는다.
+
+출력도 실제 identity 값을 보여주지 않고 aggregate count만 표시한다.
+
+## 자동 hard-stop
+
+다음 중 하나라도 있으면 write 전에 중단한다.
+
+- source student_no duplicate
+- Core student_no duplicate
+- SP core_student_id가 기대 Core 학생과 충돌
+- 한 external Auth가 다른 Core 학생에 이미 연결
+- 한 Core 학생이 같은 source의 다른 external Auth와 이미 연결
+
+## distributed transaction 문제
+
+SP와 Core는 서로 다른 database이므로 하나의 SQL transaction으로 묶을 수 없다.
+
+이 현실을 숨기지 않고 두 write를 **idempotent**하게 설계했다.
+
+중간에 실패해 한쪽만 반영되더라도:
+
+    rerun
+    → already-correct mapping 확인
+    → 빠진 쪽만 완성
+
+할 수 있다.
+
+CI에도:
+
+    node --check scripts/migrate-sp-external-identities.mjs
+
+를 추가해 migration tooling 자체도 PR 검증 대상이 되었다.
+
+---
+
+# 31. Study Planner migration 검증도 content가 아니라 count부터
+
+Study Planner target schema에는 실제 운영 학습데이터가 아직 0건이다.
+
+실제 copy가 시작되기 전에 lead-only aggregate inventory RPC를 추가했다.
+
+    get_study_planner_target_inventory()
+
+이 함수는 다음 row count만 반환한다.
+
+- staff
+- external staff identities
+- weeks
+- reference tables
+- goals
+- plans
+- items
+- execution records
+- comments
+
+학생의 계획 내용이나 교사 코멘트 본문은 노출하지 않는다.
+
+이는 migration 검증의 우선순위를 보여준다.
+
+    먼저 count / FK / unique constraint parity
+    그 다음 제한된 sample behavior
+    마지막에 frontend cut-over
+
+즉 “데이터를 복사했다”가 완료가 아니라
+**source와 target이 설명 가능한 방식으로 일치한다**가 완료 기준이다.
+
+---
+
+# 32. 2026-09-25 Integration Checkpoint
+
+현재 DICS Core는 다음 상태에 도달했다.
+
+    canonical Core students       180
+    active students               175
+    verified student_no            28
+
+    current academic term           1
+    classes                         13
+    current enrollments            144
+    G9 A/B pending                  31
+
+    Core-local student Auth          0
+    external student Auth            0
+
+    Study Planner target tables     13+
+    Study Planner live copied rows   0
+
+    Computer Lab schema          present
+    Discipline domain           active
+
+즉 플랫폼은 이제:
+
+    schema integration
+
+단계를 상당 부분 지나:
+
+    identity enrichment
+    → verified data migration
+    → domain cut-over
+
+단계로 이동하고 있다.
+
+다음 중요한 evidence point는 SP live bridge migration을 적용한 뒤
+29명 중 몇 명이 실제 source↔Core 양쪽 bridge를 완성하는지다.
