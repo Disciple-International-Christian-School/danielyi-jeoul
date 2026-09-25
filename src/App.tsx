@@ -428,6 +428,7 @@ function StudentDetailPage() {
 function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
   const queryClient = useQueryClient();
   const notify = useContext(NoticeContext);
+  const { admin } = useAuth();
   const students = useListStudents();
   const items = useListPointItems({ type, includeInactive: false });
   const create = useCreatePointRecord();
@@ -436,7 +437,6 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
   const [studentId, setStudentId] = useState('');
   const [itemId, setItemId] = useState('');
   const [points, setPoints] = useState('');
-  const [enteredByName, setEnteredByName] = useState('');
   const [recordedAt, setRecordedAt] = useState(today());
   const [reflectionSubmitted, setReflectionSubmitted] = useState(false);
   const [search, setSearch] = useState('');
@@ -464,7 +464,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!studentId || !enteredByName.trim() || !points) return;
+    if (!studentId || !points || !admin) return;
 
     const itemName = selectedItem?.name ?? '수기 입력';
     const pointValue = Number(points);
@@ -477,7 +477,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
         item: itemName,
         points: pointValue,
         recordedAt,
-        enteredByName: enteredByName.trim(),
+        enteredByName: admin.displayName,
         reflectionSubmitted: negative ? reflectionSubmitted : null,
       },
     }, {
@@ -596,14 +596,13 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
             <input id="entry-date" className="input" type="date" required value={recordedAt} onChange={(event) => setRecordedAt(event.target.value)} data-testid="input-point-date" />
           </div>
 
-          <div className="field full">
-            <label htmlFor="entry-by">기입자</label>
-            <input id="entry-by" className="input" required maxLength={40} value={enteredByName} onChange={(event) => setEnteredByName(event.target.value)} placeholder="실제 기입자 이름" data-testid="input-point-entered-by" />
+          <div className="side-note field full">
+            기록자 <strong>{admin?.displayName ?? '로그인 관리자'}</strong> · 실제 작성자 ID는 로그인 계정으로 자동 저장됩니다.
           </div>
 
           <label className="check-row field full">
             <input type="checkbox" checked={continuousMode} onChange={(event) => setContinuousMode(event.target.checked)} data-testid="checkbox-continuous-entry" />
-            연속 입력 모드 — 저장 후 항목·점수·날짜·기입자를 유지
+            연속 입력 모드 — 저장 후 항목·점수·날짜를 유지
           </label>
 
           {negative && <label className="check-row field full">
@@ -1122,6 +1121,7 @@ function SettlementPage() {
 function PunishmentsPage() {
   const queryClient = useQueryClient();
   const notify = useContext(NoticeContext);
+  const { admin } = useAuth();
   const students = useListStudents();
   const punishments = useListPunishments();
   const create = useCreatePunishment();
@@ -1130,12 +1130,11 @@ function PunishmentsPage() {
   const [types, setTypes] = useState<string[]>([]);
   const [startDate, setStartDate] = useState(today());
   const [endDate, setEndDate] = useState(today());
-  const [enteredByName, setEnteredByName] = useState('');
   const toggleType = (value: string) => setTypes((current) => current.includes(value) ? current.filter((item) => item !== value) : current.length < 2 ? [...current, value] : current);
-  const submit = (event: FormEvent) => { event.preventDefault(); create.mutate({ data: { studentId: Number(studentId), types, startDate, endDate, enteredByName: enteredByName.trim() } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListPunishmentsQueryKey() }); setStudentId(''); setTypes([]); setEnteredByName(''); notify('처분이 등록되었습니다.'); }, onError: (error) => notify(errText(error), 'error') }); };
+  const submit = (event: FormEvent) => { event.preventDefault(); if (!admin) return; create.mutate({ data: { studentId: Number(studentId), types, startDate, endDate, enteredByName: admin.displayName } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListPunishmentsQueryKey() }); setStudentId(''); setTypes([]); notify('처분이 등록되었습니다.'); }, onError: (error) => notify(errText(error), 'error') }); };
   if (students.isLoading || punishments.isLoading) return <LoadingState />;
   if (students.isError || punishments.isError) return <ErrorState error={students.error ?? punishments.error} retry={() => { students.refetch(); punishments.refetch(); }} />;
-  return <div><PageHeader eyebrow="사생회 운영" title="기숙사 처분" copy="수동 처분과 위반 여부를 같은 화면에서 기록합니다." /><div className="detail-grid" style={{ marginTop: 30 }}><form className="card card-pad" onSubmit={submit}><h2 className="section-title">처분 등록</h2><p className="section-copy">한 번에 최대 두 가지 처분을 선택할 수 있습니다.</p><div className="form-grid" style={{ marginTop: 24 }}><div className="field full"><label htmlFor="punishment-student">학생</label><select id="punishment-student" className="select" required value={studentId} onChange={(event) => setStudentId(event.target.value)} data-testid="select-punishment-student"><option value="">학생 선택</option>{(students.data ?? []).map((student) => <option key={student.id} value={student.id}>{student.name} · {student.grade}학년</option>)}</select></div><div className="field full"><label>처분 유형 <span className="muted">({types.length}/2)</span></label><div className="filter-bar">{PUNISHMENT_TYPES.map((value) => <button type="button" key={value} className={`btn ${types.includes(value) ? 'btn-primary' : 'btn-outline'}`} onClick={() => toggleType(value)} data-testid={`button-punishment-type-${value}`}>{types.includes(value) && <Check size={13} />}{value}</button>)}</div></div><div className="field"><label htmlFor="punishment-start">시작일</label><input id="punishment-start" className="input" type="date" required value={startDate} onChange={(event) => setStartDate(event.target.value)} data-testid="input-punishment-start" /></div><div className="field"><label htmlFor="punishment-end">종료일</label><input id="punishment-end" className="input" type="date" required value={endDate} onChange={(event) => setEndDate(event.target.value)} data-testid="input-punishment-end" /></div><div className="field full"><label htmlFor="punishment-by">기입자</label><input id="punishment-by" className="input" required value={enteredByName} onChange={(event) => setEnteredByName(event.target.value)} data-testid="input-punishment-entered-by" /></div></div><div className="modal-actions"><button className="btn btn-primary" disabled={create.isPending || !studentId || types.length === 0} data-testid="button-submit-punishment">{create.isPending ? '저장 중' : '처분 등록'}</button></div></form><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">최근 처분</h2><p className="section-copy">위반 시 규정에 따라 상태를 갱신합니다.</p></div></div>{punishments.data?.length === 0 ? <EmptyState title="처분 기록이 없습니다" copy="등록된 기숙사 처분이 없습니다." /> : <div className="activity-list">{punishments.data?.map((punishment) => <div className="activity-row" key={punishment.id} data-testid={`row-manual-punishment-${punishment.id}`}><div className="activity-mark"><BedDouble size={15} /></div><div style={{ minWidth: 0 }}><div className="activity-label">{punishment.studentName} · {punishment.types.join(' · ')}</div><div className="record-meta">{dateLabel(punishment.startDate)} — {dateLabel(punishment.endDate)} · {punishment.enteredByName}</div></div><button className={`pill ${punishment.violated ? 'pill-negative' : 'pill-neutral'}`} onClick={() => setViolation.mutate({ id: punishment.id, violated: !punishment.violated }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListPunishmentsQueryKey() }), onError: (error) => notify(errText(error), 'error') })} data-testid={`button-punishment-violation-${punishment.id}`}>{punishment.violated ? '위반 기록됨' : '위반 없음'}</button></div>)}</div>}</section></div></div>;
+  return <div><PageHeader eyebrow="사생회 운영" title="기숙사 처분" copy="수동 처분과 위반 여부를 같은 화면에서 기록합니다." /><div className="detail-grid" style={{ marginTop: 30 }}><form className="card card-pad" onSubmit={submit}><h2 className="section-title">처분 등록</h2><p className="section-copy">한 번에 최대 두 가지 처분을 선택할 수 있습니다.</p><div className="form-grid" style={{ marginTop: 24 }}><div className="field full"><label htmlFor="punishment-student">학생</label><select id="punishment-student" className="select" required value={studentId} onChange={(event) => setStudentId(event.target.value)} data-testid="select-punishment-student"><option value="">학생 선택</option>{(students.data ?? []).map((student) => <option key={student.id} value={student.id}>{student.name} · {student.grade}학년</option>)}</select></div><div className="field full"><label>처분 유형 <span className="muted">({types.length}/2)</span></label><div className="filter-bar">{PUNISHMENT_TYPES.map((value) => <button type="button" key={value} className={`btn ${types.includes(value) ? 'btn-primary' : 'btn-outline'}`} onClick={() => toggleType(value)} data-testid={`button-punishment-type-${value}`}>{types.includes(value) && <Check size={13} />}{value}</button>)}</div></div><div className="field"><label htmlFor="punishment-start">시작일</label><input id="punishment-start" className="input" type="date" required value={startDate} onChange={(event) => setStartDate(event.target.value)} data-testid="input-punishment-start" /></div><div className="field"><label htmlFor="punishment-end">종료일</label><input id="punishment-end" className="input" type="date" required value={endDate} onChange={(event) => setEndDate(event.target.value)} data-testid="input-punishment-end" /></div><div className="side-note field full">기록자 <strong>{admin?.displayName ?? '로그인 관리자'}</strong> · 인증된 계정으로 자동 기록됩니다.</div></div><div className="modal-actions"><button className="btn btn-primary" disabled={create.isPending || !studentId || types.length === 0} data-testid="button-submit-punishment">{create.isPending ? '저장 중' : '처분 등록'}</button></div></form><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">최근 처분</h2><p className="section-copy">위반 시 규정에 따라 상태를 갱신합니다.</p></div></div>{punishments.data?.length === 0 ? <EmptyState title="처분 기록이 없습니다" copy="등록된 기숙사 처분이 없습니다." /> : <div className="activity-list">{punishments.data?.map((punishment) => <div className="activity-row" key={punishment.id} data-testid={`row-manual-punishment-${punishment.id}`}><div className="activity-mark"><BedDouble size={15} /></div><div style={{ minWidth: 0 }}><div className="activity-label">{punishment.studentName} · {punishment.types.join(' · ')}</div><div className="record-meta">{dateLabel(punishment.startDate)} — {dateLabel(punishment.endDate)} · {punishment.enteredByName}</div></div><button className={`pill ${punishment.violated ? 'pill-negative' : 'pill-neutral'}`} onClick={() => setViolation.mutate({ id: punishment.id, violated: !punishment.violated }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListPunishmentsQueryKey() }), onError: (error) => notify(errText(error), 'error') })} data-testid={`button-punishment-violation-${punishment.id}`}>{punishment.violated ? '위반 기록됨' : '위반 없음'}</button></div>)}</div>}</section></div></div>;
 }
 
 function PointItemsPage() {
