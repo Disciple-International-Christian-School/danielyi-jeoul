@@ -1397,6 +1397,285 @@ function CoreSetupPage() {
   </div>;
 }
 
+function AdminAccountsPage() {
+  const queryClient = useQueryClient();
+  const notify = useContext(NoticeContext);
+  const accounts = useAdminAccounts();
+  const provision = useProvisionAdminAccount();
+  const update = useUpdateAdminProfile();
+
+  const [editing, setEditing] = useState<AdminAccount | null | undefined>(undefined);
+  const [credential, setCredential] = useState<{ loginId: string; temporaryPassword: string } | null>(null);
+  const [form, setForm] = useState<{
+    loginId: string;
+    displayName: string;
+    role: Role;
+    disciplineScope: DisciplineScope | null;
+    isLead: boolean;
+    isActive: boolean;
+  }>({
+    loginId: '',
+    displayName: '',
+    role: 'SEONDO',
+    disciplineScope: 'MIDDLE',
+    isLead: false,
+    isActive: true,
+  });
+
+  const scopeLabel = (scope: DisciplineScope | null) => ({
+    ALL: '전체',
+    ELEMENTARY: '초등 G1–6',
+    MIDDLE: '중등 G7–9',
+    HIGH: '고등 G10–12',
+  }[scope ?? 'ALL'] ?? '—');
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: getAdminAccountsQueryKey() });
+
+  const openNew = () => {
+    setForm({
+      loginId: '',
+      displayName: '',
+      role: 'SEONDO',
+      disciplineScope: 'MIDDLE',
+      isLead: false,
+      isActive: true,
+    });
+    setEditing(null);
+  };
+
+  const openEdit = (account: AdminAccount) => {
+    setForm({
+      loginId: account.loginId,
+      displayName: account.displayName,
+      role: account.role,
+      disciplineScope: account.disciplineScope,
+      isLead: account.isLead,
+      isActive: account.isActive,
+    });
+    setEditing(account);
+  };
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const normalizedRole = form.role;
+    const normalizedScope = normalizedRole === 'SEONDO' ? form.disciplineScope : null;
+    const normalizedLead = normalizedRole === 'SEONDO' ? form.isLead : false;
+
+    if (editing) {
+      update.mutate({
+        adminId: editing.id,
+        displayName: form.displayName.trim(),
+        role: normalizedRole,
+        disciplineScope: normalizedScope,
+        isLead: normalizedLead,
+        isActive: form.isActive,
+      }, {
+        onSuccess: () => {
+          refresh();
+          setEditing(undefined);
+          notify('관리자 계정 설정을 저장했습니다.');
+        },
+        onError: (error) => notify(errText(error), 'error'),
+      });
+      return;
+    }
+
+    provision.mutate({
+      loginId: form.loginId.trim().toLowerCase(),
+      displayName: form.displayName.trim(),
+      role: normalizedRole,
+      disciplineScope: normalizedScope,
+      isLead: normalizedLead,
+    }, {
+      onSuccess: (result) => {
+        refresh();
+        setEditing(undefined);
+        setCredential({
+          loginId: result.loginId,
+          temporaryPassword: result.temporaryPassword,
+        });
+        notify('개인 관리자 계정을 생성했습니다.');
+      },
+      onError: (error) => notify(errText(error), 'error'),
+    });
+  };
+
+  if (accounts.isLoading) return <LoadingState />;
+  if (accounts.isError) return <ErrorState error={accounts.error} retry={() => accounts.refetch()} />;
+
+  const rows = accounts.data ?? [];
+
+  return <div>
+    <PageHeader
+      eyebrow="Individual accountability"
+      title="관리자 계정"
+      copy="공유 역할 계정에서 개인 계정으로 단계적으로 전환합니다. 새 계정은 임시 비밀번호로 생성되며 첫 로그인 시 비밀번호 변경이 강제됩니다."
+      action={<button className="btn btn-primary" onClick={openNew} data-testid="button-new-admin-account"><Plus size={15} /> 개인 계정 생성</button>}
+    />
+
+    <div className="side-note" style={{ marginTop: 24 }}>
+      <strong>전환 원칙</strong>
+      <span style={{ marginLeft: 10 }}>공유계정은 당장 삭제하지 않습니다.</span>
+      <div style={{ marginTop: 5 }}>
+        개인계정 사용이 안정화된 뒤 shared SEONDO/SASAENG 계정을 비활성화합니다. 신규 기록은 인증된 개인 Auth UUID로 감사로그에 남습니다.
+      </div>
+    </div>
+
+    <div className="card card-pad" style={{ marginTop: 24 }}>
+      <div className="section-row" style={{ marginTop: 0 }}>
+        <div>
+          <h2 className="section-title">현재 관리자 계정</h2>
+          <p className="section-copy">로그인 ID와 업무범위만 표시합니다. Auth UUID와 비밀번호는 노출하지 않습니다.</p>
+        </div>
+        <span className="pill pill-positive">{rows.filter((row) => row.isActive).length}개 활성</span>
+      </div>
+
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead><tr><th>이름</th><th>로그인 ID</th><th>역할</th><th>담당</th><th>권한</th><th>비밀번호</th><th>상태</th><th>관리</th></tr></thead>
+          <tbody>{rows.map((row) => <tr key={row.id} data-testid={'row-admin-' + row.id}>
+            <td><strong>{row.displayName}</strong>{row.isSelf ? <span className="muted"> · 나</span> : null}</td>
+            <td><code>{row.loginId}</code></td>
+            <td>{row.role === 'SEONDO' ? '선도부' : '사생회'}</td>
+            <td>{row.role === 'SEONDO' ? scopeLabel(row.disciplineScope) : '기숙사'}</td>
+            <td>{row.isLead ? <span className="pill pill-positive">선도부장</span> : <span className="pill pill-neutral">일반</span>}</td>
+            <td>{row.mustChangePassword ? <span className="pill pill-warning">첫 변경 필요</span> : <span className="pill pill-positive">설정됨</span>}</td>
+            <td><span className={'pill ' + (row.isActive ? 'pill-positive' : 'pill-neutral')}>{row.isActive ? '활성' : '비활성'}</span></td>
+            <td><button className="btn btn-outline" onClick={() => openEdit(row)}>설정</button></td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    </div>
+
+    {editing !== undefined && <div className="modal-backdrop">
+      <form className="modal" onSubmit={submit}>
+        <div className="modal-header">
+          <div>
+            <div className="eyebrow">{editing ? 'Account settings' : 'Provision account'}</div>
+            <h2 className="modal-title">{editing ? '관리자 계정 설정' : '개인 관리자 계정 생성'}</h2>
+          </div>
+          <button type="button" className="btn btn-icon btn-outline" onClick={() => setEditing(undefined)} aria-label="닫기"><X size={16} /></button>
+        </div>
+
+        <div className="form-grid">
+          <div className="field full">
+            <label htmlFor="admin-display-name">표시 이름</label>
+            <input id="admin-display-name" className="input" required maxLength={80} value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} />
+          </div>
+
+          <div className="field full">
+            <label htmlFor="admin-login-id">로그인 ID</label>
+            <input
+              id="admin-login-id"
+              className="input"
+              required
+              disabled={Boolean(editing)}
+              maxLength={32}
+              value={form.loginId}
+              onChange={(event) => setForm({ ...form, loginId: event.target.value.toLowerCase() })}
+              placeholder="영문 소문자/숫자/._-"
+            />
+            {!editing && <span className="muted" style={{ fontSize: 11 }}>실제 Auth 이메일은 내부적으로 ID@scale.dics.kr 형식으로 생성됩니다.</span>}
+          </div>
+
+          <div className="field">
+            <label htmlFor="admin-role">역할</label>
+            <select
+              id="admin-role"
+              className="select"
+              value={form.role}
+              onChange={(event) => {
+                const role = event.target.value as Role;
+                setForm({
+                  ...form,
+                  role,
+                  disciplineScope: role === 'SEONDO' ? (form.disciplineScope ?? 'MIDDLE') : null,
+                  isLead: role === 'SEONDO' ? form.isLead : false,
+                });
+              }}
+            >
+              <option value="SEONDO">선도부</option>
+              <option value="SASAENG">사생회</option>
+            </select>
+          </div>
+
+          {form.role === 'SEONDO' && <div className="field">
+            <label htmlFor="admin-scope">담당 범위</label>
+            <select id="admin-scope" className="select" value={form.disciplineScope ?? 'MIDDLE'} onChange={(event) => setForm({ ...form, disciplineScope: event.target.value as DisciplineScope })}>
+              <option value="ELEMENTARY">초등 G1–6</option>
+              <option value="MIDDLE">중등 G7–9</option>
+              <option value="HIGH">고등 G10–12</option>
+              <option value="ALL">전체</option>
+            </select>
+          </div>}
+
+          {form.role === 'SEONDO' && <label className="check-row field full">
+            <input type="checkbox" checked={form.isLead} onChange={(event) => setForm({ ...form, isLead: event.target.checked })} />
+            선도부장 권한 — 정산·Core 설정·계정관리 접근
+          </label>}
+
+          {editing && <label className="check-row field full">
+            <input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />
+            계정 활성화
+          </label>}
+        </div>
+
+        <div className="side-note" style={{ marginTop: 18 }}>
+          {editing
+            ? '계정을 비활성화해도 과거 작성자/감사로그는 그대로 보존됩니다.'
+            : '임시 비밀번호는 생성 직후 한 번만 화면에 표시합니다. 실제 사용자에게 별도 전달한 뒤 이 화면을 닫으세요.'}
+        </div>
+
+        <div className="modal-actions">
+          <button type="button" className="btn btn-outline" onClick={() => setEditing(undefined)}>취소</button>
+          <button className="btn btn-primary" disabled={provision.isPending || update.isPending || !form.displayName.trim() || !form.loginId.trim()}>
+            {editing ? '설정 저장' : (provision.isPending ? '계정 생성 중' : '계정 생성')}
+          </button>
+        </div>
+      </form>
+    </div>}
+
+    {credential && <div className="modal-backdrop">
+      <div className="modal">
+        <div className="modal-header">
+          <div>
+            <div className="eyebrow">One-time credential</div>
+            <h2 className="modal-title">임시 로그인 정보</h2>
+          </div>
+        </div>
+
+        <div className="side-note">
+          <strong>이 비밀번호는 지금 한 번만 표시됩니다.</strong>
+          <div style={{ marginTop: 6 }}>사용자는 첫 로그인 직후 새 비밀번호를 설정해야 합니다.</div>
+        </div>
+
+        <div className="form-grid" style={{ marginTop: 20 }}>
+          <div className="field full">
+            <label>로그인 ID</label>
+            <div className="credential-box"><code>{credential.loginId}</code></div>
+          </div>
+          <div className="field full">
+            <label>임시 비밀번호</label>
+            <div className="credential-box"><code>{credential.temporaryPassword}</code></div>
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={async () => {
+              await navigator.clipboard.writeText('ID: ' + credential.loginId + '\nTemporary password: ' + credential.temporaryPassword);
+              notify('임시 로그인 정보를 클립보드에 복사했습니다.');
+            }}
+          >복사</button>
+          <button type="button" className="btn btn-primary" onClick={() => setCredential(null)}>확인 후 닫기</button>
+        </div>
+      </div>
+    </div>}
+  </div>;
+}
+
 function AuditLogPage() {
   const logs = useDisciplineAuditLogs();
   const [entityFilter, setEntityFilter] = useState('ALL');
