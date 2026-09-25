@@ -893,7 +893,7 @@ enrollments  0
 대신 별도의 correction migration:
 
 ```text
-20260925000017_fix_current_term_setup_runtime.sql
+20260925004655_fix_current_term_setup_runtime.sql
 ```
 
 을 추가했다.
@@ -1374,3 +1374,133 @@ core.students.id
 를 각각 분리해 다뤄야 한다.
 
 이 발견은 DICS Core가 단순히 “여러 앱이 같은 학생번호를 쓰는 구조”가 아니라, **여러 시스템의 identity namespace를 조정하는 integration layer**가 되어야 한다는 점을 분명하게 만들었다.
+
+---
+
+# 25. Migration Drift Reconciliation — 운영 DB와 Git을 다시 일치시키다
+
+병렬 개발이 진행되면서 새로운 유형의 문제가 나타났다.
+
+운영 Supabase migration history에는:
+
+```text
+computer_lab_p0
+study_planner_target_schema
+external_auth_identity_bridge
+...
+```
+
+가 실제 적용되어 있었지만, Daniel integration branch의 migration 디렉터리를 확인하니 일부 파일은 timestamp가 중복되어 있었고 `computer_lab_p0` 원본은 아예 보이지 않았다.
+
+## 위험
+
+운영 DB에는 구조가 존재하지만 Git에 source migration이 없으면:
+
+- 새 환경 재현 불가
+- disaster recovery 시 schema 재생성 불가
+- 어떤 변경이 어느 repo에서 왔는지 추적 불가
+- 이후 migration 순서 판단이 어려움
+
+즉 **DB가 source of truth가 되고 Git이 뒤따라가는 drift**가 생긴다.
+
+## 원본 탐색
+
+GitHub 설치 repo 전체를 확인한 결과:
+
+```text
+shualoalumin/dics-device-manager
+```
+
+에서 정확한 원본:
+
+```text
+20260925005111_computer_lab_p0.sql
+```
+
+을 찾았다.
+
+DB schema를 역추출해 비슷한 SQL을 새로 만드는 대신 **원본 migration을 그대로 Core integration history에 복원**했다.
+
+## Timestamp 정리
+
+병렬 작업 때문에:
+
+```text
+20260925000015_...
+20260925000015_...
+20260925000016_...
+20260925000016_...
+```
+
+처럼 같은 migration version prefix가 중복되어 있었다.
+
+운영 Supabase의 실제 applied migration timestamp를 기준으로 뒤쪽 파일명을 정렬했다.
+
+결과적으로:
+
+```text
+20260925004004 lead_audit_view
+20260925004257 current_term_setup
+20260925004557 core_migration_readiness
+20260925004655 fix_current_term_setup_runtime
+20260925004934 parallel_db_reconciliation
+20260925005111 computer_lab_p0
+20260925005238 study_planner_target_schema
+20260925005346 external_auth_identity_bridge
+20260925005501 study_planner_fk_indexes
+20260925005646 external_auth_identity_bridge_reconcile
+20260925005951 split_core_external_auth_readiness_v3
+```
+
+처럼 실제 적용 순서가 파일명에서 읽히도록 정리했다.
+
+## 교훈
+
+> **병렬 개발에서는 코드 충돌만 볼 것이 아니라, database migration history의 충돌도 별도로 관리해야 한다.**
+
+Claude/GPT/다른 프로젝트가 하나의 Core DB에 접근할수록 `live migration ↔ Git source` reconciliation은 정기적인 운영 항목이 되어야 한다.
+
+---
+
+# 26. DICS Core가 실제 Multi-domain DB가 된 시점
+
+2026-09-25 후반 readiness를 다시 측정했다.
+
+```text
+Core students                 180
+active students               175
+student_no assigned            28
+
+current term                    1
+current classes                13
+current enrollments           144
+G9 section pending             31
+
+Study Planner target tables    13
+Computer Lab tables             8
+
+external auth linked            0
+local Core auth linked          0
+department definitions          0
+```
+
+이 숫자의 의미는 중요하다.
+
+처음에는 Daniel's Scale 안에 Core table을 만든 수준이었지만, 이제 같은 DB에:
+
+```text
+core.*
+discipline.*
+study_planner.*
+computer_lab.*
+```
+
+가 실제 schema로 존재한다.
+
+아직 Study Planner의 live 데이터와 Computer Lab 운영 데이터 전체가 완전히 cut-over된 것은 아니다.
+
+하지만 architecture 관점에서는:
+
+> **DICS Core가 더 이상 미래 계획이 아니라 여러 domain이 실제로 공존하는 중앙 데이터 플랫폼의 형태를 갖추기 시작했다.**
+
+다음 단계의 핵심은 schema 생성이 아니라 **identity와 운영 데이터를 정확히 연결하는 것**이다.
