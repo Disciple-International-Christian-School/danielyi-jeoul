@@ -553,28 +553,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
       copy={negative ? '아침 종이 시트도 빠르게 옮길 수 있도록 연속 입력에 최적화했습니다.' : '학생의 좋은 행동을 놓치지 않고 상점으로 남깁니다.'}
     />
 
-    <div className="side-note" style={{ marginTop: 24 }}>
-      <strong>이번 주 자동 상점</strong>
-      <span style={{ marginLeft: 10 }}>{generatedThisWeek}/{expectedThisWeek}건 생성됨</span>
-      <button
-        type="button"
-        className="btn btn-outline"
-        style={{ marginLeft: 12 }}
-        disabled={ensureWeeklyMerits.isPending}
-        onClick={() => ensureWeeklyMerits.mutate(undefined, {
-          onSuccess: (inserted) => {
-            refresh();
-            notify(inserted > 0 ? '이번 주 부서활동 상점 ' + inserted + '건을 반영했습니다.' : '이번 주 부서활동 상점은 이미 최신 상태입니다.');
-          },
-          onError: (error) => notify(errText(error), 'error'),
-        })}
-        data-testid="button-ensure-department-merits"
-      >
-        <RefreshCw size={14} /> 이번 주 반영
-      </button>
-    </div>
-
-    <div className="detail-grid" style={{ marginTop: 22 }}>
+    <div className="detail-grid" style={{ marginTop: 30 }}>
       <form className="card card-pad" onSubmit={submit}>
         <div className="section-row" style={{ margin: 0 }}>
           <div>
@@ -1664,7 +1643,28 @@ function DepartmentMeritAdminPage() {
       action={<button className="btn btn-primary" onClick={resetNewDepartment} data-testid="button-new-department"><Plus size={15} /> 새 부서</button>}
     />
 
-    <div className="detail-grid" style={{ marginTop: 30 }}>
+    <div className="side-note" style={{ marginTop: 24 }}>
+      <strong>이번 주 자동 상점</strong>
+      <span style={{ marginLeft: 10 }}>{generatedThisWeek}/{expectedThisWeek}건 생성됨</span>
+      <button
+        type="button"
+        className="btn btn-outline"
+        style={{ marginLeft: 12 }}
+        disabled={ensureWeeklyMerits.isPending}
+        onClick={() => ensureWeeklyMerits.mutate(undefined, {
+          onSuccess: (inserted) => {
+            refresh();
+            notify(inserted > 0 ? '이번 주 부서활동 상점 ' + inserted + '건을 반영했습니다.' : '이번 주 부서활동 상점은 이미 최신 상태입니다.');
+          },
+          onError: (error) => notify(errText(error), 'error'),
+        })}
+        data-testid="button-ensure-department-merits"
+      >
+        <RefreshCw size={14} /> 이번 주 반영
+      </button>
+    </div>
+
+    <div className="detail-grid" style={{ marginTop: 22 }}>
       <section className="card card-pad">
         <div className="section-row" style={{ marginTop: 0 }}>
           <div>
