@@ -772,3 +772,257 @@ personal admin provisioning
 의 순서로 진행된 프로젝트다.
 
 이 문서는 이후 개발에서도 계속 누적한다.
+
+
+---
+
+# 18. Current Term Provisioning — “추측하지 않는 자동화”
+
+Core 학생 UUID가 모두 준비된 뒤에도 학기/반 정보는 비어 있었다.
+
+2026-09-25 readiness:
+
+```text
+core.students       180
+academic_terms        0
+classes               0
+enrollments           0
+```
+
+생활지도 화면은 기존 legacy grade를 fallback으로 사용할 수 있었지만,
+반별 공지와 장기 통합을 위해서는 실제 학기별 enrollment가 필요했다.
+
+## 데이터 원본 확인
+
+과거에 공유된 `2026-7학사일정 (2).hwp`를 다시 찾아
+2026 Fall의 경계를 확인했다.
+
+가을학기 표에서:
+
+- 2026-08-19: 시업 및 입학식
+- 2027-01-21: 방학식
+- 겨울방학: 2027-01-21 시작
+
+이 흐름을 근거로:
+
+```text
+2026-FALL
+starts_on = 2026-08-19
+ends_on   = 2027-01-21
+```
+
+로 Core term을 정의했다.
+
+## 가장 중요한 제약
+
+G9은 A/B 분반이다.
+
+하지만 현재 Daniel Supabase에는 G9 학생의 “학년=9” 정보만 있고,
+A/B 개인별 배정 근거는 없었다.
+
+따라서 자동화 범위를 명확히 잘랐다.
+
+```text
+G1–8     → 현재 grade로 자동 enrollment
+G10–12   → 현재 grade로 자동 enrollment
+
+G9       → 자동배정 금지
+           A/B 명단 확인 후 수동 배정
+```
+
+이 결정은 “자동화 가능한 것”보다
+**“근거가 있는 것만 자동화한다”**는 원칙을 우선한 사례다.
+
+---
+
+# 19. Runtime-only DB Bug — CI가 잡지 못한 것
+
+학기 provisioning RPC는 migration 적용도 성공했고,
+frontend typecheck/build도 성공했다.
+
+하지만 production에서 실제 함수를 처음 호출하자 실패했다.
+
+원인:
+
+```text
+v_classes_created := v_classes_created + row_count
+```
+
+PL/pgSQL의 `ROW_COUNT`는 일반 변수처럼 직접 참조할 수 없고:
+
+```text
+GET DIAGNOSTICS variable = ROW_COUNT;
+```
+
+로 읽어야 한다.
+
+## 왜 이 버그가 의미 있었는가
+
+이 오류는:
+
+- SQL migration 적용 단계에서는 발견되지 않았고
+- frontend CI에서도 발견되지 않았고
+- 실제 function execution path에서만 드러났다.
+
+즉:
+
+> **컴파일/빌드 성공과 운영 경로 검증은 서로 다른 품질 단계다.**
+
+라는 사실을 보여줬다.
+
+## 안전성 확인
+
+함수 호출 자체가 실패했기 때문에 PostgreSQL statement 전체가 rollback됐다.
+
+즉 실패 직후:
+
+```text
+terms        0
+classes      0
+enrollments  0
+```
+
+임을 직접 확인했다.
+
+부분 생성된 학적 데이터는 없었다.
+
+## 수정 방식
+
+이미 production에 적용된 migration 파일을 소급 수정하지 않았다.
+
+대신 별도의 correction migration:
+
+```text
+20260925000017_fix_current_term_setup_runtime.sql
+```
+
+을 추가했다.
+
+이 방식은 migration history 자체를 개발 기록으로 보존한다.
+
+---
+
+# 20. Current Term 실제 적용 결과
+
+correction migration 후 동일한 provisioning RPC를 다시 실행했다.
+
+결과:
+
+```text
+2026-FALL
+2026-08-19 ~ 2027-01-21
+
+classes created        13
+enrollments created   144
+G9 pending              31
+```
+
+13개 class 구조:
+
+```text
+G1
+G2
+G3
+G4
+G5
+G6
+G7
+G8
+G9-A
+G9-B
+G10
+G11
+G12
+```
+
+활성 학생 175명 중:
+
+```text
+non-G9 144명 → 자동 enrollment 완료
+G9      31명 → A/B 검증 대기
+```
+
+## 이 단계의 의미
+
+이제 “학생이 몇 학년인가”를 Daniel의 legacy student row에만 의존하지 않고,
+Core가:
+
+```text
+학생 자체
+  ↓
+2026 Fall
+  ↓
+학급
+```
+
+관계를 실제로 보유하기 시작했다.
+
+즉 DICS Core가 단순 UUID registry에서
+**학적(directory + enrollment) 시스템으로 한 단계 진입한 시점**이다.
+
+---
+
+# 21. Core Provisioning Console
+
+학기/반 생성 작업을 SQL 콘솔에서 반복하지 않도록
+선도부장 전용 `Core 설정` 화면을 추가했다.
+
+기능:
+
+- 학기 코드/이름
+- 시작일/종료일
+- current term 초기화
+- class/enrollment readiness 확인
+- G9 미배정 인원 확인
+- G9-A / G9-B 개별 배정
+
+## 의도
+
+이 화면은 Daniel's Scale의 장기 업무화면이라기보다
+**DICS Core가 별도 Admin app으로 분리되기 전의 provisioning console**이다.
+
+장기적으로는:
+
+```text
+Daniel's Scale
+→ discipline domain only
+
+DICS Core Admin
+→ students / terms / classes / enrollment / shared identity
+```
+
+로 책임을 분리하는 것이 목표다.
+
+---
+
+# 22. 2026-09-25 Updated Readiness
+
+Current production aggregate:
+
+```text
+Core students                 180
+active students               175
+
+current academic term           1
+classes                        13
+active enrollments            144
+G9 pending                     31
+
+student_no assigned             0
+Auth linked                     0
+
+departments                     0
+department memberships          0
+department merit rules          0
+```
+
+다음 병목은 더 선명해졌다.
+
+1. G9-A/B 실제 명단 확인
+2. SP의 기존 student_no/Auth를 Core에 연결
+3. 부서활동 실제 membership/rule 적재
+4. 개인 관리자 계정 provision
+5. 충분한 검증 후 discipline FK를 Core UUID로 cut-over
+
+이제부터는 “새 기능을 더 만드는 단계”보다
+**기존 학교 데이터를 Core에 정확히 연결하는 단계**의 비중이 커진다.
