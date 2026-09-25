@@ -1,7 +1,7 @@
 // Supabase Auth context — replaces Clerk. Admin accounts are provisioned by
 // the maintainer; the login page maps a login ID to the synthetic email
 // `${id}@scale.dics.kr` and calls signInWithPassword.
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 
 import type { DisciplineScope, Role } from './api';
@@ -16,6 +16,9 @@ export interface AdminProfile {
   disciplineScope: DisciplineScope | null;
   isLead: boolean;
   isActive: boolean;
+  loginId: string;
+  mustChangePassword: boolean;
+  lastPasswordChangedAt: string | null;
 }
 
 interface AdminRow {
@@ -26,6 +29,9 @@ interface AdminRow {
   discipline_scope: DisciplineScope | null;
   is_lead: boolean;
   is_active: boolean;
+  login_id: string;
+  must_change_password: boolean;
+  last_password_changed_at: string | null;
 }
 
 export function roleLabel(role: Role): string {
@@ -37,6 +43,7 @@ interface AuthContextValue {
   admin: AdminProfile | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshAdmin: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -44,6 +51,7 @@ const AuthContext = createContext<AuthContextValue>({
   admin: null,
   loading: true,
   signOut: async () => undefined,
+  refreshAdmin: async () => undefined,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -70,6 +78,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const userId = session?.user.id ?? null;
+
+  const loadAdmin = useCallback(async (currentUserId: string) => {
+    setAdminLoading(true);
+    const { data, error } = await supabase
+      .from('admins')
+      .select('*')
+      .eq('user_id', currentUserId)
+      .single();
+
+    if (error || !data) {
+      setAdmin(null);
+    } else {
+      const row = data as AdminRow;
+      setAdmin({
+        id: row.id,
+        userId: row.user_id,
+        displayName: row.display_name,
+        role: row.role,
+        roleLabel: roleLabel(row.role),
+        disciplineScope: row.discipline_scope,
+        isLead: row.is_lead,
+        isActive: row.is_active,
+        loginId: row.login_id,
+        mustChangePassword: row.must_change_password,
+        lastPasswordChangedAt: row.last_password_changed_at,
+      });
+    }
+    setAdminLoading(false);
+  }, []);
 
   useEffect(() => {
     if (!userId) {
@@ -99,6 +136,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             disciplineScope: row.discipline_scope,
             isLead: row.is_lead,
             isActive: row.is_active,
+            loginId: row.login_id,
+            mustChangePassword: row.must_change_password,
+            lastPasswordChangedAt: row.last_password_changed_at,
           });
         }
         setAdminLoading(false);
@@ -108,6 +148,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [userId]);
 
+  const refreshAdmin = useCallback(async () => {
+    if (!userId) {
+      setAdmin(null);
+      return;
+    }
+    await loadAdmin(userId);
+  }, [loadAdmin, userId]);
+
   const loading = !sessionLoaded || (session !== null && adminLoading);
 
   const signOut = async () => {
@@ -115,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, admin, loading, signOut }}>
+    <AuthContext.Provider value={{ session, admin, loading, signOut, refreshAdmin }}>
       {children}
     </AuthContext.Provider>
   );
