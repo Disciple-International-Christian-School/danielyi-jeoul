@@ -48,6 +48,7 @@ import {
   useCurrentSettlement,
   useDeletePointItem,
   useDeletePointRecord,
+  useDisciplineAuditLogs,
   useDepartmentMeritStatus,
   useEnsureWeeklyDepartmentMerits,
   useGetDashboard,
@@ -126,6 +127,7 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
     { href: '/reflections', label: '반성문', icon: BookOpenCheck, roles: ['SEONDO'] as Role[], leadOnly: false },
     { href: '/reports', label: '공지·출력', icon: Printer, roles: ['SEONDO'] as Role[], leadOnly: false },
     { href: '/settlement', label: '정산 관리', icon: CalendarRange, roles: ['SEONDO'] as Role[], leadOnly: true },
+    { href: '/audit', label: '감사 로그', icon: Database, roles: ['SEONDO'] as Role[], leadOnly: true },
     { href: '/punishments', label: '기숙사 처분', icon: BedDouble, roles: ['SASAENG'] as Role[], leadOnly: false },
     { href: '/point-items', label: '점수 항목', icon: SlidersHorizontal, roles: ['SEONDO'] as Role[], leadOnly: false },
   ];
@@ -1118,6 +1120,89 @@ function SettlementPage() {
   </div>;
 }
 
+function AuditLogPage() {
+  const logs = useDisciplineAuditLogs();
+  const [entityFilter, setEntityFilter] = useState('ALL');
+  const [actionFilter, setActionFilter] = useState<'ALL' | 'INSERT' | 'UPDATE' | 'DELETE'>('ALL');
+
+  if (logs.isLoading) return <LoadingState />;
+  if (logs.isError) return <ErrorState error={logs.error} retry={() => logs.refetch()} />;
+
+  const entityTypes = Array.from(new Set((logs.data ?? []).map((log) => log.entityType))).sort();
+  const rows = (logs.data ?? []).filter((log) =>
+    (entityFilter === 'ALL' || log.entityType === entityFilter)
+    && (actionFilter === 'ALL' || log.action === actionFilter)
+  );
+
+  const actionLabel = (action: 'INSERT' | 'UPDATE' | 'DELETE') =>
+    action === 'INSERT' ? '생성' : action === 'UPDATE' ? '수정' : '삭제';
+
+  const entityLabel = (entity: string) => ({
+    point_records: '점수 기록',
+    reflection_records: '반성문',
+    punishments: '처분',
+    settlement_periods: '정산기간',
+  }[entity] ?? entity);
+
+  const pretty = (value: Record<string, unknown> | null) =>
+    value ? JSON.stringify(value, null, 2) : '—';
+
+  return <div>
+    <PageHeader
+      eyebrow="책임성 · 추적"
+      title="감사 로그"
+      copy="생활지도 기록의 생성·수정·삭제 이력을 인증된 관리자 계정 기준으로 확인합니다."
+    />
+
+    <div className="card card-pad" style={{ marginTop: 28 }}>
+      <div className="filter-bar">
+        <div className="field">
+          <label htmlFor="audit-entity">기록 종류</label>
+          <select id="audit-entity" className="select" value={entityFilter} onChange={(event) => setEntityFilter(event.target.value)} data-testid="select-audit-entity">
+            <option value="ALL">전체</option>
+            {entityTypes.map((entity) => <option key={entity} value={entity}>{entityLabel(entity)}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="audit-action">변경 종류</label>
+          <select id="audit-action" className="select" value={actionFilter} onChange={(event) => setActionFilter(event.target.value as 'ALL' | 'INSERT' | 'UPDATE' | 'DELETE')} data-testid="select-audit-action">
+            <option value="ALL">전체</option>
+            <option value="INSERT">생성</option>
+            <option value="UPDATE">수정</option>
+            <option value="DELETE">삭제</option>
+          </select>
+        </div>
+      </div>
+
+      {rows.length === 0 ? <EmptyState title="감사 기록이 없습니다" copy="Audit 적용 이후 변경이 발생하면 여기에 기록됩니다." /> :
+        <div className="activity-list" style={{ marginTop: 20 }}>
+          {rows.map((log) => <div className="activity-row" key={log.id} style={{ alignItems: 'flex-start' }} data-testid={'row-audit-' + log.id}>
+            <div className="activity-mark"><Database size={15} /></div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div className="activity-label">
+                {log.actorName} · {entityLabel(log.entityType)} #{log.entityId ?? '—'} · {actionLabel(log.action)}
+              </div>
+              <div className="record-meta">{dateTimeLabel(log.createdAt)}{log.actorRole ? ' · ' + (log.actorRole === 'SEONDO' ? '선도부' : '사생회') : ''}</div>
+              <details style={{ marginTop: 8 }}>
+                <summary className="table-link" style={{ cursor: 'pointer' }}>변경 상세 보기</summary>
+                <div className="detail-grid" style={{ marginTop: 10 }}>
+                  <div>
+                    <div className="eyebrow">BEFORE</div>
+                    <pre className="audit-json">{pretty(log.beforeData)}</pre>
+                  </div>
+                  <div>
+                    <div className="eyebrow">AFTER</div>
+                    <pre className="audit-json">{pretty(log.afterData)}</pre>
+                  </div>
+                </div>
+              </details>
+            </div>
+          </div>)}
+        </div>}
+    </div>
+  </div>;
+}
+
 function PunishmentsPage() {
   const queryClient = useQueryClient();
   const notify = useContext(NoticeContext);
@@ -1196,7 +1281,7 @@ function ProtectedRoutes() {
   if (loading) return <LoadingState />;
   if (!session) return <Redirect to="/sign-in" />;
   if (!admin) return <div className="app-loading"><div className="error-box"><AlertTriangle size={24} /><p>관리자 권한이 없는 계정입니다. 운영 담당자에게 문의해주세요.</p><button className="btn btn-outline" onClick={() => signOut()} data-testid="button-no-admin-sign-out"><LogOut size={14} /> 로그아웃</button></div></div>;
-  return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} /><Route path="/settlement" component={() => <LeadGate><SettlementPage /></LeadGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
+  return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} /><Route path="/settlement" component={() => <LeadGate><SettlementPage /></LeadGate>} /><Route path="/audit" component={() => <LeadGate><AuditLogPage /></LeadGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
 }
 
 function NotFoundInline() {
