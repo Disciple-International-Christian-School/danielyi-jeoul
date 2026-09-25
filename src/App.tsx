@@ -77,7 +77,7 @@ import {
   useListPunishments,
   useListReflections,
   useListStudents,
-  useMarkAdminPasswordChanged,
+  useChangeAdminPassword,
   useProvisionAdminAccount,
   useSetDepartmentActive,
   useSetDepartmentStudentMembership,
@@ -1601,7 +1601,7 @@ function AdminAccountsPage() {
 
           {form.role === 'SEONDO' && <div className="field">
             <label htmlFor="admin-scope">담당 범위</label>
-            <select id="admin-scope" className="select" value={form.disciplineScope ?? 'MIDDLE'} onChange={(event) => setForm({ ...form, disciplineScope: event.target.value as DisciplineScope })}>
+            <select id="admin-scope" className="select" disabled={form.isLead} value={form.disciplineScope ?? 'MIDDLE'} onChange={(event) => setForm({ ...form, disciplineScope: event.target.value as DisciplineScope })}>
               <option value="ELEMENTARY">초등 G1–6</option>
               <option value="MIDDLE">중등 G7–9</option>
               <option value="HIGH">고등 G10–12</option>
@@ -1610,7 +1610,7 @@ function AdminAccountsPage() {
           </div>}
 
           {form.role === 'SEONDO' && <label className="check-row field full">
-            <input type="checkbox" checked={form.isLead} onChange={(event) => setForm({ ...form, isLead: event.target.checked })} />
+            <input type="checkbox" checked={form.isLead} onChange={(event) => setForm({ ...form, isLead: event.target.checked, disciplineScope: event.target.checked ? 'ALL' : (form.disciplineScope === 'ALL' ? 'MIDDLE' : form.disciplineScope) })} />
             선도부장 권한 — 정산·Core 설정·계정관리 접근
           </label>}
 
@@ -2149,7 +2149,7 @@ function LoginPage() {
 function ChangePasswordPage() {
   const { admin, refreshAdmin, signOut } = useAuth();
   const [, setLocation] = useLocation();
-  const markChanged = useMarkAdminPasswordChanged();
+  const changePassword = useChangeAdminPassword();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [pending, setPending] = useState(false);
@@ -2175,19 +2175,12 @@ function ChangePasswordPage() {
     }
 
     setPending(true);
-    const { error: updateError } = await supabase.auth.updateUser({ password });
-    if (updateError) {
-      setError(updateError.message);
-      setPending(false);
-      return;
-    }
-
     try {
-      await markChanged.mutateAsync();
+      await changePassword.mutateAsync(password);
       await refreshAdmin();
       setLocation('/dashboard');
-    } catch (markError) {
-      setError('비밀번호는 변경됐지만 계정 상태 갱신에 실패했습니다. 다시 로그인 후 재시도해주세요. ' + errText(markError));
+    } catch (changeError) {
+      setError(errText(changeError));
       setPending(false);
     }
   };
@@ -2251,6 +2244,7 @@ function ProtectedRoutes() {
   if (loading) return <LoadingState />;
   if (!session) return <Redirect to="/sign-in" />;
   if (!admin) return <div className="app-loading"><div className="error-box"><AlertTriangle size={24} /><p>관리자 권한이 없는 계정입니다. 운영 담당자에게 문의해주세요.</p><button className="btn btn-outline" onClick={() => signOut()} data-testid="button-no-admin-sign-out"><LogOut size={14} /> 로그아웃</button></div></div>;
+  if (!admin.isActive) return <div className="app-loading"><div className="error-box"><ShieldAlert size={24} /><p>비활성화된 관리자 계정입니다. 선도부장에게 문의해주세요.</p><button className="btn btn-outline" onClick={() => signOut()}><LogOut size={14} /> 로그아웃</button></div></div>;
   if (admin.mustChangePassword) return <ChangePasswordPage />;
   return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} /><Route path="/settlement" component={() => <LeadGate><SettlementPage /></LeadGate>} /><Route path="/audit" component={() => <LeadGate><AuditLogPage /></LeadGate>} /><Route path="/admins" component={() => <LeadGate><AdminAccountsPage /></LeadGate>} /><Route path="/core-setup" component={() => <LeadGate><CoreSetupPage /></LeadGate>} /><Route path="/department-merits" component={() => <LeadGate><DepartmentMeritAdminPage /></LeadGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
 }
