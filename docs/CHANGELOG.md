@@ -763,6 +763,41 @@ Identity ≠ Role
 - Supabase security advisor 확인 결과 신규 경고 없음.
 - 기존 Auth의 leaked-password protection 비활성 경고는 학생 6자리 PIN 정책 검토 전까지 보류.
 
+### Core readiness / SP shadow schema Phase — 2026-09-25
+
+**Production DB applied**
+
+- `v_core_migration_readiness` 추가.
+- `v_core_student_readiness` 추가.
+- 현재 Core readiness:
+  - Core total 180
+  - active 175
+  - Daniel bridge 175
+  - current-term enrollment 144
+  - student_no linked 0
+  - Auth linked 0
+- 병렬 세션에서 live DB에 먼저 적용된 current-term/audit 구조를 Git migration으로 reconciliation.
+- `study_planner` shadow target schema 생성.
+  - 실제 SP data는 아직 0건.
+  - student FK는 처음부터 `core.students.id`.
+  - term master는 `core.academic_terms` 재사용.
+  - 기존 SP 운영 프로젝트는 그대로 유지.
+
+**Frontend in branch**
+
+- Core 설정 화면을 provisioning console + integration readiness dashboard로 확장.
+- Core Identity / 학번 / Auth / 현재 학적 / READY 수치를 표시.
+- READY / PARTIAL / CORE_ONLY 상태 집계.
+- 미완료 학생별로 어떤 연결이 빠져 있는지 표시.
+- G9-A/B provisioning UI와 같은 화면에서 다음 병목을 확인.
+
+**Documentation**
+
+- `docs/DEVELOPMENT_JOURNAL.md`를 공식 개발 서사 원본으로 유지.
+- 병렬 DB drift 발견/복구, readiness 계측, Study Planner shadow schema까지 서사 기록.
+- `docs/SP_CORE_MIGRATION_RUNBOOK.md` 추가.
+- Claude/GPT coordination Issue에 live SP aggregate inventory 요청.
+
 ### Frontend in branch — deployment pending
 
 - 학생 명부를 DICS Core read-only roster 관점으로 변경.
