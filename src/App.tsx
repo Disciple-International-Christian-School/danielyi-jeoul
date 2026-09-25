@@ -40,6 +40,7 @@ import {
   getListStudentsQueryKey,
   getCurrentSettlementQueryKey,
   getCoreMigrationReadinessQueryKey,
+  getDisciplineCoreFkReadinessQueryKey,
   getCoreStudentReadinessQueryKey,
   getCoreSetupStatusQueryKey,
   getDepartmentMeritStatusQueryKey,
@@ -51,6 +52,7 @@ import {
   useAdminAccounts,
   useAssignCurrentGrade9Section,
   useCoreMigrationReadiness,
+  useDisciplineCoreFkReadiness,
   useCoreStudentReadiness,
   useCoreSetupStatus,
   useCreateDepartmentWithMeritRule,
@@ -1166,6 +1168,7 @@ function CoreSetupPage() {
   const notify = useContext(NoticeContext);
   const status = useCoreSetupStatus();
   const readiness = useCoreMigrationReadiness();
+  const disciplineFk = useDisciplineCoreFkReadiness();
   const studentReadiness = useCoreStudentReadiness();
   const grade9 = useGrade9Assignments();
   const initializeTerm = useInitializeCurrentAcademicTerm();
@@ -1180,6 +1183,7 @@ function CoreSetupPage() {
   const refreshCore = () => {
     queryClient.invalidateQueries({ queryKey: getCoreSetupStatusQueryKey() });
     queryClient.invalidateQueries({ queryKey: getCoreMigrationReadinessQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getDisciplineCoreFkReadinessQueryKey() });
     queryClient.invalidateQueries({ queryKey: getCoreStudentReadinessQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGrade9AssignmentsQueryKey() });
     queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
@@ -1224,16 +1228,17 @@ function CoreSetupPage() {
     });
   };
 
-  if (status.isLoading || readiness.isLoading || studentReadiness.isLoading || grade9.isLoading) return <LoadingState />;
-  if (status.isError || readiness.isError || studentReadiness.isError || grade9.isError) {
+  if (status.isLoading || readiness.isLoading || disciplineFk.isLoading || studentReadiness.isLoading || grade9.isLoading) return <LoadingState />;
+  if (status.isError || readiness.isError || disciplineFk.isError || studentReadiness.isError || grade9.isError) {
     return <ErrorState
-      error={status.error ?? readiness.error ?? studentReadiness.error ?? grade9.error}
-      retry={() => { status.refetch(); readiness.refetch(); studentReadiness.refetch(); grade9.refetch(); }}
+      error={status.error ?? readiness.error ?? disciplineFk.error ?? studentReadiness.error ?? grade9.error}
+      retry={() => { status.refetch(); readiness.refetch(); disciplineFk.refetch(); studentReadiness.refetch(); grade9.refetch(); }}
     />;
   }
 
   const current = status.data;
   const core = readiness.data;
+  const discipline = disciplineFk.data;
   const readinessRows = studentReadiness.data ?? [];
   const readyStudents = readinessRows.filter((row) => row.readinessStatus === 'READY').length;
   const partialStudents = readinessRows.filter((row) => row.readinessStatus === 'PARTIAL').length;
@@ -1291,6 +1296,46 @@ function CoreSetupPage() {
         Core UUID는 학생 identity의 시작점이고, 학번·현재 학적·(Core Auth 또는 검증된 외부 Auth)가 연결되어야 migration 기준 READY가 됩니다. 외부 Auth는 Core Auth와 별도 namespace로 추적합니다.
       </div>
     </div>
+
+    {discipline && <div className="card card-pad" style={{ marginTop: 18 }}>
+      <div className="section-row" style={{ marginTop: 0 }}>
+        <div>
+          <div className="eyebrow">Discipline FK cut-over</div>
+          <h2 className="section-title" style={{ marginTop: 8 }}>생활지도 Core UUID 전환 상태</h2>
+          <p className="section-copy">legacy integer student_id는 호환용으로 남아 있고, 원본 기록은 canonical Core UUID를 병행 저장합니다.</p>
+        </div>
+        <span className={'pill ' + (
+          discipline.pointRecordsMismatch === 0
+          && discipline.punishmentsMismatch === 0
+          && discipline.pointRecordsCoreLinked === discipline.pointRecordsTotal
+          && discipline.punishmentsCoreLinked === discipline.punishmentsTotal
+            ? 'pill-positive'
+            : 'pill-warning'
+        )}>
+          {discipline.pointRecordsMismatch === 0 && discipline.punishmentsMismatch === 0 ? 'mismatch 0' : '확인 필요'}
+        </span>
+      </div>
+
+      <div className="metric-grid" style={{ marginTop: 20 }}>
+        <div className="card metric-card">
+          <div className="metric-label">점수 기록 Core 연결</div>
+          <div className="metric-value">{discipline.pointRecordsCoreLinked}/{discipline.pointRecordsTotal}</div>
+          <div className="muted" style={{ fontSize: 10 }}>mismatch {discipline.pointRecordsMismatch}</div>
+        </div>
+        <div className="card metric-card">
+          <div className="metric-label">처분 기록 Core 연결</div>
+          <div className="metric-value">{discipline.punishmentsCoreLinked}/{discipline.punishmentsTotal}</div>
+          <div className="muted" style={{ fontSize: 10 }}>mismatch {discipline.punishmentsMismatch}</div>
+        </div>
+      </div>
+
+      <div className="side-note" style={{ marginTop: 16 }}>
+        <strong>최종 integer FK 제거 gate</strong>
+        <div style={{ marginTop: 5 }}>
+          모든 기존 record Core 연결 100% · mismatch 0 · 신규 write Core UUID only · 주요 read/report 결과 동일 조건을 계속 만족할 때만 final cut-over를 진행합니다.
+        </div>
+      </div>
+    </div>}
 
     {!current ? <div className="detail-grid" style={{ marginTop: 30 }}>
       <form className="card card-pad" onSubmit={submitTerm}>
