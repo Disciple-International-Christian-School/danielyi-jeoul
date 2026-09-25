@@ -38,9 +38,13 @@ import {
   getListReflectionsQueryKey,
   getListStudentsQueryKey,
   getCurrentSettlementQueryKey,
+  getCoreSetupStatusQueryKey,
   getDepartmentMeritStatusQueryKey,
+  getGrade9AssignmentsQueryKey,
   useDailyDisciplineNotice,
   useWeeklyDisciplineReport,
+  useAssignCurrentGrade9Section,
+  useCoreSetupStatus,
   useCreatePointItem,
   useCreatePointRecord,
   useCreatePunishment,
@@ -55,6 +59,8 @@ import {
   useGetStudent,
   useExtendReflectionTo21,
   useImportPointItems,
+  useInitializeCurrentAcademicTerm,
+  useGrade9Assignments,
   useListPointItems,
   useListPointRecords,
   useListPunishments,
@@ -128,6 +134,7 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
     { href: '/reports', label: '공지·출력', icon: Printer, roles: ['SEONDO'] as Role[], leadOnly: false },
     { href: '/settlement', label: '정산 관리', icon: CalendarRange, roles: ['SEONDO'] as Role[], leadOnly: true },
     { href: '/audit', label: '감사 로그', icon: Database, roles: ['SEONDO'] as Role[], leadOnly: true },
+    { href: '/core-setup', label: 'Core 설정', icon: Users, roles: ['SEONDO'] as Role[], leadOnly: true },
     { href: '/punishments', label: '기숙사 처분', icon: BedDouble, roles: ['SASAENG'] as Role[], leadOnly: false },
     { href: '/point-items', label: '점수 항목', icon: SlidersHorizontal, roles: ['SEONDO'] as Role[], leadOnly: false },
   ];
@@ -1120,6 +1127,165 @@ function SettlementPage() {
   </div>;
 }
 
+function CoreSetupPage() {
+  const queryClient = useQueryClient();
+  const notify = useContext(NoticeContext);
+  const status = useCoreSetupStatus();
+  const grade9 = useGrade9Assignments();
+  const initializeTerm = useInitializeCurrentAcademicTerm();
+  const assignGrade9 = useAssignCurrentGrade9Section();
+
+  const [termCode, setTermCode] = useState('2026-FALL');
+  const [termName, setTermName] = useState('2026 Fall');
+  const [startsOn, setStartsOn] = useState('');
+  const [endsOn, setEndsOn] = useState('');
+  const [search, setSearch] = useState('');
+
+  const refreshCore = () => {
+    queryClient.invalidateQueries({ queryKey: getCoreSetupStatusQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGrade9AssignmentsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+    queryClient.invalidateQueries({ queryKey: ['reports'] });
+  };
+
+  const submitTerm = (event: FormEvent) => {
+    event.preventDefault();
+    if (!termCode.trim() || !termName.trim() || !startsOn || !endsOn) return;
+
+    const confirmed = window.confirm(
+      '현재 학기를 생성하고 G9을 제외한 활성 학생을 현재 학년 기준으로 자동 배정할까요? G9은 A/B를 별도로 확인 배정합니다.'
+    );
+    if (!confirmed) return;
+
+    initializeTerm.mutate({
+      code: termCode.trim(),
+      name: termName.trim(),
+      startsOn,
+      endsOn,
+    }, {
+      onSuccess: (result) => {
+        refreshCore();
+        notify(
+          'Core 학기 생성 완료 · 반 ' + result.classes_created
+          + '개 생성 · 학생 ' + result.enrollments_created
+          + '명 자동 배정 · G9 ' + result.grade9_pending + '명 확인 필요'
+        );
+      },
+      onError: (error) => notify(errText(error), 'error'),
+    });
+  };
+
+  const assign = (studentId: number, section: 'A' | 'B', studentName: string) => {
+    assignGrade9.mutate({ studentId, section }, {
+      onSuccess: () => {
+        refreshCore();
+        notify(studentName + ' → G9-' + section + ' 배정 완료');
+      },
+      onError: (error) => notify(errText(error), 'error'),
+    });
+  };
+
+  if (status.isLoading || grade9.isLoading) return <LoadingState />;
+  if (status.isError || grade9.isError) {
+    return <ErrorState error={status.error ?? grade9.error} retry={() => { status.refetch(); grade9.refetch(); }} />;
+  }
+
+  const current = status.data;
+  const needle = search.trim().toLowerCase();
+  const grade9Rows = (grade9.data ?? []).filter((row) =>
+    !needle || row.studentName.toLowerCase().includes(needle)
+  );
+
+  return <div>
+    <PageHeader
+      eyebrow="DICS Core provisioning"
+      title="Core 설정"
+      copy="현재 학기와 반 배정을 안전하게 초기화하는 선도부장 전용 provisioning 화면입니다. 장기적으로는 별도 Core Admin으로 분리합니다."
+    />
+
+    {!current ? <div className="detail-grid" style={{ marginTop: 30 }}>
+      <form className="card card-pad" onSubmit={submitTerm}>
+        <div className="eyebrow">Phase 1</div>
+        <h2 className="section-title" style={{ marginTop: 10 }}>현재 학기 생성</h2>
+        <p className="section-copy">학기 날짜는 시스템이 추측하지 않습니다. 실제 학사일정을 확인한 뒤 입력하세요.</p>
+
+        <div className="form-grid" style={{ marginTop: 24 }}>
+          <div className="field">
+            <label htmlFor="core-term-code">학기 코드</label>
+            <input id="core-term-code" className="input" required value={termCode} onChange={(event) => setTermCode(event.target.value)} data-testid="input-core-term-code" />
+          </div>
+          <div className="field">
+            <label htmlFor="core-term-name">학기 이름</label>
+            <input id="core-term-name" className="input" required value={termName} onChange={(event) => setTermName(event.target.value)} data-testid="input-core-term-name" />
+          </div>
+          <div className="field">
+            <label htmlFor="core-term-start">시작일</label>
+            <input id="core-term-start" className="input" type="date" required value={startsOn} onChange={(event) => setStartsOn(event.target.value)} data-testid="input-core-term-start" />
+          </div>
+          <div className="field">
+            <label htmlFor="core-term-end">종료일</label>
+            <input id="core-term-end" className="input" type="date" required value={endsOn} onChange={(event) => setEndsOn(event.target.value)} data-testid="input-core-term-end" />
+          </div>
+        </div>
+
+        <div className="side-note" style={{ marginTop: 20 }}>
+          실행 시 G1–8·G10–12는 현재 검증된 grade 기준으로 자동 배정합니다. <strong>G9 31명은 A/B를 추측하지 않고 미배정 상태로 남깁니다.</strong>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-primary" disabled={initializeTerm.isPending || !startsOn || !endsOn} data-testid="button-initialize-core-term">
+            {initializeTerm.isPending ? '초기화 중' : '현재 학기 초기화'}
+          </button>
+        </div>
+      </form>
+
+      <section className="card card-pad">
+        <div className="eyebrow">현재 Readiness</div>
+        <h2 className="section-title" style={{ marginTop: 10 }}>학생 Core는 준비됨</h2>
+        <p className="subheading" style={{ marginTop: 12 }}>
+          Canonical 학생 UUID는 이미 180명 모두 생성되어 있습니다. 다음 단계는 학기/반 enrollment입니다.
+        </p>
+        <div className="side-note" style={{ marginTop: 22 }}>
+          이 화면은 학생 master를 새로 만드는 것이 아니라 기존 Core 학생에 학기별 소속을 붙이는 단계입니다.
+        </div>
+      </section>
+    </div> : <>
+      <div className="metric-grid" style={{ marginTop: 28 }}>
+        <div className="card metric-card"><div className="metric-label">현재 학기</div><div className="metric-value" style={{ fontSize: 17 }}>{current.termCode}</div><div className="muted" style={{ fontSize: 10 }}>{dateLabel(current.startsOn)} — {dateLabel(current.endsOn)}</div></div>
+        <div className="card metric-card"><div className="metric-label">반</div><div className="metric-value">{current.classCount}</div></div>
+        <div className="card metric-card"><div className="metric-label">Enrollment</div><div className="metric-value">{current.enrollmentCount}</div></div>
+        <div className="card metric-card"><div className="metric-label">G9 배정</div><div className="metric-value">{current.grade9Assigned}/{current.grade9Total}</div></div>
+        <div className="card metric-card"><div className="metric-label">G9 미배정</div><div className={current.grade9Pending > 0 ? 'metric-value danger-text' : 'metric-value success-text'}>{current.grade9Pending}</div></div>
+      </div>
+
+      <div className="card card-pad" style={{ marginTop: 26 }}>
+        <div className="section-row" style={{ marginTop: 0 }}>
+          <div>
+            <div className="eyebrow">Phase 2</div>
+            <h2 className="section-title" style={{ marginTop: 8 }}>G9-A / G9-B 확인 배정</h2>
+            <p className="section-copy">별도 검증된 G9 명단을 보면서 한 명씩 배정합니다. 현재 선택은 언제든 A↔B로 수정할 수 있습니다.</p>
+          </div>
+          <div className="search-box"><Search size={15} /><input className="input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="G9 학생 검색" data-testid="input-core-grade9-search" /></div>
+        </div>
+
+        {grade9Rows.length === 0 ? <EmptyState title="G9 학생이 없습니다" copy="현재 학기 또는 학생 데이터를 확인하세요." /> :
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead><tr><th>학생</th><th>현재 배정</th><th>G9-A</th><th>G9-B</th></tr></thead>
+              <tbody>{grade9Rows.map((row) => <tr key={row.studentId} data-testid={'row-core-grade9-' + row.studentId}>
+                <td><strong>{row.studentName}</strong></td>
+                <td>{row.homeroom ?? <span className="pill pill-warning">미배정</span>}</td>
+                <td><button className={'btn ' + (row.section === 'A' ? 'btn-primary' : 'btn-outline')} disabled={assignGrade9.isPending} onClick={() => assign(row.studentId, 'A', row.studentName)} data-testid={'button-core-grade9-a-' + row.studentId}>{row.section === 'A' && <Check size={13} />} G9-A</button></td>
+                <td><button className={'btn ' + (row.section === 'B' ? 'btn-primary' : 'btn-outline')} disabled={assignGrade9.isPending} onClick={() => assign(row.studentId, 'B', row.studentName)} data-testid={'button-core-grade9-b-' + row.studentId}>{row.section === 'B' && <Check size={13} />} G9-B</button></td>
+              </tr>)}</tbody>
+            </table>
+          </div>}
+      </div>
+    </>}
+  </div>;
+}
+
 function AuditLogPage() {
   const logs = useDisciplineAuditLogs();
   const [entityFilter, setEntityFilter] = useState('ALL');
@@ -1281,7 +1447,7 @@ function ProtectedRoutes() {
   if (loading) return <LoadingState />;
   if (!session) return <Redirect to="/sign-in" />;
   if (!admin) return <div className="app-loading"><div className="error-box"><AlertTriangle size={24} /><p>관리자 권한이 없는 계정입니다. 운영 담당자에게 문의해주세요.</p><button className="btn btn-outline" onClick={() => signOut()} data-testid="button-no-admin-sign-out"><LogOut size={14} /> 로그아웃</button></div></div>;
-  return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} /><Route path="/settlement" component={() => <LeadGate><SettlementPage /></LeadGate>} /><Route path="/audit" component={() => <LeadGate><AuditLogPage /></LeadGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
+  return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} /><Route path="/settlement" component={() => <LeadGate><SettlementPage /></LeadGate>} /><Route path="/audit" component={() => <LeadGate><AuditLogPage /></LeadGate>} /><Route path="/core-setup" component={() => <LeadGate><CoreSetupPage /></LeadGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
 }
 
 function NotFoundInline() {
