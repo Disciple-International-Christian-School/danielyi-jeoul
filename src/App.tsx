@@ -1233,9 +1233,14 @@ function CoreSetupPage() {
         <div className="muted" style={{ fontSize: 10 }}>SP / 학교 공통 student_no</div>
       </div>
       <div className="card metric-card">
-        <div className="metric-label">Auth 연결</div>
+        <div className="metric-label">Core Auth</div>
         <div className="metric-value">{core.authLinked}/{core.activeStudents}</div>
-        <div className="muted" style={{ fontSize: 10 }}>기존 학생 로그인 계정</div>
+        <div className="muted" style={{ fontSize: 10 }}>DICS Core 프로젝트 로그인</div>
+      </div>
+      <div className="card metric-card">
+        <div className="metric-label">외부 Auth</div>
+        <div className="metric-value">{core.externalAuthLinked}/{core.activeStudents}</div>
+        <div className="muted" style={{ fontSize: 10 }}>SP 등 legacy 프로젝트 identity</div>
       </div>
       <div className="card metric-card">
         <div className="metric-label">현재 학적</div>
@@ -1253,7 +1258,7 @@ function CoreSetupPage() {
       <strong>현재 전환 상태</strong>
       <span style={{ marginLeft: 10 }}>READY {readyStudents} · PARTIAL {partialStudents} · CORE ONLY {coreOnlyStudents}</span>
       <div style={{ marginTop: 5 }}>
-        Core UUID는 학생 identity의 시작점이고, 학번·Auth·현재 학적까지 연결되어야 통합 플랫폼 기준 READY가 됩니다.
+        Core UUID는 학생 identity의 시작점이고, 학번·현재 학적·(Core Auth 또는 검증된 외부 Auth)가 연결되어야 migration 기준 READY가 됩니다. 외부 Auth는 Core Auth와 별도 namespace로 추적합니다.
       </div>
     </div>
 
@@ -1349,12 +1354,13 @@ function CoreSetupPage() {
         {pendingRows.length === 0 ? <EmptyState title="Core 통합 완료" copy="활성 학생의 학번·Auth·현재 학적 연결이 모두 완료되었습니다." /> :
           <div className="table-wrap">
             <table className="data-table">
-              <thead><tr><th>학생</th><th>학년/반</th><th>학번</th><th>Auth</th><th>현재 학적</th><th>상태</th></tr></thead>
+              <thead><tr><th>학생</th><th>학년/반</th><th>학번</th><th>Core Auth</th><th>외부 Auth</th><th>현재 학적</th><th>상태</th></tr></thead>
               <tbody>{pendingRows.map((row) => <tr key={row.coreStudentId}>
                 <td><strong>{row.name}</strong></td>
                 <td>{row.homeroom ?? ('G' + row.grade)}</td>
                 <td>{row.hasStudentNo ? <span className="pill pill-positive">연결</span> : <span className="pill pill-warning">미연결</span>}</td>
-                <td>{row.hasAuthLink ? <span className="pill pill-positive">연결</span> : <span className="pill pill-warning">미연결</span>}</td>
+                <td>{row.hasAuthLink ? <span className="pill pill-positive">연결</span> : <span className="pill pill-neutral">없음</span>}</td>
+                <td>{row.hasExternalAuthLink ? <span className="pill pill-positive">연결</span> : <span className="pill pill-neutral">없음</span>}</td>
                 <td>{row.hasCurrentEnrollment ? <span className="pill pill-positive">배정</span> : <span className="pill pill-warning">미배정</span>}</td>
                 <td><span className={'pill ' + (row.readinessStatus === 'PARTIAL' ? 'pill-warning' : 'pill-neutral')}>{row.readinessStatus}</span></td>
               </tr>)}</tbody>
