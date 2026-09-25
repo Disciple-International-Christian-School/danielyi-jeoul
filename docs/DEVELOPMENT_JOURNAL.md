@@ -1026,3 +1026,207 @@ department merit rules          0
 
 이제부터는 “새 기능을 더 만드는 단계”보다
 **기존 학교 데이터를 Core에 정확히 연결하는 단계**의 비중이 커진다.
+
+
+---
+
+# 23. Parallel DB Drift — 통합 Dev 환경의 첫 실제 경고
+
+Claude/GPT 병렬 작업이 본격화되면서 live Supabase가 Git보다 먼저 변한 순간이 발생했다.
+
+Readiness를 다시 측정했을 때 직전에는:
+
+    terms         0
+    classes       0
+    enrollments   0
+
+이던 값이 갑자기:
+
+    terms           1
+    classes        13
+    enrollments   144
+
+로 바뀌어 있었다.
+
+추가 확인 결과 migration history에는:
+
+    lead_audit_view
+    current_term_setup
+    fix_current_term_setup_runtime
+
+가 live DB에 적용되어 있었지만, 동일 변경이 현재 Git migration tree에는 완전히 반영되지 않은 상태였다.
+
+## 왜 중요한가
+
+병렬 개발에서 가장 위험한 상태는 “두 모델이 다른 코드를 작성하는 것” 자체가 아니다.
+
+더 위험한 것은:
+
+    Git history != live database history
+
+가 되는 순간이다.
+
+이 상태가 길어지면 다음 개발자가 migration을 재현할 수 없고,
+복구/재배포/새 환경 구축이 어려워진다.
+
+## 대응
+
+live 구조를 직접 읽고 다음을 version-controlled reconciliation migration으로 되돌려 기록했다.
+
+- 2026-FALL academic term
+- G1–G8, G10–G12 class shells
+- G9-A / G9-B class shells
+- G9을 제외한 144명 current enrollment
+- lead-facing audit view
+
+Reconciliation migration은 idempotent하게 작성해 live DB에 이미 존재하는 구조를 다시 적용해도 중복 생성되지 않도록 했다.
+
+## 운영 원칙으로 승격
+
+앞으로 병렬 AI 개발에서:
+
+1. live DB 변경이 발견되면 migration history를 먼저 확인한다.
+2. Git에 같은 구조가 없으면 drift로 간주한다.
+3. 실데이터가 아닌 구조 변화는 반드시 reconciliation migration으로 Git에 복귀시킨다.
+4. “현재 DB가 잘 된다”보다 “새 환경에서 동일 DB를 재현할 수 있다”를 완료 기준으로 본다.
+
+이 사건은 Claude + GPT 병렬 개발이 단순 코드 분업을 넘어
+실제 database change-management 규칙을 필요로 한다는 것을 보여줬다.
+
+---
+
+# 24. Core Readiness Dashboard — 통합 진행률을 숫자로 보기
+
+Core identity가 만들어진 뒤부터 migration 진행상태를 감으로 판단하지 않기로 했다.
+
+새 readiness projection은 학생마다 다음 상태를 계산한다.
+
+    CORE_ONLY
+    PARTIAL
+    READY
+
+READY 기준:
+
+    canonical Core UUID
+    + student_no
+    + Auth link
+    + current-term enrollment
+
+2026-09-25 현 시점:
+
+    Core total                 180
+    Active students            175
+    Daniel bridge              175
+    Current enrollment         144
+    Student number linked        0
+    Auth linked                  0
+
+G9 31명은 A/B 분반 근거가 필요해 의도적으로 current enrollment가 비어 있다.
+
+Core 설정 화면은 이제 provisioning console뿐 아니라
+통합 진행률을 보여주는 dashboard 역할도 한다.
+
+향후 SP mapping이 진행되면:
+
+    student_no  0 → 기존 SP cohort → 전교생
+    Auth        0 → 로그인 보유 학생
+    enrollment 144 → 175
+
+처럼 migration이 숫자로 드러난다.
+
+이 숫자는 향후 개발 보고서에서 “무엇을 완료했는가”를 설명하는 객관적 근거로 사용할 수 있다.
+
+---
+
+# 25. Study Planner Shadow Schema — 앱을 합치기 전에 옮겨갈 자리를 먼저 만든다
+
+Study Planner는 현재 별도 Supabase 프로젝트에서 운영되고 있다.
+
+기존 SP schema의 가장 중요한 특징은:
+
+    students.id = auth.users.id
+
+라는 점이다.
+
+DICS Core에서는 이를 그대로 가져오지 않는다.
+
+통합 목표:
+
+    core.students.id
+    = canonical student UUID
+
+    core.students.auth_user_id
+    = optional login identity
+
+따라서 DICS Core 프로젝트 안에 비어 있는 study_planner schema를 먼저 만들었다.
+
+## 설계 변화
+
+기존 SP:
+
+    public.students
+    public.terms
+    public.week_plans
+    ...
+
+Core target:
+
+    core.students
+    core.academic_terms
+
+    study_planner.weeks
+    study_planner.term_goals
+    study_planner.week_plans
+    study_planner.plan_items
+    study_planner.item_records
+    ...
+
+즉 학생과 학기 master는 중복 생성하지 않는다.
+
+Study Planner는 학습 domain 데이터만 소유한다.
+
+## 왜 먼저 빈 schema를 만들었는가
+
+실데이터 migration 전에 target schema가 있으면:
+
+- FK 방향을 먼저 검증할 수 있고,
+- 기존 SP table과 1:1 비교할 수 있고,
+- migration order를 계획할 수 있고,
+- live SP를 건드리지 않고도 통합 구조를 검증할 수 있다.
+
+현재 target schema에는 실제 SP 학생/계획 데이터가 0건이다.
+
+기존 SP production은 그대로 유지된다.
+
+이 단계는:
+
+    현재 앱을 바로 합친다
+
+가 아니라:
+
+    안전하게 옮길 목적지를 먼저 만든다
+
+는 migration 전략이다.
+
+---
+
+# 26. 다음 Integration 단계
+
+Study Planner migration은 다음 순서로 진행한다.
+
+1. live SP table별 row count/schema drift 확인
+2. SP 학생의 student_no/Auth와 Core 학생 mapping
+3. mapping 검증
+4. static/reference data 복사
+5. terms를 Core academic_terms와 reconcile
+6. goals/plans/items/records 순서로 데이터 복사
+7. row count + FK + sample behavior 검증
+8. SP frontend를 Core-backed API로 전환
+9. 일정 기간 dual-check
+10. legacy SP database를 archive/retire 여부 판단
+
+중요한 원칙은 계속 동일하다.
+
+실데이터를 Git에 넣지 않고,
+mapping을 이름만으로 확정하지 않으며,
+기존 운영 앱을 먼저 끄지 않는다.
