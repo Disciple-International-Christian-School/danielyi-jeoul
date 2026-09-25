@@ -553,7 +553,28 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
       copy={negative ? '아침 종이 시트도 빠르게 옮길 수 있도록 연속 입력에 최적화했습니다.' : '학생의 좋은 행동을 놓치지 않고 상점으로 남깁니다.'}
     />
 
-    <div className="detail-grid" style={{ marginTop: 30 }}>
+    <div className="side-note" style={{ marginTop: 24 }}>
+      <strong>이번 주 자동 상점</strong>
+      <span style={{ marginLeft: 10 }}>{generatedThisWeek}/{expectedThisWeek}건 생성됨</span>
+      <button
+        type="button"
+        className="btn btn-outline"
+        style={{ marginLeft: 12 }}
+        disabled={ensureWeeklyMerits.isPending}
+        onClick={() => ensureWeeklyMerits.mutate(undefined, {
+          onSuccess: (inserted) => {
+            refresh();
+            notify(inserted > 0 ? '이번 주 부서활동 상점 ' + inserted + '건을 반영했습니다.' : '이번 주 부서활동 상점은 이미 최신 상태입니다.');
+          },
+          onError: (error) => notify(errText(error), 'error'),
+        })}
+        data-testid="button-ensure-department-merits"
+      >
+        <RefreshCw size={14} /> 이번 주 반영
+      </button>
+    </div>
+
+    <div className="detail-grid" style={{ marginTop: 22 }}>
       <form className="card card-pad" onSubmit={submit}>
         <div className="section-row" style={{ margin: 0 }}>
           <div>
@@ -1497,6 +1518,8 @@ function DepartmentMeritAdminPage() {
   const notify = useContext(NoticeContext);
   const departments = useDepartmentMeritAdmin();
   const members = useDepartmentCurrentMembers();
+  const weeklyStatus = useDepartmentMeritStatus();
+  const ensureWeeklyMerits = useEnsureWeeklyDepartmentMerits();
   const students = useCoreStudentReadiness();
   const saveRule = useCreateDepartmentWithMeritRule();
   const setMembership = useSetDepartmentStudentMembership();
@@ -1622,13 +1645,16 @@ function DepartmentMeritAdminPage() {
     });
   };
 
-  if (departments.isLoading || members.isLoading || students.isLoading) return <LoadingState />;
-  if (departments.isError || members.isError || students.isError) {
+  if (departments.isLoading || members.isLoading || weeklyStatus.isLoading || students.isLoading) return <LoadingState />;
+  if (departments.isError || members.isError || weeklyStatus.isError || students.isError) {
     return <ErrorState
-      error={departments.error ?? members.error ?? students.error}
-      retry={() => { departments.refetch(); members.refetch(); students.refetch(); }}
+      error={departments.error ?? members.error ?? weeklyStatus.error ?? students.error}
+      retry={() => { departments.refetch(); members.refetch(); weeklyStatus.refetch(); students.refetch(); }}
     />;
   }
+
+  const expectedThisWeek = weeklyStatus.data?.length ?? 0;
+  const generatedThisWeek = weeklyStatus.data?.filter((row) => row.generated).length ?? 0;
 
   return <div>
     <PageHeader
