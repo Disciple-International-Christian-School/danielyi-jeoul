@@ -198,6 +198,15 @@ export interface DisciplineAuditLog {
   createdAt: string;
 }
 
+export interface DisciplineCoreFkReadiness {
+  pointRecordsTotal: number;
+  pointRecordsCoreLinked: number;
+  pointRecordsMismatch: number;
+  punishmentsTotal: number;
+  punishmentsCoreLinked: number;
+  punishmentsMismatch: number;
+}
+
 export interface CoreMigrationReadiness {
   coreTotal: number;
   activeStudents: number;
@@ -431,6 +440,15 @@ interface SettlementPeriodRow {
   starts_on: string;
   ends_on: string | null;
   created_at: string;
+}
+
+interface DisciplineCoreFkReadinessRow {
+  point_records_total: number;
+  point_records_core_linked: number;
+  point_records_mismatch: number;
+  punishments_total: number;
+  punishments_core_linked: number;
+  punishments_mismatch: number;
 }
 
 interface CoreMigrationReadinessRow {
@@ -677,6 +695,17 @@ function mapDisciplineAuditLog(row: DisciplineAuditLogRow): DisciplineAuditLog {
   };
 }
 
+function mapDisciplineCoreFkReadiness(row: DisciplineCoreFkReadinessRow): DisciplineCoreFkReadiness {
+  return {
+    pointRecordsTotal: row.point_records_total,
+    pointRecordsCoreLinked: row.point_records_core_linked,
+    pointRecordsMismatch: row.point_records_mismatch,
+    punishmentsTotal: row.punishments_total,
+    punishmentsCoreLinked: row.punishments_core_linked,
+    punishmentsMismatch: row.punishments_mismatch,
+  };
+}
+
 function mapCoreMigrationReadiness(row: CoreMigrationReadinessRow): CoreMigrationReadiness {
   return {
     coreTotal: row.core_total,
@@ -915,6 +944,7 @@ export const getDepartmentMeritStatusQueryKey = () => ['department-merits', 'cur
 export const getDepartmentMeritAdminQueryKey = () => ['department-merits', 'admin'] as const;
 export const getDepartmentMembersQueryKey = () => ['department-merits', 'members'] as const;
 export const getCoreMigrationReadinessQueryKey = () => ['core', 'migration-readiness'] as const;
+export const getDisciplineCoreFkReadinessQueryKey = () => ['core', 'discipline-fk-readiness'] as const;
 export const getCoreStudentReadinessQueryKey = () => ['core', 'student-readiness'] as const;
 export const getDisciplineAuditLogsQueryKey = () => ['audit-logs', 'discipline'] as const;
 export const getAdminAccountsQueryKey = () => ['admin-accounts'] as const;
@@ -1131,6 +1161,19 @@ export function useDisciplineAuditLogs() {
           .limit(200),
       );
       return rows.map(mapDisciplineAuditLog);
+    },
+  });
+}
+
+export function useDisciplineCoreFkReadiness() {
+  return useQuery({
+    queryKey: getDisciplineCoreFkReadinessQueryKey(),
+    queryFn: async (): Promise<DisciplineCoreFkReadiness> => {
+      const rows = unwrap<DisciplineCoreFkReadinessRow[]>(
+        await supabase.from('v_discipline_core_fk_readiness').select('*').limit(1),
+      );
+      if (rows.length === 0) throw new Error('Discipline Core FK 상태를 확인할 수 없습니다.');
+      return mapDisciplineCoreFkReadiness(rows[0]);
     },
   });
 }
