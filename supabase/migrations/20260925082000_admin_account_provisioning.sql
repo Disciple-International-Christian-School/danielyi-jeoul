@@ -47,6 +47,10 @@ end $$;
 create unique index if not exists admins_login_id_lower_uidx
   on public.admins (lower(login_id));
 
+create index if not exists admins_provisioned_by_idx
+  on public.admins (provisioned_by)
+  where provisioned_by is not null;
+
 comment on column public.admins.login_id is
   'Human login identifier. Frontend maps it to <login_id>@scale.dics.kr.';
 comment on column public.admins.must_change_password is
@@ -119,7 +123,7 @@ begin
     raise exception 'Auth 계정을 찾을 수 없습니다.';
   end if;
 
-  if v_email <> v_login || '@scale.dics.kr' then
+  if v_email <> (v_login || '@scale.dics.kr') then
     raise exception 'Auth 이메일과 login_id가 일치하지 않습니다.';
   end if;
 
