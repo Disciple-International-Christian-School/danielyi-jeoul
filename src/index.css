@@ -470,3 +470,17 @@ body::before {
     margin-top: 8mm;
   }
 }
+
+
+.audit-json {
+  margin: 8px 0 0;
+  padding: 12px;
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  font: 10px/1.55 var(--app-font-mono);
+}
