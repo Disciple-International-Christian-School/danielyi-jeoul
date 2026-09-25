@@ -898,6 +898,37 @@ Identity ≠ Role
 - newly provisioned personal staff accounts 0
 - must-change-password accounts 0
 
+### Discipline Core UUID cut-over — 2026-09-25
+
+**Production DB applied**
+
+- `point_records.core_student_id` / `punishments.core_student_id` 추가.
+- 기존 record canonical UUID backfill.
+- Core UUID FK + indexes.
+- legacy integer / Core UUID mismatch 방지 trigger.
+- `v_discipline_core_fk_readiness` aggregate validation.
+- Core UUID write entrypoints:
+  - `create_point_record_core(...)`
+  - `create_punishment_core(...)`
+- 기존 business-rule RPC에 delegate하여 검증 로직 중복 방지.
+
+**Validation**
+
+- point records 1/1 Core-linked.
+- mismatch 0.
+- punishment mismatch 0.
+- authenticated rollback RPC test:
+  - created true
+  - Core UUID present
+  - legacy/Core identity match true
+  - test data rollback 완료.
+
+**Frontend**
+
+- new point record / punishment creation now sends canonical Core UUID.
+- legacy integer route/read compatibility는 다음 단계까지 유지.
+- API type cut-over가 stale App call-site를 CI에서 탐지했고 수정 후 CI green.
+
 ### Frontend in branch — deployment pending
 
 - 학생 명부를 DICS Core read-only roster 관점으로 변경.
