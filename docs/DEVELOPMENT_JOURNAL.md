@@ -1230,3 +1230,147 @@ Study Planner migration은 다음 순서로 진행한다.
 실데이터를 Git에 넣지 않고,
 mapping을 이름만으로 확정하지 않으며,
 기존 운영 앱을 먼저 끄지 않는다.
+
+---
+
+# 23. SP 29명 Identity Reconciliation — “전체 성공보다 검증 가능한 부분 성공”
+
+Study Planner pilot에는 이미 29명의 학생에게 학번 형식 ID가 부여되어 있었다.
+
+Core가 만들어진 뒤 이 값을 학교 공통 `student_no`로 보강하려고 했지만, 실데이터 migration에서 가장 먼저 한 일은 UPDATE가 아니었다.
+
+```text
+SP source
+student_no + name + grade
+          ↓
+Daniel operational roster
+name + grade + core_student_id
+```
+
+PIN은 이 reconciliation에서 완전히 제외했다.
+
+## 첫 검증 결과
+
+```text
+source rows     29
+exact matches   28
+unmatched        1
+ambiguous        0
+```
+
+29명을 한 번에 넣을 수도 있었다.
+
+하지만 한 학생의 이름 표기가 두 시스템 사이에서 달랐다.
+
+## 결정
+
+```text
+확정 28명 → 먼저 반영
+불일치 1명 → pending
+```
+
+이 결정은 migration 완료율을 100%로 보이게 만드는 것보다 **잘못된 학생에게 identity를 붙이지 않는 것**을 우선한 것이다.
+
+## 실제 반영
+
+검증된 28명만 `core.students.student_no`에 반영했다.
+
+그 결과:
+
+```text
+Core students              180
+student_no assigned         28
+student_no pending         152
+```
+
+기존 SP pilot 29명 중 1명은 별도 원본으로 이름을 확인할 때까지 보류한다.
+
+## 의미
+
+이 단계에서 student_no는 더 이상 SP 화면 안에서만 쓰는 값이 아니라, 실제로 DICS Core에 들어오기 시작했다.
+
+하지만 기존 문서가 이 번호를 “임시로 매긴 값”이라고 설명하고 있었기 때문에, 전교생으로 확대할 때는 번호 발급정책 자체도 별도 결정으로 남겨야 한다.
+
+> **기존 사용 중인 번호를 존중하되, 전교생 확장은 별도의 안정적인 school-wide numbering policy가 필요하다.**
+
+---
+
+# 24. 중요한 Architecture Correction — UUID가 같아 보여도 같은 Auth가 아니다
+
+SP 통합 문서를 처음 만들 때는:
+
+```text
+existing SP auth.users.id
+        ↓
+core.students.auth_user_id
+```
+
+로 연결하면 된다고 표현했다.
+
+그러나 실제 배포구조를 다시 대조하면서 중요한 문제가 드러났다.
+
+SP와 Daniel/DICS Core는 **서로 다른 Supabase 프로젝트**다.
+
+따라서:
+
+```text
+SP Project A
+auth.users.id = UUID-A
+```
+
+와:
+
+```text
+Core Project B
+auth.users.id = UUID-B
+```
+
+는 서로 다른 Auth namespace다.
+
+문자열이 UUID라는 이유로 외부 프로젝트의 ID를 Core 프로젝트의 `auth.users(id)` FK에 넣을 수 없다.
+
+## 수정된 전환 모델
+
+Migration 기간:
+
+```text
+SP external auth UUID
+        ↓
+core.external_auth_identities
+        ↓
+core.students.id
+```
+
+최종 통합 후:
+
+```text
+DICS Core local auth.users.id
+        ↓
+core.students.auth_user_id
+        ↓
+core.students.id
+```
+
+즉:
+
+- `core.students.id`는 프로젝트와 무관한 canonical student identity
+- `core.students.auth_user_id`는 **Core 프로젝트의 local Auth 전용**
+- 기존 외부 앱 Auth는 `core.external_auth_identities`로 migration provenance를 보존
+
+한다.
+
+## 왜 이 정정이 중요한가
+
+이 문제를 놓치면 “UUID니까 그대로 연결하면 된다”는 착각으로 데이터베이스 FK와 인증 경계를 섞게 된다.
+
+통합 시스템에서 identity는:
+
+```text
+사람의 identity
+로그인 계정의 identity
+외부 시스템의 identity
+```
+
+를 각각 분리해 다뤄야 한다.
+
+이 발견은 DICS Core가 단순히 “여러 앱이 같은 학생번호를 쓰는 구조”가 아니라, **여러 시스템의 identity namespace를 조정하는 integration layer**가 되어야 한다는 점을 분명하게 만들었다.
