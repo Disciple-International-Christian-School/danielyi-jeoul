@@ -140,6 +140,19 @@ export interface DailyDisciplineNotice {
   reflectionStatus: ReflectionStatus | null;
 }
 
+export interface DisciplineAuditLog {
+  id: number;
+  actorUserId: string | null;
+  actorName: string;
+  actorRole: Role | null;
+  action: 'INSERT' | 'UPDATE' | 'DELETE';
+  entityType: string;
+  entityId: string | null;
+  beforeData: Record<string, unknown> | null;
+  afterData: Record<string, unknown> | null;
+  createdAt: string;
+}
+
 export interface DepartmentMeritStatus {
   weekStart: string;
   departmentId: string;
@@ -318,6 +331,19 @@ interface DailyDisciplineNoticeRow {
   reflection_status: ReflectionStatus | null;
 }
 
+interface DisciplineAuditLogRow {
+  id: number;
+  actor_user_id: string | null;
+  actor_name: string;
+  actor_role: Role | null;
+  action: 'INSERT' | 'UPDATE' | 'DELETE';
+  entity_type: string;
+  entity_id: string | null;
+  before_data: Record<string, unknown> | null;
+  after_data: Record<string, unknown> | null;
+  created_at: string;
+}
+
 interface DepartmentMeritStatusRow {
   week_start: string;
   department_id: string;
@@ -431,6 +457,21 @@ function mapReflection(row: ReflectionRow): Reflection {
     submittedAt: row.submitted_at,
     status: row.status,
     assignedScope: row.assigned_scope,
+  };
+}
+
+function mapDisciplineAuditLog(row: DisciplineAuditLogRow): DisciplineAuditLog {
+  return {
+    id: row.id,
+    actorUserId: row.actor_user_id,
+    actorName: row.actor_name,
+    actorRole: row.actor_role,
+    action: row.action,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    beforeData: row.before_data,
+    afterData: row.after_data,
+    createdAt: row.created_at,
   };
 }
 
@@ -582,6 +623,7 @@ export const getCurrentSettlementQueryKey = () => ['settlement', 'current'] as c
 export const getDailyDisciplineNoticeQueryKey = (recordedAt: string) => ['reports', 'daily-notice', recordedAt] as const;
 export const getWeeklyDisciplineReportQueryKey = () => ['reports', 'weekly'] as const;
 export const getDepartmentMeritStatusQueryKey = () => ['department-merits', 'current-week'] as const;
+export const getDisciplineAuditLogsQueryKey = () => ['audit-logs', 'discipline'] as const;
 
 // ---------------------------------------------------------------------------
 // Reads
@@ -691,6 +733,22 @@ export function useListPunishments() {
         await supabase.from('v_punishments').select('*').order('created_at', { ascending: false }),
       );
       return rows.map(mapPunishment);
+    },
+  });
+}
+
+export function useDisciplineAuditLogs() {
+  return useQuery({
+    queryKey: getDisciplineAuditLogsQueryKey(),
+    queryFn: async (): Promise<DisciplineAuditLog[]> => {
+      const rows = unwrap<DisciplineAuditLogRow[]>(
+        await supabase
+          .from('v_discipline_audit_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(200),
+      );
+      return rows.map(mapDisciplineAuditLog);
     },
   });
 }
