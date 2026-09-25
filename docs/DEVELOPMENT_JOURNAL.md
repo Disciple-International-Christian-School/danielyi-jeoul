@@ -1907,3 +1907,201 @@ GitHub Actions 결과:
 실제 부서활동 명단과 점수는 아직 의도적으로 입력하지 않았다.
 
 다음 운영 단계는 실제 담당자가 명단을 검증한 뒤 UI에서 직접 등록하는 것이다.
+
+
+---
+
+# 36. Shared account에서 Personal accountability로
+
+Daniel's Scale는 초기에 역할 기반 shared account 두 개로 운영되었다.
+
+이 구조는 빠른 MVP 운영에는 충분했지만,
+created_by / updated_by와 audit log가 실제로 들어오기 시작하면서
+“누가 했는가”의 의미가 달라졌다.
+
+공유계정 상태에서는:
+
+    auth.uid()
+    = 한 사람의 identity가 아니라 여러 사람이 공유하는 role identity
+
+이므로 audit trail이 완전한 개인 책임성을 제공하지 못한다.
+
+## 결정
+
+기존 shared account를 즉시 삭제하지 않고 개인계정을 병행한다.
+
+이유:
+
+- 현재 학교 운영을 끊지 않는다.
+- 개인계정 provisioning 오류가 있어도 fallback이 남는다.
+- 실제 담당범위 권한을 하나씩 검증할 수 있다.
+- audit actor가 개인 이름으로 남는지 운영 중 확인할 수 있다.
+
+개인계정이 안정화된 뒤에만 shared account를 inactive 처리한다.
+
+---
+
+# 37. Auth Admin API를 브라우저에서 분리
+
+개인계정을 만들려면 Supabase Auth user를 생성해야 한다.
+
+공식 Auth Admin API는 service credential을 필요로 하며,
+이 key는 browser에 노출하면 안 된다.
+
+따라서:
+
+    browser
+      ↓ authenticated JWT
+    provision-admin-account Edge Function
+      ↓ service credential
+    Supabase Auth Admin API
+      ↓
+    auth.users
+      ↓ caller JWT
+    register_admin_profile()
+      ↓
+    public.admins
+
+구조를 만들었다.
+
+Edge Function은 user 생성 전에 caller가 실제 활성 SEONDO lead인지 확인한다.
+
+Auth user 생성 후 profile 등록이 실패하면:
+
+    auth.admin.deleteUser()
+
+로 보상 cleanup을 수행해 orphan Auth account를 남기지 않는다.
+
+## Temporary credential
+
+새 계정의 temporary password는 server에서 cryptographic random 값으로 생성한다.
+
+이 값은:
+
+- Git에 저장하지 않음
+- admins table에 저장하지 않음
+- 한 번만 UI에 반환
+- 사용자가 첫 로그인하면 즉시 변경
+
+하는 방향으로 설계했다.
+
+현재 운영 DB의 실제 admin profile 수는 그대로 2개이며,
+개인 실직원 계정은 아직 생성하지 않았다.
+
+---
+
+# 38. “비밀번호 바꿨음” flag 자체도 신뢰하면 안 됐다
+
+첫 설계는:
+
+    browser에서 Auth password 변경
+    → mark_admin_password_changed() RPC
+
+순서였다.
+
+기능적으로는 동작하지만 문제를 발견했다.
+
+RPC 자체를 authenticated user가 직접 호출할 수 있다면
+실제 password 변경 없이:
+
+    must_change_password = false
+
+만 만들 수 있다.
+
+이건 UI가 올바른 순서로 호출한다는 가정에 의존한다.
+
+## 수정
+
+client-side completion RPC를 제거했다.
+
+대신:
+
+    change-admin-password Edge Function
+
+을 만들었다.
+
+이 함수가:
+
+1. JWT session 검증
+2. 활성 admin profile 확인
+3. password complexity 확인
+4. 실제 Supabase Auth password update
+5. 성공 후에만 must_change_password 해제
+
+를 수행한다.
+
+따라서 완료상태는 UI event가 아니라 실제 Auth mutation 결과에 연결된다.
+
+---
+
+# 39. 첫 로그인 강제 흐름
+
+신규 개인계정은:
+
+    must_change_password = true
+
+로 시작한다.
+
+ProtectedRoutes는 이 flag가 true인 동안 일반 운영화면을 렌더하지 않는다.
+
+사용자는 바로 password change screen으로 이동한다.
+
+비밀번호 조건:
+
+    12자 이상
+    uppercase
+    lowercase
+    number
+    special character
+
+변경이 성공하면 admin profile을 reload하고 정상 dashboard로 진입한다.
+
+비활성 admin account 역시 별도 차단화면에서 운영화면 접근을 막는다.
+
+---
+
+# 40. 관리자 권한 self-protection
+
+개인계정 관리 화면은 lead-only다.
+
+설계 보호장치:
+
+- SASAENG는 SEONDO lead가 될 수 없음
+- lead account는 discipline scope가 항상 ALL
+- 마지막 활성 SEONDO lead는 해제/비활성화할 수 없음
+- login_id는 account 생성 후 UI에서 변경하지 않음
+- 계정 비활성화 후에도 과거 audit/provenance는 보존
+
+이 구조의 목적은 편의보다 “운영자 스스로 전체 admin access를 실수로 제거하지 못하게 하는 것”이다.
+
+---
+
+# 41. Personal Admin checkpoint
+
+현재 상태:
+
+    admin profiles                   2
+    active admins                    2
+    active leads                     1
+    must-change-password accounts    0
+    newly provisioned real accounts  0
+
+Edge Functions:
+
+    provision-admin-account     ACTIVE / JWT required
+    change-admin-password       ACTIVE / JWT required
+
+Frontend:
+
+    관리자 계정 console
+    temporary credential one-time display
+    first-login password enforcement
+    inactive account lockout
+
+CI:
+
+    personal-admin final branch state
+    typecheck/build SUCCESS
+
+다음 실제 운영 action은 코드를 더 만드는 것이 아니라
+검증된 담당자부터 개인계정을 순차 provision하는 것이다.
