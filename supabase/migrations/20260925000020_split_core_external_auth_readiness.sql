@@ -20,12 +20,6 @@ select
   (select count(*) from active_students)::int as active_students,
   (select count(*) from active_students where student_no is not null)::int as student_no_assigned,
   (select count(*) from active_students where auth_user_id is not null)::int as auth_linked,
-  (
-    select count(distinct eai.student_id)
-    from core.external_auth_identities eai
-    join active_students s on s.id = eai.student_id
-    where eai.is_active
-  )::int as external_auth_linked,
   (select count(*) from core.academic_terms)::int as term_count,
   (select count(*) from core.academic_terms where is_current)::int as current_term_count,
   (select count(*) from core.classes)::int as class_count,
@@ -41,7 +35,13 @@ select
     from public.students ls
     where ls.deleted_at is null
       and ls.core_student_id is not null
-  )::int as daniel_bridge_count;
+  )::int as daniel_bridge_count,
+  (
+    select count(distinct eai.student_id)
+    from core.external_auth_identities eai
+    join active_students s on s.id = eai.student_id
+    where eai.is_active
+  )::int as external_auth_linked;
 
 create or replace view public.v_core_student_readiness
 with (security_invoker = true) as
@@ -63,7 +63,6 @@ select
   ls.grade,
   (cs.student_no is not null) as has_student_no,
   (cs.auth_user_id is not null) as has_auth_link,
-  (ea.student_id is not null) as has_external_auth_link,
   (e.student_id is not null) as has_current_enrollment,
   c.label as homeroom,
   case
@@ -77,7 +76,8 @@ select
       or e.student_id is not null
     then 'PARTIAL'
     else 'CORE_ONLY'
-  end as readiness_status
+  end as readiness_status,
+  (ea.student_id is not null) as has_external_auth_link
 from core.students cs
 join public.students ls
   on ls.core_student_id = cs.id
