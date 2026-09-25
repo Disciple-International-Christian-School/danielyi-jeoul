@@ -1768,3 +1768,142 @@ Study Planner target schema에는 실제 운영 학습데이터가 아직 0건�
 
 다음 중요한 evidence point는 SP live bridge migration을 적용한 뒤
 29명 중 몇 명이 실제 source↔Core 양쪽 bridge를 완성하는지다.
+
+
+---
+
+# 33. Department Merit 운영화 — Excel 의존에서 운영 DB 관리로
+
+부서활동 자동 상점 엔진은 이미 존재했지만 실제 운영 데이터는 0건이었다.
+
+초기 요구는 부서활동 Excel을 기반으로 매주 월요일 상점을 자동 부여하는 것이었다.
+하지만 장기 운영을 생각하면 Excel 파일을 매번 개발자가 읽어 DB seed로 옮기는 구조는 적절하지 않았다.
+
+## 문제
+
+파일 중심 운영은 다음 위험을 가진다.
+
+- 부서원 변경 때마다 개발 작업 필요
+- 실제 명단을 Git에 잘못 올릴 위험
+- 어느 날짜부터 학생이 소속됐는지 이력 관리 어려움
+- 상점 점수 변경 시 과거 규칙과 현재 규칙의 경계가 불명확
+
+## 결정
+
+부서/소속/주간 상점 규칙 자체를 운영 DB에서 관리한다.
+
+선도부장은 사이트에서:
+
+    부서 생성
+    → 주간 상점 규칙 지정
+    → 학생 소속 추가/종료
+    → 이번 주 자동상점 반영
+
+을 직접 수행한다.
+
+실제 학생 소속 row는 Supabase에만 존재하고 Git에는 들어가지 않는다.
+
+## 데이터 모델 원칙
+
+소속은 삭제하지 않는다.
+
+    starts_on
+    ends_on
+
+으로 이력을 보존한다.
+
+규칙 변경도 overwrite보다 versioning을 우선한다.
+
+    기존 rule
+       effective_to 종료
+
+    새 rule
+       effective_from 시작
+
+따라서 나중에 특정 주에 왜 몇 점이 부여됐는지 설명할 수 있다.
+
+## 권한
+
+읽기:
+
+    SEONDO
+
+쓰기:
+
+    lead only
+
+SASAENG에는 부서 명단/상점 규칙 접근이 필요하지 않으므로 RLS를 좁혔다.
+
+## 실제 운영 안전성
+
+기능을 production DB에 적용한 직후 확인:
+
+    departments              0
+    memberships              0
+    merit rules              0
+    generated weekly records 0
+
+즉 기능은 live지만 실제 학생 데이터나 점수는 자동 생성되지 않았다.
+
+운영자가 검증된 명단을 입력하는 순간부터만 데이터가 생긴다.
+
+---
+
+# 34. UI 자동 치환 오류를 merge 전에 잡은 사례
+
+부서 상점 페이지에 “이번 주 반영” 상태를 넣는 과정에서
+범용 문자열 치환이 예상보다 넓은 첫 번째 matching block을 잡았다.
+
+결과적으로 해당 UI 조각이 잠시 벌점 입력 페이지에 삽입됐다.
+
+이 변경은 branch에만 있었고 production data에는 영향이 없었다.
+
+즉시 source를 다시 읽어 실제 삽입 위치를 확인했고:
+
+    잘못된 block 제거
+    → Department Merit page의 명시적 PageHeader anchor 사용
+    → 재삽입
+    → CI 재실행
+
+으로 수정했다.
+
+GitHub Actions 결과:
+
+    erroneous commit   FAIL
+    corrected commit   SUCCESS
+
+## 교훈
+
+대형 단일 파일을 문자열 기반으로 수정할 때는:
+
+1. write 이후 source 위치 검증
+2. typecheck/build
+3. branch CI
+
+세 단계 모두 필요하다.
+
+특히 AI 병렬개발에서는 “도구 호출 성공”을 “기능 위치까지 정확함”으로 간주하지 않는다.
+
+---
+
+# 35. Department Merit — 현재 완료선
+
+현재 부서 자동 상점 흐름은 다음까지 준비됐다.
+
+    lead가 부서 생성
+    → 주간 점수/기록명 지정
+    → 학생 소속 추가
+    → 필요 시 이번 주 반영
+    → ensure_weekly_department_merits()
+    → deterministic source_key
+    → 중복 생성 방지
+
+자동반영 상태는 화면에서:
+
+    generated / expected
+
+숫자로 확인할 수 있다.
+
+실제 부서활동 명단과 점수는 아직 의도적으로 입력하지 않았다.
+
+다음 운영 단계는 실제 담당자가 명단을 검증한 뒤 UI에서 직접 등록하는 것이다.
