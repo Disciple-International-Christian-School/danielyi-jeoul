@@ -12,6 +12,7 @@ DICS 학생 상점·벌점 관리 콘솔. 관리자 전용 (선도부 / 사생�
 - [개발 서사 / Development Journal](docs/DEVELOPMENT_JOURNAL.md)
 - [DICS Core 통합 스키마](docs/DICS_CORE_ARCHITECTURE.md)
 - [SP → DICS Core Migration Runbook](docs/SP_CORE_MIGRATION_RUNBOOK.md)
+- [개인 관리자 계정 운영 Runbook](docs/ADMIN_ACCOUNT_OPERATIONS.md)
 - [아키텍처](docs/architecture.md)
 - [원본 스펙 (35절)](docs/spec.md)
 
