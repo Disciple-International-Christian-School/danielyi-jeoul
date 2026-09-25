@@ -26,6 +26,8 @@
 | D-013 | OPEN | 전교생 human-facing student number 발급정책 | 기존 `GGNN` 형식은 학년을 포함해 진급 시 stable ID 원칙과 충돌 |
 | D-014 | OPEN | 기존 SP `GGNN`을 permanent student_no로 유지할지 legacy login alias로 전환할지 | 기존 사용자 경험 보존과 장기 identity 안정성을 함께 고려해야 함 |
 | D-015 | TRANSITION | Daniel 내부에 Core provisioning console 유지 | Core Admin이 별도 앱으로 분리되기 전 안전한 provisioning 경로 필요 |
+| D-016 | TRANSITION | shared Core DB는 중앙 migration ledger를 둔다 | 여러 domain/AI lane이 live DB를 동시에 바꾸면 Git↔DB drift가 발생 |
+| D-017 | ACCEPTED | 외부 Auth mapping 값은 Git/Issue/채팅 handoff 대신 secure migration path로 이동 | Auth UUID·student_no 매핑은 운영 identity data이며 공개 개발 기록과 분리해야 함 |
 
 ---
 
@@ -183,3 +185,68 @@ core.students.auth_user_id
 나머지 전교생 번호를 기계적으로 생성하기 전에 school-wide numbering policy를 확정한다.
 
 Canonical UUID는 이미 별도로 존재하므로 이 결정을 서두를 기술적 이유가 없다.
+
+
+---
+
+## D-016 — Shared Core Migration Ownership
+
+DICS Core가 실제로 다음 schema를 동시에 담기 시작했다.
+
+```text
+core.*
+discipline.*
+study_planner.*
+computer_lab.*
+```
+
+병렬 작업 중 live migration이 Git보다 먼저 적용되는 drift가 실제로 발생했다.
+
+따라서 현재는 Daniel repo의 `supabase/migrations/`를 임시 ledger로 사용하되,
+장기적으로는 별도 `DICS-Core` repository가 중앙 migration ordering과 `core.*`를 소유하도록 한다.
+
+완료 기준은 단순히 production DB가 동작하는 것이 아니라:
+
+> Git migration history만으로 새 환경의 구조를 재현할 수 있는가?
+
+이다.
+
+---
+
+## D-017 — External Identity는 Secure Migration Data
+
+SP의 기존 Auth UUID와 student_no를 Core에 연결해야 하지만,
+이 mapping row 자체는 schema가 아니라 **운영 identity data**다.
+
+따라서 다음 방식은 사용하지 않는다.
+
+```text
+❌ Git SQL seed에 실제 mapping 작성
+❌ GitHub Issue에 UUID/student_no 목록 첨부
+❌ PR comment로 실데이터 전달
+```
+
+허용되는 방향:
+
+```text
+trusted source read
+        ↓
+verified mapping
+        ↓
+authenticated/service migration path
+        ↓
+Core guarded RPC
+        ↓
+core.external_auth_identities
+```
+
+Core RPC는:
+
+- student_no가 실제 Core 학생인지 확인
+- external identity가 다른 학생에게 연결되어 있으면 거부
+- 한 학생이 같은 source의 다른 identity를 이미 가지면 거부
+- 동일 mapping 재실행은 verification timestamp만 갱신
+
+하도록 설계한다.
+
+PIN/password는 이 과정에 참여하지 않는다.
