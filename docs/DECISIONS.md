@@ -28,6 +28,8 @@
 | D-015 | TRANSITION | Daniel 내부에 Core provisioning console 유지 | Core Admin이 별도 앱으로 분리되기 전 안전한 provisioning 경로 필요 |
 | D-016 | TRANSITION | shared Core DB는 중앙 migration ledger를 둔다 | 여러 domain/AI lane이 live DB를 동시에 바꾸면 Git↔DB drift가 발생 |
 | D-017 | ACCEPTED | 외부 Auth mapping 값은 Git/Issue/채팅 handoff 대신 secure migration path로 이동 | Auth UUID·student_no 매핑은 운영 identity data이며 공개 개발 기록과 분리해야 함 |
+| D-018 | ACCEPTED | 공유 관리자 계정은 즉시 삭제하지 않고 개인계정으로 staged transition | 운영 연속성을 보존하면서 audit actor를 개인화하기 위함 |
+| D-019 | ACCEPTED | 개인계정 Auth 생성과 첫 비밀번호 변경 완료 처리는 Edge Function에서 수행 | service credential을 브라우저에 노출하지 않고 실제 Auth 변경 성공을 server-side에서 검증해야 함 |
 
 ---
 
@@ -250,3 +252,78 @@ Core RPC는:
 하도록 설계한다.
 
 PIN/password는 이 과정에 참여하지 않는다.
+
+
+---
+
+## D-018 — Shared Role Account → Individual Account
+
+기존 운영은:
+
+```text
+seondo
+sasaeng
+```
+
+같은 role-centered shared account로 시작했다.
+
+초기 MVP에서는 단순했지만 audit trail이 실제로 필요해지면서 한계가 생겼다.
+
+```text
+entered_by_name
+= 사람이 입력한 문자열
+
+auth.uid()
+= 실제 로그인 actor
+```
+
+는 동일한 신뢰수준이 아니다.
+
+따라서 개인계정으로 이동한다.
+
+다만 기존 공유계정을 먼저 삭제하지 않는다.
+
+```text
+개인계정 provision
+→ 실제 운영 검증
+→ 책임범위 확인
+→ audit actor 확인
+→ 공유계정 비활성화
+```
+
+순서로 staged transition 한다.
+
+---
+
+## D-019 — Password Completion은 Client Flag가 아니다
+
+처음 구현에서는 신규 계정이 비밀번호를 바꾼 뒤:
+
+```text
+mark_admin_password_changed()
+```
+
+RPC로 profile flag를 내리는 구조가 가능했다.
+
+하지만 이렇게 하면 기술적으로는 실제 password change 없이 RPC만 호출해 flag를 우회할 수 있다.
+
+따라서 이 설계를 폐기했다.
+
+최종 구조:
+
+```text
+JWT-authenticated Edge Function
+  → Supabase Auth password 실제 변경
+  → 성공 확인
+  → must_change_password = false
+```
+
+service credential은 Edge Function에만 존재하고 브라우저에는 노출하지 않는다.
+
+개인 계정 생성도 같은 이유로:
+
+```text
+provision-admin-account
+```
+
+Edge Function에서만 Auth Admin API를 호출한다.
