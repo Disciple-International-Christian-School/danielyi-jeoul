@@ -248,21 +248,76 @@ core.students.id
 
 ## 7. Study Planner 전환
 
-현재 SP는 학생 Auth UUID를 곧바로 student PK로 사용한다.
+현재 SP는 **별도 Supabase 프로젝트**에서 운영되고 있으며 학생 Auth UUID를 곧바로 student PK로 사용한다.
 
-전환 목표:
+여기서 중요한 제약이 있다.
 
 ```text
-auth.uid()
-   ↓
-core.students.auth_user_id
-   ↓
-core.students.id
-   ↓
-study_planner records
+SP auth.users.id
 ```
 
-즉 앱 내부 학습 데이터의 `student_id`도 최종적으로 Core UUID를 사용한다.
+는 SP Supabase 프로젝트의 Auth identity이고,
+
+```text
+DICS Core auth.users.id
+```
+
+는 Core Supabase 프로젝트의 Auth identity다.
+
+UUID 문자열 형식이 같더라도 **서로 다른 Auth namespace**이므로 기존 SP UUID를 곧바로:
+
+```text
+core.students.auth_user_id
+```
+
+FK에 넣으면 안 된다.
+
+### Migration 기간
+
+```text
+SP external auth.users.id
+        ↓
+core.external_auth_identities
+        ↓
+core.students.id
+        ↓
+canonical student identity
+```
+
+`core.external_auth_identities`는 외부 프로젝트의 identity를 FK가 아닌 text identifier로 보존한다.
+
+예:
+
+```text
+source_system      = STUDY_PLANNER
+source_project_ref = <SP project ref>
+external_user_id   = <SP auth UUID>
+student_id         = core.students.id
+```
+
+PIN/password는 이 bridge에 저장하지 않는다.
+
+### 최종 통합 후
+
+학생 계정을 DICS Core Auth에 provision/migrate하면:
+
+```text
+DICS Core auth.users.id
+        ↓
+core.students.auth_user_id
+        ↓
+core.students.id
+        ↓
+study_planner.*
+discipline.*
+computer_lab.*
+assessment.*
+```
+
+가 된다.
+
+따라서 기존 SP의 외부 Auth UUID는 migration provenance로 남고,
+새 domain FK는 모두 canonical `core.students.id`를 사용한다.
 
 ---
 
@@ -372,17 +427,18 @@ Do not poll whole tables.
 
 ## 12. 현재 Daniel 작업 브랜치의 의미
 
-`gpt/operations-foundation`에서는 아직 운영 데이터를 옮기지 않는다.
+`gpt/operations-foundation`은 이제 schema 준비 단계를 넘어 **운영 DB를 backward-compatible하게 단계적 전환 중**이다.
 
-준비하는 것:
+현재 적용된 것:
 
-- Core schema
-- legacy mapping bridge
-- 주간 NET
-- 관리자 종료형 settlement
-- 반성문 시간 마감
-- 간소화된 로그인 UX
+- Core student UUID 180명 bootstrap 및 legacy bridge
+- 2026 Fall current term + 13개 class
+- G1–8/G10–12 enrollment 144명
+- G9-A/B 31명 검증 대기
+- 기존 SP pilot 중 검증된 28명의 student_no Core 보강
+- external app Auth identity bridge
+- 주간 NET / settlement / reflection due-time / audit foundation
 
-다음 실제 데이터 단계는 **기존 Daniel Supabase 최소 학생 DB에 Core UUID bootstrap migration을 실제 적용하는 것**이다.
+다음 단계는 **G9-A/B 실제 명단 검증, 나머지 전교생 student_no 발급정책 확정, SP external Auth mapping**이다.
 
-그 다음 기존 SP의 학번/Auth 정보와 G9-A/B 등 학기별 반 정보를 해당 Core 학생에 보강하고, 충분히 검증한 뒤 discipline FK를 UUID로 전환한다.
+충분한 mapping 검증 후 discipline FK를 legacy integer에서 canonical Core UUID로 전환한다.
