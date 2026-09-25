@@ -23,7 +23,10 @@ Target identity:
     = school-wide human identifier
 
     core.students.auth_user_id
-    = optional Supabase Auth login UUID
+    = optional login UUID provisioned in the DICS Core Supabase project
+
+    core.external_auth_identities
+    = legacy/external Auth identities from other projects
 
 Target domain:
 
@@ -86,7 +89,8 @@ Target:
 
     core.students.id
     core.students.student_no
-    core.students.auth_user_id
+    core.external_auth_identities
+    later: core.students.auth_user_id for Core-local Auth
 
 Mapping policy:
 
@@ -95,13 +99,16 @@ Mapping policy:
 3. use name/grade/homeroom only as supporting evidence,
 4. require manual review for ambiguity,
 5. store the confirmed Core UUID in SP bridge column,
-6. write student_no/Auth into Core only after uniqueness checks.
+6. write student_no into Core only after uniqueness checks,
+7. store the legacy SP Auth UUID in core.external_auth_identities,
+8. provision core.students.auth_user_id only after the login is recreated/migrated into the Core project's Auth namespace.
 
 Validation:
 
     mapped real SP students == expected real SP students
     duplicate student_no == 0
-    duplicate auth_user_id == 0
+    duplicate external SP identity == 0
+    duplicate Core-local auth_user_id == 0
     ambiguous rows == 0 before data migration
 
 ## 5. Phase C — Reference data
@@ -176,11 +183,13 @@ Behavior checks:
 
 Only after copied data validates:
 
-1. implement Study Planner RLS against core.students.auth_user_id,
-2. expose public views/RPCs as needed,
-3. point a staging SP frontend at DICS Core,
-4. run side-by-side behavior tests,
-5. move production frontend only after verification.
+1. during migration, do not treat the external SP Auth UUID as Core auth.uid(),
+2. provision/migrate student login identities into DICS Core Auth,
+3. implement Study Planner RLS against the resulting Core-local core.students.auth_user_id,
+4. expose public views/RPCs as needed,
+5. point a staging SP frontend at DICS Core,
+6. run side-by-side behavior tests,
+7. move production frontend only after verification.
 
 ## 10. Phase H — Legacy retirement decision
 
