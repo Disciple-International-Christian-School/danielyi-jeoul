@@ -9,7 +9,9 @@ DICS 학생 상점·벌점 관리 콘솔. 관리자 전용 (선도부 / 사생�
 - [초기 구축 기록 — Legacy](docs/LEGACY_INITIAL_BUILD.md)
 - [현재 이후 변경 이력 — Change Log](docs/CHANGELOG.md)
 - [운영 개선 로드맵](docs/OPERATIONS_ROADMAP.md)
+- [개발 서사 / Development Journal](docs/DEVELOPMENT_JOURNAL.md)
 - [DICS Core 통합 스키마](docs/DICS_CORE_ARCHITECTURE.md)
+- [SP → DICS Core Migration Runbook](docs/SP_CORE_MIGRATION_RUNBOOK.md)
 - [아키텍처](docs/architecture.md)
 - [원본 스펙 (35절)](docs/spec.md)
 
