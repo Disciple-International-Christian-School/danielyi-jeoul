@@ -518,44 +518,44 @@ core.students.id
 - [x] `core.academic_terms / classes / enrollments` 설계
 - [x] Daniel legacy `public.students.core_student_id` bridge migration 준비
 - [x] 기존 Daniel Supabase 최소 학생 DB(이름/학년)를 기준으로 Core UUID bootstrap migration 준비
-- [ ] 기존 Daniel 학생 행을 운영 DB에서 Core UUID로 실제 매핑 적용
+- [x] 기존 Daniel 학생 행을 운영 DB에서 Core UUID로 실제 매핑 적용
 - [ ] Study Planner 기존 학생과 Core mapping 계획 확정
-- [ ] G9-A / G9-B 포함 현재 학기 enrollment 적재
+- [~] 현재 학기 enrollment: G1–8/G10–12 완료, G9-A/B 31명 검증 대기
 - [x] 간단 로그인 화면 변경 준비
 - [x] 주간 positive / negative / NET 계산 view 준비
 - [x] 주간 체력훈련 대상 판정 준비
 
 ### P1-B — 정산기간
 
-- [ ] `settlement_periods`
-- [ ] OPEN period
-- [ ] 관리자의 정산 종료
-- [ ] 정산기간 NET
-- [ ] 체력훈련 대상 주차 수
-- [ ] 징계위원회 대상 판정
+- [x] `settlement_periods`
+- [x] OPEN period
+- [x] 관리자의 정산 종료
+- [x] 정산기간 NET
+- [x] 체력훈련 대상 주차 수
+- [x] 징계위원회 대상 판정
 
 ### P1-C — 반성문 운영
 
-- [ ] 시간형 마감 `due_at`
-- [ ] G7–12 17:00
-- [ ] 21:00 연장
-- [ ] G1–6 익일 등교 제출
-- [ ] 학년군 담당자
-- [ ] 오늘의 반성문 대상 화면
-- [ ] 반별 출력
+- [x] 시간형 마감 `due_at`
+- [x] G7–12 17:00
+- [x] 21:00 연장
+- [x] G1–6 익일 등교 제출
+- [x] 학년군 담당자
+- [x] 오늘의 반성문 대상 화면
+- [x] 반별 출력
 
 ### P1-D — 주간 보고
 
-- [ ] 주간 정산 화면
-- [ ] 체력훈련 대상 출력
-- [ ] 관리자용 누락/집계 확인
+- [x] 주간 정산 화면
+- [x] 체력훈련 대상 출력
+- [x] 관리자용 누락/집계 확인
 
 ### P2 — 자동화
 
-- [ ] 부서활동 월요일 상점 자동 입력
-- [ ] 일괄 입력 UX 고도화
+- [x] 부서활동 월요일 상점 자동 입력 foundation
+- [x] 일괄 입력 UX 고도화
 - [ ] 벌점 시트 사진 업로드 + 검토 기반 추출
-- [ ] 개인 관리자 계정 + 상세 Audit trail 완성
+- [x] 개인 관리자 계정 구조 + 상세 Audit trail foundation
 
 ### P3 — Legacy 제거 / 통합 프로필
 
