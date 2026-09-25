@@ -201,6 +201,31 @@ export interface CoreStudentReadiness {
   readinessStatus: 'READY' | 'PARTIAL' | 'CORE_ONLY';
 }
 
+export interface DepartmentMeritAdmin {
+  departmentId: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+  ruleId: string | null;
+  points: number | null;
+  itemLabel: string | null;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  currentMemberCount: number;
+}
+
+export interface DepartmentCurrentMember {
+  membershipId: string;
+  departmentId: string;
+  coreStudentId: string;
+  studentNo: string | null;
+  studentName: string;
+  grade: number | null;
+  homeroom: string | null;
+  startsOn: string;
+  endsOn: string | null;
+}
+
 export interface DepartmentMeritStatus {
   weekStart: string;
   departmentId: string;
@@ -440,6 +465,31 @@ interface DisciplineAuditLogRow {
   created_at: string;
 }
 
+interface DepartmentMeritAdminRow {
+  department_id: string;
+  code: string;
+  name: string;
+  is_active: boolean;
+  rule_id: string | null;
+  points: number | null;
+  item_label: string | null;
+  effective_from: string | null;
+  effective_to: string | null;
+  current_member_count: number;
+}
+
+interface DepartmentCurrentMemberRow {
+  membership_id: string;
+  department_id: string;
+  core_student_id: string;
+  student_no: string | null;
+  student_name: string;
+  grade: number | null;
+  homeroom: string | null;
+  starts_on: string;
+  ends_on: string | null;
+}
+
 interface DepartmentMeritStatusRow {
   week_start: string;
   department_id: string;
@@ -598,6 +648,35 @@ function mapCoreStudentReadiness(row: CoreStudentReadinessRow): CoreStudentReadi
     hasCurrentEnrollment: row.has_current_enrollment,
     homeroom: row.homeroom,
     readinessStatus: row.readiness_status,
+  };
+}
+
+function mapDepartmentMeritAdmin(row: DepartmentMeritAdminRow): DepartmentMeritAdmin {
+  return {
+    departmentId: row.department_id,
+    code: row.code,
+    name: row.name,
+    isActive: row.is_active,
+    ruleId: row.rule_id,
+    points: row.points,
+    itemLabel: row.item_label,
+    effectiveFrom: row.effective_from,
+    effectiveTo: row.effective_to,
+    currentMemberCount: row.current_member_count,
+  };
+}
+
+function mapDepartmentCurrentMember(row: DepartmentCurrentMemberRow): DepartmentCurrentMember {
+  return {
+    membershipId: row.membership_id,
+    departmentId: row.department_id,
+    coreStudentId: row.core_student_id,
+    studentNo: row.student_no,
+    studentName: row.student_name,
+    grade: row.grade,
+    homeroom: row.homeroom,
+    startsOn: row.starts_on,
+    endsOn: row.ends_on,
   };
 }
 
@@ -775,6 +854,8 @@ export const getCurrentSettlementQueryKey = () => ['settlement', 'current'] as c
 export const getDailyDisciplineNoticeQueryKey = (recordedAt: string) => ['reports', 'daily-notice', recordedAt] as const;
 export const getWeeklyDisciplineReportQueryKey = () => ['reports', 'weekly'] as const;
 export const getDepartmentMeritStatusQueryKey = () => ['department-merits', 'current-week'] as const;
+export const getDepartmentMeritAdminQueryKey = () => ['department-merits', 'admin'] as const;
+export const getDepartmentMembersQueryKey = () => ['department-merits', 'members'] as const;
 export const getCoreMigrationReadinessQueryKey = () => ['core', 'migration-readiness'] as const;
 export const getCoreStudentReadinessQueryKey = () => ['core', 'student-readiness'] as const;
 export const getDisciplineAuditLogsQueryKey = () => ['audit-logs', 'discipline'] as const;
@@ -933,6 +1014,102 @@ export function useCoreStudentReadiness() {
           .order('name', { ascending: true }),
       );
       return rows.map(mapCoreStudentReadiness);
+    },
+  });
+}
+
+export function useDepartmentMeritAdmin() {
+  return useQuery({
+    queryKey: getDepartmentMeritAdminQueryKey(),
+    queryFn: async (): Promise<DepartmentMeritAdmin[]> => {
+      const rows = unwrap<DepartmentMeritAdminRow[]>(
+        await supabase
+          .from('v_department_merit_admin')
+          .select('*')
+          .order('name', { ascending: true }),
+      );
+      return rows.map(mapDepartmentMeritAdmin);
+    },
+  });
+}
+
+export function useDepartmentCurrentMembers() {
+  return useQuery({
+    queryKey: getDepartmentMembersQueryKey(),
+    queryFn: async (): Promise<DepartmentCurrentMember[]> => {
+      const rows = unwrap<DepartmentCurrentMemberRow[]>(
+        await supabase
+          .from('v_department_current_members')
+          .select('*')
+          .order('grade', { ascending: true, nullsFirst: false })
+          .order('student_name', { ascending: true }),
+      );
+      return rows.map(mapDepartmentCurrentMember);
+    },
+  });
+}
+
+export function useCreateDepartmentWithMeritRule() {
+  return useMutation({
+    mutationFn: async ({
+      code,
+      name,
+      points,
+      itemLabel,
+      effectiveFrom,
+    }: {
+      code: string;
+      name: string;
+      points: number;
+      itemLabel: string;
+      effectiveFrom: string;
+    }) => {
+      const { data, error } = await supabase.rpc('create_department_with_merit_rule', {
+        p_code: code,
+        p_name: name,
+        p_points: points,
+        p_item_label: itemLabel,
+        p_effective_from: effectiveFrom,
+      });
+      if (error) throw new Error(error.message);
+      return data as string;
+    },
+  });
+}
+
+export function useSetDepartmentStudentMembership() {
+  return useMutation({
+    mutationFn: async ({
+      departmentId,
+      studentId,
+      active,
+      effectiveOn,
+    }: {
+      departmentId: string;
+      studentId: string;
+      active: boolean;
+      effectiveOn: string;
+    }) => {
+      const { data, error } = await supabase.rpc('set_department_student_membership', {
+        p_department_id: departmentId,
+        p_student_id: studentId,
+        p_active: active,
+        p_effective_on: effectiveOn,
+      });
+      if (error) throw new Error(error.message);
+      return data as string;
+    },
+  });
+}
+
+export function useSetDepartmentActive() {
+  return useMutation({
+    mutationFn: async ({ departmentId, active }: { departmentId: string; active: boolean }) => {
+      const { error } = await supabase.rpc('set_department_active', {
+        p_department_id: departmentId,
+        p_active: active,
+      });
+      if (error) throw new Error(error.message);
     },
   });
 }
