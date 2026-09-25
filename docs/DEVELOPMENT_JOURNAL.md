@@ -2105,3 +2105,169 @@ CI:
 
 다음 실제 운영 action은 코드를 더 만드는 것이 아니라
 검증된 담당자부터 개인계정을 순차 provision하는 것이다.
+
+
+---
+
+# 42. Discipline Record도 Core UUID를 직접 갖기 시작
+
+학생 master는 이미 Core UUID로 통합됐지만,
+생활지도 원본 record는 여전히:
+
+    point_records.student_id
+    punishments.student_id
+
+정수형 legacy 학생 ID를 FK로 사용하고 있었다.
+
+Dashboard와 report에서는 bridge view를 통해 Core UUID를 보여줄 수 있었지만,
+원본 record 자체가 canonical identity를 직접 갖지 않는다는 차이가 남아 있었다.
+
+## 왜 바로 FK를 교체하지 않았는가
+
+기존 frontend, reflection trigger, weekly/settlement 계산, reports가
+legacy integer ID를 기반으로 이미 운영되고 있었다.
+
+한 번에:
+
+    integer FK 제거
+    → UUID FK 교체
+    → 모든 query/RPC/view 수정
+
+을 하면 rollback surface가 너무 커진다.
+
+따라서 dual-key transition을 선택했다.
+
+    legacy student_id
+    + core_student_id
+
+두 값을 일정 기간 함께 저장한다.
+
+## Backfill
+
+운영 DB 당시:
+
+    point_records       1
+    reflection_records  1
+    punishments         0
+
+기존 point record 1건의 Core UUID를 legacy student bridge에서 backfill했다.
+
+검증:
+
+    point_records total        1
+    Core linked                1
+    mismatch                   0
+
+    punishments total          0
+    mismatch                   0
+
+---
+
+# 43. Dual-key는 “두 개를 믿는 구조”가 아니다
+
+두 ID를 함께 저장하면 오히려 불일치 가능성이 생길 수 있다.
+
+따라서:
+
+    private.sync_discipline_core_student_id()
+
+trigger를 만들었다.
+
+규칙:
+
+1. legacy student_id에서 canonical UUID를 조회
+2. core_student_id가 비어 있으면 자동 채움
+3. core_student_id가 이미 있는데 다른 학생을 가리키면 insert/update 거부
+
+즉 transition 동안에도 source of truth는:
+
+    core.students.id
+
+이고 legacy integer는 호환용 locator다.
+
+Rollback insert test에서:
+
+    core_uuid_auto_filled = true
+
+를 확인했다.
+
+테스트 record는 transaction rollback으로 운영 데이터에 남지 않았다.
+
+---
+
+# 44. Write Path가 먼저 Canonical UUID로 이동
+
+dual-key 저장이 안정화된 뒤,
+새 write entrypoint를 추가했다.
+
+    create_point_record_core(core_student_uuid, ...)
+    create_punishment_core(core_student_uuid, ...)
+
+이 함수들은 business rule을 복제하지 않는다.
+
+    Core UUID
+      ↓ legacy bridge lookup
+    existing create_point_record / create_punishment
+      ↓
+    기존 validation 한 곳 유지
+
+이렇게 기존 규정 검증은 그대로 유지하면서
+frontend가 더 이상 legacy integer를 새로운 write identity로 사용할 필요가 없게 했다.
+
+## 실제 authenticated rollback test
+
+활성 SEONDO Auth context를 transaction 안에서 설정하고:
+
+    create_point_record_core(...)
+
+를 호출했다.
+
+결과:
+
+    created              true
+    core_matches_legacy  true
+    core_uuid_present    true
+
+이후 rollback.
+
+운영 record count는 변하지 않았다.
+
+---
+
+# 45. Frontend write cut-over
+
+API type을 먼저 Core UUID로 변경하자 CI가 실패했다.
+
+    PointRecordInput.studentId
+    PunishmentInput.studentId
+
+가 제거됐는데 App.tsx가 아직 legacy integer를 보내고 있었기 때문이다.
+
+CI error:
+
+    Object literal may only specify known properties
+    'studentId' does not exist ...
+
+이 실패는 의도한 compile-time migration gate 역할을 했다.
+
+App call-site를 다음처럼 수정했다.
+
+    selectedStudent.coreStudentId
+      ↓
+    create_point_record_core
+
+    selectedStudent.coreStudentId
+      ↓
+    create_punishment_core
+
+Core UUID가 없는 학생은 submit 자체를 막고 오류를 표시한다.
+
+수정 후:
+
+    typecheck SUCCESS
+    build SUCCESS
+
+따라서 2026-09-25 기준 새 생활지도 기록 생성 경로는
+이미 canonical Core UUID를 입력 identity로 사용한다.
+
+legacy integer ID는 아직 read/route compatibility를 위해 남아 있다.
