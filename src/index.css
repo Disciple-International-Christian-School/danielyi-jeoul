@@ -484,3 +484,22 @@ body::before {
   background: var(--surface-subtle);
   font: 10px/1.55 var(--app-font-mono);
 }
+
+
+/* Lead-managed department merit console */
+.department-row-button {
+  width: 100%;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.department-row-button:hover {
+  background: rgba(35, 73, 80, .035);
+}
+.department-row-button.selected {
+  background: rgba(35, 73, 80, .065);
+  box-shadow: inset 3px 0 0 rgba(35, 73, 80, .45);
+}
