@@ -929,6 +929,34 @@ Identity ≠ Role
 - legacy integer route/read compatibility는 다음 단계까지 유지.
 - API type cut-over가 stale App call-site를 CI에서 탐지했고 수정 후 CI green.
 
+### Discipline canonical Core UUID dual-key — 2026-09-25
+
+**Production DB applied**
+
+- `point_records.core_student_id` / `punishments.core_student_id` 추가.
+- 기존 discipline records를 canonical `core.students.id`로 backfill.
+- Core UUID FK + supporting indexes 추가.
+- legacy student_id ↔ Core UUID mismatch 방지 trigger 추가.
+- `v_point_records`, `v_punishments`에 Core UUID 노출.
+- aggregate cut-over readiness view `v_discipline_core_fk_readiness` 추가.
+- canonical write RPC:
+  - `create_point_record_core(...)`
+  - `create_punishment_core(...)`
+
+**Verification**
+
+- current point records: 1/1 Core linked, mismatch 0.
+- current punishments: 0, mismatch 0.
+- rollback insert trigger test: Core UUID auto-fill success.
+- authenticated rollback RPC test: Core UUID/legacy ID same-student match success.
+- test records were rolled back; no test discipline row remains.
+
+**Frontend in branch**
+
+- new point/penalty writes send canonical Core UUID.
+- new punishment writes send canonical Core UUID.
+- legacy integer route/read compatibility intentionally remains until final FK cut-over.
+
 ### Frontend in branch — deployment pending
 
 - 학생 명부를 DICS Core read-only roster 관점으로 변경.
