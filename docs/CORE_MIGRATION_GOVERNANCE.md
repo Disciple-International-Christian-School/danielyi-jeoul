@@ -181,8 +181,8 @@ CI fails if a SQL file appears for a LIVE_ONLY_DATA version.
 
 Current reconciliation checkpoint:
 
-    production migrations 52
-    TRACKED structural    48
+    production migrations 53
+    TRACKED structural    49
     LIVE_ONLY_DATA         4
     extra Git migrations   0
 
