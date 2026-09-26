@@ -110,6 +110,7 @@ import './index.css';
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+const buildCommit = /^[0-9a-f]{40}$/i.test(__BUILD_COMMIT__) ? __BUILD_COMMIT__ : null;
 
 type NoticeTone = 'success' | 'error';
 const NoticeContext = createContext<(message: string, tone?: NoticeTone) => void>(() => undefined);
@@ -148,6 +149,14 @@ function Brand() {
     <span className="brand-mark" aria-hidden="true">저울</span>
     <span className="brand-name">다니엘의 저울</span>
   </Link>;
+}
+
+function BuildVersion({ mobile = false }: { mobile?: boolean }) {
+  return <div
+    className={`build-version${mobile ? ' build-version-mobile' : ''}`}
+    title={buildCommit ? `배포 커밋: ${buildCommit}` : '이 빌드에는 Git 커밋 정보가 없습니다.'}
+    data-testid="text-build-version"
+  >배포 · {buildCommit?.slice(0, 7) ?? '커밋 미확인'}</div>;
 }
 
 function Toast({ message, tone, onClose }: { message: string; tone: NoticeTone; onClose: () => void }) {
@@ -193,6 +202,7 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
         })}
       </nav>
       <div className="sidebar-bottom">
+        <BuildVersion />
         <div className="user-mini">
           <div className="avatar" data-testid="avatar-admin">{displayName.slice(0, 1)}</div>
           <div className="user-mini-copy"><div className="user-mini-name" data-testid="text-admin-name">{displayName}</div><div className="user-mini-meta">{roleLabel}</div></div>
@@ -206,7 +216,7 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
         <div className="topbar-title">{title}</div>
         <div className="topbar-actions"><span className="topbar-date">{new Intl.DateTimeFormat('ko-KR', { dateStyle: 'full' }).format(new Date())}</span><span className="pill pill-positive" data-testid="status-health"><Gauge size={12} /> 운영 중</span></div>
       </header>
-      <div className="content page-enter">{children}</div>
+      <div className="content page-enter">{children}<BuildVersion mobile /></div>
     </main>
     {notice && <Toast message={notice.message} tone={notice.tone} onClose={() => setNotice(null)} />}
   </div></NoticeContext.Provider>;
