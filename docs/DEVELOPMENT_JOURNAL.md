@@ -3307,3 +3307,17 @@ checkpoint:
     production migrations 55
     TRACKED structural    51
     LIVE_ONLY_DATA         4
+
+---
+
+# 운영 배포 출처를 화면에서 확인하기 — 2026-09-27
+
+## 문제
+
+PR #1은 병합되고 `main` CI는 통과했지만, Netlify production은 9월 21일 빌드에 머물러 있었다. Git 연결 설정만으로는 현재 운영 화면이 어느 커밋으로 만들어졌는지 확인하기 어려웠다.
+
+## 조치
+
+Netlify의 Git 빌드가 제공하는 `COMMIT_REF`를 Vite 빌드 시점에 주입하고, 로그인한 관리자 화면에 짧은 커밋 ID를 표시한다. 전체 40자리 값은 화면 요소의 제목에 남긴다. 커밋 메타데이터가 없는 로컬/수동 빌드는 `커밋 미확인`으로 표시해 출처를 추정하지 않는다. 인쇄물에는 배포 정보를 넣지 않는다.
+
+이 변경은 학생 데이터나 Supabase 스키마를 건드리지 않는다. 다음 `main` 반영 후 Netlify가 자동으로 production deploy를 생성하는지 확인하고, 화면의 커밋 ID와 GitHub `main`을 대조한다.
