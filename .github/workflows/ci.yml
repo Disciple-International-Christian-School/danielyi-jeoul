@@ -53,6 +53,9 @@ jobs:
 
           echo "Migration versions are unique: ${#versions[@]} files"
 
+      - name: Check migration ledger
+        run: npm run check:migration-ledger
+
       - name: Check migration tool syntax
         run: node --check scripts/migrate-sp-external-identities.mjs
 
