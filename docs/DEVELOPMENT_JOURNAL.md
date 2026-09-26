@@ -2418,3 +2418,420 @@ Frontend 전환 후 GitHub Actions:
     rollback / report 결과 동일
 
 을 모두 충족한 뒤다.
+
+
+---
+
+# 47. Read Path도 Core UUID로 이동
+
+write path가 canonical UUID로 바뀐 뒤에도 학생 상세 route와 점수 history filtering은:
+
+    student_id integer
+
+를 사용하고 있었다.
+
+즉 새 데이터 생성 identity는 Core였지만,
+조회 contract의 중심은 아직 legacy ID였다.
+
+## 전략
+
+URL 모양 자체는 유지했다.
+
+    /students/:id
+
+다만 새 링크가 넣는 `:id`의 의미를:
+
+    legacy integer
+    ↓
+    Core UUID
+
+로 바꿨다.
+
+과거 숫자 URL은 즉시 깨지지 않도록 fallback resolver를 유지했다.
+
+    숫자면 legacy lookup
+    UUID면 canonical lookup
+
+따라서 새 traffic은 Core UUID로 이동하면서
+기존 bookmark/링크는 transition 기간 동안 계속 작동한다.
+
+반성문 view에도 core_student_id를 append하여
+reflection → student detail 링크도 Core UUID를 사용하게 했다.
+
+---
+
+# 48. 계산식은 바로 갈아끼우지 않고 Shadow Parity부터
+
+weekly / settlement 계산은 출력에 Core UUID가 보이더라도
+실제 GROUP BY / JOIN은 integer student_id 기반이었다.
+
+이 계산식을 바로 교체하지 않았다.
+
+먼저:
+
+    v_weekly_scores_core_shadow
+    v_weekly_penalties_core_shadow
+    v_settlement_scores_core_shadow
+
+를 만들었다.
+
+기존 계산과 Core 계산을 동시에 실행하고:
+
+    v_discipline_core_calc_parity
+
+에서 aggregate 비교했다.
+
+첫 production 결과:
+
+    weekly
+    1 legacy / 1 Core / mismatch 0
+
+    weekly penalties
+    1 legacy / 1 Core / mismatch 0
+
+    settlement
+    0 legacy / 0 Core / mismatch 0
+
+mismatch=0을 확인한 뒤에만
+public contract 이름인:
+
+    v_weekly_scores
+    v_weekly_penalties
+    v_settlement_scores
+
+가 Core 계산을 source로 사용하도록 promotion했다.
+
+---
+
+# 49. Dashboard 중심 View도 175/175 Parity 확인
+
+가장 위험한 부분은 student summary였다.
+
+이 view는 단순 점수 합계가 아니라:
+
+- lifetime 상·벌점
+- 주간 NET
+- 체력훈련 대상
+- 정산기간 NET
+- 징계위원회 대상
+- 반성문 미제출/2배
+- 기숙사 처분
+- 귀가금지 조건
+
+을 모두 조합한다.
+
+따라서:
+
+    v_student_summary_core_shadow
+
+를 별도로 만들고 기존 summary와 비교했다.
+
+production result:
+
+    legacy rows 175
+    Core rows   175
+    mismatch      0
+
+그 뒤 기존 구현을 frozen shadow로 보존하고
+`v_student_summary`를 Core UUID 기반 구현으로 promotion했다.
+
+promotion 전후:
+
+    summary rows        175 → 175
+    weekly report rows  175 → 175
+
+Dashboard counts:
+
+    students            175 → 175
+    weekly targets        0 → 0
+    missing reflections   0 → 0
+    double reflections    0 → 0
+    active punishments    0 → 0
+    committee targets     0 → 0
+
+즉 public contract는 그대로인데 내부 identity만 Core로 이동했다.
+
+---
+
+# 50. 문자열 검색이 아니라 PostgreSQL Dependency Graph
+
+legacy integer column을 drop하기 전
+처음에는 function/view definition 문자열에서 `student_id`를 검색했다.
+
+하지만 이 방식은:
+
+    core_student_id
+
+안의 문자열까지 잡아 false positive를 만들었다.
+
+최종 판단에는:
+
+    pg_depend
+
+를 사용했다.
+
+실제 physical column dependency는:
+
+point_records.student_id:
+
+    v_discipline_core_fk_readiness
+    v_settlement_scores_legacy_shadow
+    v_student_summary_legacy_shadow
+    v_weekly_penalties_legacy_shadow
+    v_weekly_scores_legacy_shadow
+
+punishments.student_id:
+
+    v_discipline_core_fk_readiness
+    v_student_summary_legacy_shadow
+
+뿐이었다.
+
+이 확인을 통해 “어떤 객체를 먼저 끊어야 column drop이 안전한가”가 명확해졌다.
+
+---
+
+# 51. Trigger가 마지막 숨은 Legacy Dependency였다
+
+View와 RPC를 거의 전부 Core UUID로 옮긴 뒤
+trigger를 별도로 조사했다.
+
+그 과정에서:
+
+    private.create_reflection_for_penalty()
+
+가 여전히:
+
+    new.student_id
+
+로 학생 학년을 찾고 있음을 발견했다.
+
+만약 이 상태에서 integer column을 삭제했다면
+새 벌점 입력 시 반성문 자동생성이 깨졌을 것이다.
+
+따라서 trigger를:
+
+    new.core_student_id
+      ↓
+    public.students.core_student_id
+      ↓
+    grade lookup
+
+으로 변경했다.
+
+이 사례는 schema dependency와 runtime trigger dependency를
+별도로 점검해야 한다는 중요한 근거가 되었다.
+
+---
+
+# 52. Destructive Cut-over 직전 Evidence를 남기다
+
+최종 drop 직전 production preflight:
+
+    point_records          1 / 1 Core linked
+    point mismatch         0
+
+    punishments            0 / 0 Core linked
+    punishment mismatch    0
+
+    weekly                 1 / 1, mismatch 0
+    weekly penalties       1 / 1, mismatch 0
+    settlement             0 / 0, mismatch 0
+
+    student summary        175 / 175, mismatch 0
+
+를 확인했다.
+
+이 값을:
+
+    discipline.core_cutover_evidence
+
+에 aggregate-only row로 저장했다.
+
+실제 학생 이름·학번·Auth UUID·mapping row는 저장하지 않았다.
+
+이 evidence가 존재한 뒤에만 destructive migration을 실행했다.
+
+---
+
+# 53. Physical Integer FK 제거 완료
+
+최종 migration에서:
+
+    point_records.student_id
+    punishments.student_id
+
+를 실제로 drop했다.
+
+현재 physical student identity:
+
+    point_records.core_student_id UUID NOT NULL
+    punishments.core_student_id   UUID NOT NULL
+
+두 테이블 모두 canonical Core UUID만 저장한다.
+
+legacy API compatibility는:
+
+    core_student_id
+      ↓
+    public.students bridge
+      ↓
+    derived student_id
+
+방식으로 view에서 계산한다.
+
+즉:
+
+    저장 identity = Core UUID 하나
+    표시 compatibility = 필요할 때만 legacy integer 계산
+
+구조가 되었다.
+
+## Post-cutover verification
+
+기존 운영 데이터:
+
+    point record       1
+    point sum          5
+    reflection         1
+    punishment         0
+    weekly report    175
+
+모두 유지됐다.
+
+Dashboard counts도 동일했다.
+
+### Core + legacy wrapper rollback test
+
+column 삭제 후 다시 테스트했다.
+
+점수:
+
+    core path           Core match true
+    legacy wrapper      Core match true
+    reflection created  true / true
+
+처분:
+
+    core path           Core match true
+    legacy wrapper      Core match true
+
+모든 테스트 transaction은 rollback하여
+운영 상벌점에는 테스트 row가 남지 않았다.
+
+최종 status:
+
+    stage = POST_LEGACY_COLUMN_DROP_VERIFIED
+    legacy_columns_removed = true
+    cutover_completed = true
+
+---
+
+# 54. Business Rule의 방향도 뒤집다
+
+초기 transition에서는:
+
+    create_point_record_core(UUID)
+      ↓
+    create_point_record(integer)
+
+처럼 Core RPC가 legacy 함수의 wrapper였다.
+
+최종 cut-over 전 이 방향을 뒤집었다.
+
+현재:
+
+    create_point_record_core(UUID)
+    = authoritative implementation
+
+    create_point_record(integer)
+    = compatibility wrapper
+
+처분도 동일하다.
+
+    create_punishment_core(UUID)
+    = authoritative implementation
+
+    create_punishment(integer)
+    = compatibility wrapper
+
+부서 자동상점도 point_records insert 시
+Core UUID만 물리적으로 저장한다.
+
+따라서 앞으로 legacy wrapper를 제거해도
+business rule 본체에는 영향이 없다.
+
+---
+
+# 55. Migration Ledger까지 Production과 맞추다
+
+Core cut-over를 마치고 migration history를 비교하던 중
+Git에서 미리 만든 filename timestamp와
+Supabase live history version이 다른 구간을 발견했다.
+
+예:
+
+    Git draft timestamp
+    ≠ live applied version
+
+이 상태는 지금 DB가 동작하더라도
+향후 CLI가 migration을 재적용하려 할 수 있다.
+
+따라서 recent 15개 migration을:
+
+    migration name
+    + live version
+
+기준으로 다시 대조했다.
+
+결과:
+
+    15 / 15 Git filename = live Supabase version
+
+으로 reconciliation했다.
+
+추가 admin RLS optimization migration도
+live version:
+
+    20260926172018
+
+로 Git filename을 맞췄다.
+
+이 과정에서 migration 내용은 바꾸지 않고
+기존 blob SHA를 재사용해 path만 이동한 경우도 있었다.
+
+---
+
+# 56. Advisor Cleanup — 의미 있는 Warning만 고친다
+
+Supabase performance advisor에서:
+
+    admins_read_self_or_lead
+
+policy가 auth.uid()를 row마다 다시 평가할 수 있다는 warning이 있었다.
+
+정책을:
+
+    user_id = (select auth.uid())
+    or (select private.current_admin_is_lead())
+
+형태로 바꿨다.
+
+재검사 결과:
+
+    auth_rls_initplan warning
+    → 0
+
+남은 performance finding은 현재 모두:
+
+    unused_index INFO
+
+다.
+
+아직 데이터량과 query history가 작은 단계이므로
+“unused”라는 이유만으로 index를 삭제하지 않았다.
+
+security advisor의 남은 주요 warning은
+Computer Lab의 intentional RPC surface와
+Auth leaked-password protection 설정 등
+다른 lane / platform setting 영역으로 분리해 유지한다.
