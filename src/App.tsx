@@ -214,7 +214,7 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
       <header className="topbar">
         <div className="mobile-brand"><span className="brand-mark">저울</span><span>다니엘의 저울</span></div>
         <div className="topbar-title">{title}</div>
-        <div className="topbar-actions"><span className="topbar-date">{new Intl.DateTimeFormat('ko-KR', { dateStyle: 'full' }).format(new Date())}</span><span className="pill pill-positive" data-testid="status-health"><Gauge size={12} /> 운영 중</span></div>
+        <div className="topbar-actions"><span className="topbar-date">{new Intl.DateTimeFormat('ko-KR', { dateStyle: 'full', timeZone: 'Asia/Seoul' }).format(new Date())}</span><span className="pill pill-positive" data-testid="status-health"><Gauge size={12} /> 운영 중</span></div>
       </header>
       <div className="content page-enter">{children}<BuildVersion mobile /></div>
     </main>
