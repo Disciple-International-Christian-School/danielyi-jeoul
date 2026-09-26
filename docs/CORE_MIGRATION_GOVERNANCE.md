@@ -134,6 +134,73 @@ Prefer:
 
 This preserves the development story and makes production history explainable.
 
+## 6A. Production migration ledger contract
+
+The live Supabase migration history and Git migrations are reconciled through:
+
+    supabase/migration-ledger.json
+
+Two statuses are allowed.
+
+### TRACKED
+
+A structural migration that belongs in Git.
+
+Contract:
+
+    ledger version
+    + ledger name
+    = exact Git filename
+
+CI fails if:
+
+- the tracked file is missing,
+- its filename does not match the production version/name,
+- a Git migration exists without a TRACKED ledger entry,
+- ledger versions are duplicated.
+
+### LIVE_ONLY_DATA
+
+A historical/operational data migration whose SQL must not be committed.
+
+Examples include:
+
+- private student roster imports,
+- corrections tied to private roster rows,
+- environment-specific Auth/admin bindings,
+- historical seed data not required to reconstruct schema.
+
+Contract:
+
+- version is recorded,
+- rationale is recorded,
+- SQL file must be absent from public Git,
+- a sensitive live migration name may be redacted if the name itself contains private information.
+
+CI fails if a SQL file appears for a LIVE_ONLY_DATA version.
+
+Current reconciliation checkpoint:
+
+    production migrations 52
+    TRACKED structural    48
+    LIVE_ONLY_DATA         4
+    extra Git migrations   0
+
+This gives a reproducible structural ledger without forcing operational PII into source control.
+
+## 6B. Applying a new migration
+
+After any live migration:
+
+1. read the actual Supabase migration version,
+2. compare it with the Git filename,
+3. if the connector assigned a different version, rename the Git file to the live version,
+4. add or update the ledger entry,
+5. run `npm run check:migration-ledger`,
+6. wait for CI green,
+7. record the change in the development journal when it materially changes architecture.
+
+Do not assume a timestamp chosen before execution is the timestamp production recorded.
 ## 7. Parallel AI handoff
 
 Every AI session that changes shared DB structure should record:
