@@ -3241,3 +3241,69 @@ checkpoint:
 
 최종 frontend cleanup push에서
 migration-ledger check / typecheck / build가 모두 성공했다.
+
+
+---
+
+# 63. Legacy G9 Wrapper의 Privilege를 낮추다
+
+G9 A/B 배정 frontend가 Core UUID RPC를 직접 사용하게 된 뒤,
+legacy integer wrapper의 실행 권한을 다시 점검했다.
+
+구조:
+
+    assign_current_grade9_section(integer, text)
+      ↓
+    assign_current_grade9_section_core(uuid, text)
+
+integer wrapper는:
+
+1. public.students에서 Core UUID를 읽고
+2. authoritative Core RPC에 delegate
+
+만 수행한다.
+
+따라서 wrapper 자체가 SECURITY DEFINER일 이유가 없었다.
+
+## 변경
+
+legacy wrapper를:
+
+    SECURITY DEFINER
+    ↓
+    SECURITY INVOKER
+
+로 변경했다.
+
+Core UUID authoritative RPC는
+lead-only authorization과 core.enrollments privileged write를 수행하므로
+현재 SECURITY DEFINER를 유지한다.
+
+## 결과
+
+Supabase advisor:
+
+    authenticated SECURITY DEFINER warnings
+    11 → 10
+
+legacy wrapper:
+
+    security_definer = false
+
+즉 compatibility path는 유지하면서
+불필요한 privileged surface 하나를 제거했다.
+
+## Migration governance
+
+live migration:
+
+    20260926175410_grade9_legacy_wrapper_invoker
+
+Git filename과 production version을 맞추고
+TRACKED ledger entry를 추가했다.
+
+checkpoint:
+
+    production migrations 55
+    TRACKED structural    51
+    LIVE_ONLY_DATA         4
