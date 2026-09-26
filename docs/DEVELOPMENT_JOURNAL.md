@@ -3035,3 +3035,96 @@ LIVE_ONLY_DATA:
 
 이 시점부터 migration governance가 문서 규칙이 아니라
 실제 merge gate가 되었다.
+
+
+---
+
+# 61. G9 A/B 배정도 Core UUID로 전환
+
+discipline 원본 record의 integer FK를 제거한 뒤,
+Core Setup 화면에 남아 있던 G9 A/B 수동 배정 write path를 점검했다.
+
+DB에는 이미:
+
+    assign_current_grade9_section_core(uuid, text)
+
+가 authoritative implementation으로 존재했고,
+
+    assign_current_grade9_section(integer, text)
+
+는 legacy compatibility wrapper로 정리돼 있었다.
+
+하지만 frontend hook은 아직:
+
+    studentId: number
+    → assign_current_grade9_section(integer, ...)
+
+를 호출하고 있었다.
+
+이를:
+
+    coreStudentId: string
+    → assign_current_grade9_section_core(uuid, ...)
+
+로 전환했다.
+
+UI의 row key와 test id도 Core UUID를 사용하도록 바꿨다.
+
+## Migration ledger reconciliation
+
+병렬 세션이 live DB에 먼저 적용한 migration:
+
+    grade9_core_assignment_rpc
+
+의 실제 production version은:
+
+    20260926173405
+
+였지만 Git draft filename은 다른 timestamp였다.
+
+따라서 Git migration filename을:
+
+    20260926173405_grade9_core_assignment_rpc.sql
+
+로 맞추고,
+migration ledger에 TRACKED entry를 추가했다.
+
+checkpoint:
+
+    production migrations 53
+    TRACKED structural    49
+    LIVE_ONLY_DATA         4
+
+## Rollback verification
+
+실제 G9 학생 1명을 transaction 안에서만 사용해:
+
+    Core UUID RPC → G9-A
+    legacy wrapper → G9-B
+
+를 차례로 호출했다.
+
+두 경로 모두 동일 canonical Core 학생의 enrollment를 수정하는 것을 확인했다.
+
+결과:
+
+    Core path student match    true
+    Legacy wrapper match       true
+
+transaction은 rollback하여 실제 학생의 반 배정은 변경되지 않았다.
+
+## CI behavior
+
+API hook만 먼저 UUID로 바꾼 intermediate commit에서는
+App call-site가 아직 integer를 보내고 있어 typecheck가 실패했다.
+
+App까지 Core UUID로 수정한 다음 commit에서:
+
+    migration ledger check SUCCESS
+    typecheck SUCCESS
+    build SUCCESS
+
+로 복구됐다.
+
+이 사례는 frontend type system이 identity migration의 stale call-site를 잡는
+compile-time gate로 계속 작동하고 있음을 보여준다.
