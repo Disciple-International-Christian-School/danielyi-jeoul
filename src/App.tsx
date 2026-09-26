@@ -42,6 +42,7 @@ import {
   getCoreMigrationReadinessQueryKey,
   getDisciplineCoreFkReadinessQueryKey,
   getDisciplineCoreCalcParityQueryKey,
+  getDisciplineCoreCutoverStatusQueryKey,
   getStudentSummaryCoreParityQueryKey,
   getCoreStudentReadinessQueryKey,
   getCoreSetupStatusQueryKey,
@@ -56,6 +57,7 @@ import {
   useCoreMigrationReadiness,
   useDisciplineCoreFkReadiness,
   useDisciplineCoreCalcParity,
+  useDisciplineCoreCutoverStatus,
   useStudentSummaryCoreParity,
   useCoreStudentReadiness,
   useCoreSetupStatus,
@@ -1177,6 +1179,7 @@ function CoreSetupPage() {
   const readiness = useCoreMigrationReadiness();
   const disciplineFk = useDisciplineCoreFkReadiness();
   const calcParity = useDisciplineCoreCalcParity();
+  const cutoverStatus = useDisciplineCoreCutoverStatus();
   const summaryParity = useStudentSummaryCoreParity();
   const studentReadiness = useCoreStudentReadiness();
   const grade9 = useGrade9Assignments();
@@ -1194,6 +1197,7 @@ function CoreSetupPage() {
     queryClient.invalidateQueries({ queryKey: getCoreMigrationReadinessQueryKey() });
     queryClient.invalidateQueries({ queryKey: getDisciplineCoreFkReadinessQueryKey() });
     queryClient.invalidateQueries({ queryKey: getDisciplineCoreCalcParityQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getDisciplineCoreCutoverStatusQueryKey() });
     queryClient.invalidateQueries({ queryKey: getStudentSummaryCoreParityQueryKey() });
     queryClient.invalidateQueries({ queryKey: getCoreStudentReadinessQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGrade9AssignmentsQueryKey() });
@@ -1239,11 +1243,11 @@ function CoreSetupPage() {
     });
   };
 
-  if (status.isLoading || readiness.isLoading || disciplineFk.isLoading || calcParity.isLoading || summaryParity.isLoading || studentReadiness.isLoading || grade9.isLoading) return <LoadingState />;
-  if (status.isError || readiness.isError || disciplineFk.isError || calcParity.isError || summaryParity.isError || studentReadiness.isError || grade9.isError) {
+  if (status.isLoading || readiness.isLoading || disciplineFk.isLoading || calcParity.isLoading || cutoverStatus.isLoading || summaryParity.isLoading || studentReadiness.isLoading || grade9.isLoading) return <LoadingState />;
+  if (status.isError || readiness.isError || disciplineFk.isError || calcParity.isError || cutoverStatus.isError || summaryParity.isError || studentReadiness.isError || grade9.isError) {
     return <ErrorState
-      error={status.error ?? readiness.error ?? disciplineFk.error ?? calcParity.error ?? summaryParity.error ?? studentReadiness.error ?? grade9.error}
-      retry={() => { status.refetch(); readiness.refetch(); disciplineFk.refetch(); calcParity.refetch(); summaryParity.refetch(); studentReadiness.refetch(); grade9.refetch(); }}
+      error={status.error ?? readiness.error ?? disciplineFk.error ?? calcParity.error ?? cutoverStatus.error ?? summaryParity.error ?? studentReadiness.error ?? grade9.error}
+      retry={() => { status.refetch(); readiness.refetch(); disciplineFk.refetch(); calcParity.refetch(); cutoverStatus.refetch(); summaryParity.refetch(); studentReadiness.refetch(); grade9.refetch(); }}
     />;
   }
 
@@ -1251,24 +1255,9 @@ function CoreSetupPage() {
   const core = readiness.data;
   const discipline = disciplineFk.data;
   const calculations = calcParity.data;
+  const cutover = cutoverStatus.data;
   const summary = summaryParity.data;
-  const cutoverReady = Boolean(
-    discipline
-    && calculations
-    && summary
-    && discipline.pointRecordsMismatch === 0
-    && discipline.punishmentsMismatch === 0
-    && discipline.pointRecordsCoreLinked === discipline.pointRecordsTotal
-    && discipline.punishmentsCoreLinked === discipline.punishmentsTotal
-    && calculations.weeklyMismatches === 0
-    && calculations.weeklyPenaltyMismatches === 0
-    && calculations.settlementMismatches === 0
-    && calculations.weeklyLegacyRows === calculations.weeklyCoreRows
-    && calculations.weeklyPenaltyLegacyRows === calculations.weeklyPenaltyCoreRows
-    && calculations.settlementLegacyRows === calculations.settlementCoreRows
-    && summary.mismatches === 0
-    && summary.legacyRows === summary.coreRows
-  );
+  const cutoverReady = Boolean(cutover?.cutoverCompleted);
   const readinessRows = studentReadiness.data ?? [];
   const readyStudents = readinessRows.filter((row) => row.readinessStatus === 'READY').length;
   const partialStudents = readinessRows.filter((row) => row.readinessStatus === 'PARTIAL').length;
@@ -1332,7 +1321,11 @@ function CoreSetupPage() {
         <div>
           <div className="eyebrow">Discipline FK cut-over</div>
           <h2 className="section-title" style={{ marginTop: 8 }}>생활지도 Core UUID 전환 상태</h2>
-          <p className="section-copy">legacy integer student_id는 호환용으로 남아 있고, 원본 기록은 canonical Core UUID를 병행 저장합니다.</p>
+          <p className="section-copy">
+            {cutover?.cutoverCompleted
+              ? '원본 생활지도 기록은 canonical Core UUID만 물리 FK로 사용합니다. legacy integer ID는 화면 호환용으로만 계산됩니다.'
+              : 'Core UUID 전환 검증이 진행 중입니다.'}
+          </p>
         </div>
         <span className={'pill ' + (
           discipline.pointRecordsMismatch === 0
@@ -1378,12 +1371,14 @@ function CoreSetupPage() {
       </div>
 
       <div className="side-note" style={{ marginTop: 16 }}>
-        <strong>{cutoverReady ? 'Core cut-over 준비됨' : '최종 integer FK 제거 gate'}</strong>
+        <strong>{cutoverReady ? 'Core cut-over 완료' : '최종 integer FK 제거 gate'}</strong>
         <span className={'pill ' + (cutoverReady ? 'pill-positive' : 'pill-warning')} style={{ marginLeft: 10 }}>
-          {cutoverReady ? 'ALL GREEN' : '확인 중'}
+          {cutoverReady ? 'COMPLETED' : '확인 중'}
         </span>
         <div style={{ marginTop: 5 }}>
-          모든 기존 record Core 연결 100% · mismatch 0 · 신규 write Core UUID only · legacy/Core 계산 및 summary 결과 동일 조건을 계속 만족할 때만 final cut-over를 진행합니다.
+          {cutoverReady
+            ? '물리 integer FK 제거 완료 · Core UUID NOT NULL · legacy/Core 사전 parity evidence mismatch 0 · 기존 화면 contract는 derived compatibility ID로 유지됩니다.'
+            : '모든 기존 record Core 연결 100% · mismatch 0 · 신규 write Core UUID only · legacy/Core 계산 및 summary 결과 동일 조건을 계속 만족할 때만 final cut-over를 진행합니다.'}
         </div>
       </div>
     </div>}
