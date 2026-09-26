@@ -2835,3 +2835,203 @@ security advisor의 남은 주요 warning은
 Computer Lab의 intentional RPC surface와
 Auth leaked-password protection 설정 등
 다른 lane / platform setting 영역으로 분리해 유지한다.
+
+
+---
+
+# 57. Production Migration History 전체를 다시 맞추다
+
+Core cut-over 직후 최근 migration만 Git ↔ Supabase version을 맞췄지만,
+전수 비교를 하자 초기/중기 구간에도 timestamp drift가 남아 있었다.
+
+첫 비교:
+
+    Git SQL files     48
+    live migrations  52
+
+version 기준:
+
+    missing from Git  20
+    extra in Git      16
+
+이 숫자만 보면 큰 drift처럼 보이지만,
+name/content를 대조하자 대부분은:
+
+    같은 structural migration
+    + 다른 draft timestamp
+
+였다.
+
+예:
+
+    Git draft
+    20260925000007_settlement_and_net_scoring.sql
+
+    production ledger
+    20260924192707_settlement_and_net_scoring
+
+따라서 SQL blob 자체는 바꾸지 않고
+live version/name으로 path만 rename했다.
+
+초기:
+
+    schema
+    logic
+    rls
+    function search_path
+
+Core foundation:
+
+    dics_core_student_bootstrap
+    settlement_and_net_scoring
+    reflection_due_times
+    core_aware_student_summary_v2
+    core_hardening
+
+운영 확장:
+
+    notice/report
+    department merit
+    responsibility scopes
+    auth provenance
+    department merit admin/security
+
+까지 production ledger에 맞췄다.
+
+재검사 결과:
+
+    Git structural SQL 48
+    live migrations    52
+
+차이는 정확히 4개만 남았다.
+
+---
+
+# 58. 남은 4개는 “누락”이 아니라 LIVE_ONLY_DATA였다
+
+남은 live migration 네 개는 구조 migration이 아니었다.
+
+성격:
+
+- historical demo/seed data
+- environment-specific Auth/admin binding
+- private student roster import
+- private roster correction
+
+즉 SQL을 Git에 복구하는 것이 오히려 잘못된 방향이었다.
+
+여기서 migration governance에 새 구분을 도입했다.
+
+    TRACKED
+    LIVE_ONLY_DATA
+
+TRACKED:
+
+    구조를 재현하는 SQL
+    → exact live version/name으로 Git에 존재
+
+LIVE_ONLY_DATA:
+
+    운영환경 데이터 변경
+    → production history에는 존재
+    → public Git SQL은 의도적으로 없음
+
+현재 checkpoint:
+
+    production migrations 52
+    TRACKED structural    48
+    LIVE_ONLY_DATA         4
+    extra Git migrations   0
+
+---
+
+# 59. Migration 이름 자체도 PII가 될 수 있었다
+
+migration ledger를 처음 생성할 때
+live history의 version/name을 그대로 snapshot하려 했다.
+
+그 과정에서 private roster correction migration은
+**migration name 자체가 실제 학생 식별정보를 포함할 수 있음**을 발견했다.
+
+SQL을 Git에 넣지 않는 것만으로는 충분하지 않았다.
+
+즉:
+
+    migration SQL = private
+    migration name = always safe
+
+라는 가정도 틀릴 수 있었다.
+
+즉시 ledger entry를:
+
+    name_redacted = true
+    private_label = private_roster_correction
+
+형태로 수정했다.
+
+실제 live migration name은 Git ledger에서 제거했다.
+
+이 경험으로 LIVE_ONLY_DATA contract에:
+
+> sensitive live migration name itself may be redacted
+
+규칙을 추가했다.
+
+---
+
+# 60. Migration Ledger를 CI Contract로 만들다
+
+새 파일:
+
+    supabase/migration-ledger.json
+
+새 checker:
+
+    scripts/check-migration-ledger.mjs
+
+새 명령:
+
+    npm run check:migration-ledger
+
+CI가 강제하는 규칙:
+
+TRACKED:
+
+    version 14자리
+    unique version
+    exact version_name.sql
+    실제 Git file 존재
+
+LIVE_ONLY_DATA:
+
+    rationale 필수
+    해당 version SQL이 Git에 있으면 실패
+    redacted entry에는 실제 name이 있으면 실패
+
+그리고:
+
+    Git의 모든 migration SQL
+    → 반드시 TRACKED ledger entry가 있어야 함
+
+따라서 앞으로는:
+
+    migration file만 추가
+    ledger 안 고침
+    → CI FAIL
+
+    private-data migration SQL commit
+    → CI FAIL
+
+    live timestamp와 Git filename mismatch
+    → CI FAIL
+
+로 전환됐다.
+
+첫 GitHub Actions 실행:
+
+    migration ledger check SUCCESS
+    typecheck SUCCESS
+    build SUCCESS
+
+이 시점부터 migration governance가 문서 규칙이 아니라
+실제 merge gate가 되었다.
