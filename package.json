@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "migrate:sp-identities": "node scripts/migrate-sp-external-identities.mjs"
+    "migrate:sp-identities": "node scripts/migrate-sp-external-identities.mjs",
+    "check:migration-ledger": "node scripts/check-migration-ledger.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.47.10",
