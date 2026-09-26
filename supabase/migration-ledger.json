@@ -325,6 +325,12 @@
       "name": "grade9_core_assignment_rpc",
       "status": "TRACKED",
       "file": "supabase/migrations/20260926173405_grade9_core_assignment_rpc.sql"
+    },
+    {
+      "version": "20260926175058",
+      "name": "legacy_students_read_only",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926175058_legacy_students_read_only.sql"
     }
   ]
 }
