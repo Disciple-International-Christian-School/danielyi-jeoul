@@ -358,7 +358,7 @@ function DashboardPage() {
         <tbody>
           {rows.map((student) => <tr key={student.id} data-testid={'row-dashboard-student-' + student.id}>
             <td>
-              <Link className="table-link" href={'/students/' + student.id} data-testid={'link-dashboard-student-' + student.id}>{student.name}</Link>
+              <Link className="table-link" href={'/students/' + (student.coreStudentId ?? student.id)} data-testid={'link-dashboard-student-' + student.id}>{student.name}</Link>
               <div className="muted" style={{ fontSize: 10, marginTop: 3 }}>{student.studentNo ?? 'Core 매핑 대기'}</div>
             </td>
             <td>{student.homeroom ?? (student.grade + '학년')}</td>
@@ -424,7 +424,7 @@ function StudentsPage() {
         <tbody>
           {rows.map((student) => <tr key={student.id} data-testid={'row-student-' + student.id}>
             <td className="muted">{student.studentNo ?? '매핑 대기'}</td>
-            <td><Link href={'/students/' + student.id} className="table-link" data-testid={'link-student-' + student.id}>{student.name}</Link></td>
+            <td><Link href={'/students/' + (student.coreStudentId ?? student.id)} className="table-link" data-testid={'link-student-' + student.id}>{student.name}</Link></td>
             <td>{student.homeroom ?? (student.grade + '학년')}</td>
             <td>{student.weeklyNetPenaltyPoints}</td>
             <td>{student.settlementNetPenaltyPoints}</td>
@@ -444,10 +444,10 @@ function StudentsPage() {
 
 function StudentDetailPage() {
   const params = useParams<{ id: string }>();
-  const id = Number(params.id);
+  const studentRef = params.id;
   const queryClient = useQueryClient();
-  const detail = useGetStudent(id);
-  const records = useListPointRecords({ studentId: id, limit: 100 });
+  const detail = useGetStudent(studentRef);
+  const records = useListPointRecords({ studentRef, limit: 100 });
   const deleteRecord = useDeletePointRecord();
   const updateRecord = useUpdatePointRecord();
   const setViolation = useSetPunishmentViolation();
@@ -455,7 +455,10 @@ function StudentDetailPage() {
   if (detail.isLoading) return <LoadingState />;
   if (detail.isError || !detail.data) return <ErrorState error={detail.error} retry={() => detail.refetch()} />;
   const student = detail.data;
-  const refreshDetail = () => { queryClient.invalidateQueries({ queryKey: getGetStudentQueryKey(id) }); queryClient.invalidateQueries({ queryKey: getListPointRecordsQueryKey({ studentId: id, limit: 100 }) }); };
+  const refreshDetail = () => {
+    queryClient.invalidateQueries({ queryKey: getGetStudentQueryKey(studentRef) });
+    queryClient.invalidateQueries({ queryKey: getListPointRecordsQueryKey({ studentRef, limit: 100 }) });
+  };
   const removeRecord = (record: PointRecord) => { if (window.confirm('이 점수 기록을 삭제할까요?')) deleteRecord.mutate({ id: record.id }, { onSuccess: () => { refreshDetail(); notify('점수 기록을 삭제했습니다.'); }, onError: (error) => notify(errText(error), 'error') }); };
   const editRecord = (record: PointRecord) => {
     const nextPoints = window.prompt('점수를 입력하세요.', String(record.points));
@@ -758,7 +761,7 @@ function ReflectionsPage() {
         <table className="data-table">
           <thead><tr><th>학생</th><th>담당</th><th>벌점 항목</th><th>벌점</th><th>입력일</th><th>제출기한</th><th>상태</th><th>조치</th></tr></thead>
           <tbody>{rows.map((reflection) => <tr key={reflection.id} data-testid={'row-reflection-' + reflection.id}>
-            <td><Link className="table-link" href={'/students/' + reflection.studentId} data-testid={'link-reflection-student-' + reflection.id}>{reflection.studentName}</Link> <span className="muted">{reflection.grade}학년</span></td>
+            <td><Link className="table-link" href={'/students/' + reflection.coreStudentId} data-testid={'link-reflection-student-' + reflection.id}>{reflection.studentName}</Link> <span className="muted">{reflection.grade}학년</span></td>
             <td className="muted">{reflection.assignedScope === 'ELEMENTARY' ? '초등' : reflection.assignedScope === 'MIDDLE' ? '중등' : '고등'}</td>
             <td>{reflection.item}</td>
             <td className="weight-number danger-text">{reflection.points}</td>
