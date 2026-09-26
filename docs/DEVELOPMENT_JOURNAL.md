@@ -3128,3 +3128,116 @@ App까지 Core UUID로 수정한 다음 commit에서:
 
 이 사례는 frontend type system이 identity migration의 stale call-site를 잡는
 compile-time gate로 계속 작동하고 있음을 보여준다.
+
+
+---
+
+# 62. Legacy student master를 Browser Read-only로 잠그다
+
+discipline record와 G9 assignment가 Core UUID 기준으로 이동한 뒤,
+남은 위험한 우회경로를 점검했다.
+
+Frontend 화면에서는 학생 명부를 이미 Core read-only 관점으로 사용하고 있었지만,
+API module 안에는 예전 MVP의:
+
+    useCreateStudent()
+    useUpdateStudent()
+    useDeleteStudent()
+
+hook이 남아 있었다.
+
+이 hook들은:
+
+    public.students
+
+를 직접 INSERT/UPDATE했다.
+
+문제는 public.students가 이제 canonical student master가 아니라:
+
+    legacy compatibility bridge
+
+라는 점이다.
+
+직접 새 row를 만들면:
+
+    core.students canonical identity
+    ↕
+    public.students legacy bridge
+
+관계가 깨질 수 있다.
+
+## DB lock-down
+
+production에서 다음 write RLS policy를 제거했다.
+
+    students_write
+    students_update
+
+그리고 browser roles의 table privilege를 줄였다.
+
+authenticated:
+
+    SELECT  true
+    INSERT  false
+    UPDATE  false
+    DELETE  false
+
+anon:
+
+    SELECT  false
+    INSERT  false
+    UPDATE  false
+    DELETE  false
+
+legacy sequence usage도 authenticated에서 제거했다.
+
+RLS:
+
+    SELECT policy 1
+    write policy 0
+
+현재 public.students는 browser 기준 완전한 read-only bridge다.
+
+## Frontend cleanup
+
+미사용:
+
+    StudentInput
+    useCreateStudent
+    useUpdateStudent
+    useDeleteStudent
+
+를 api.ts에서 제거했다.
+
+따라서 앞으로 Daniel frontend가 실수로 app-local 학생 master를 만들 수 있는
+정상 코드 경로도 사라졌다.
+
+## Identity ownership
+
+현재 원칙:
+
+    core.students
+    = canonical student master
+
+    public.students
+    = legacy read-only compatibility bridge
+
+실제 학생 추가/명부 수정은
+Core provisioning/import workflow에서만 수행한다.
+
+## Migration governance
+
+live version:
+
+    20260926175058_legacy_students_read_only
+
+Git filename과 production ledger를 일치시켰다.
+
+checkpoint:
+
+    production migrations 54
+    TRACKED structural    50
+    LIVE_ONLY_DATA         4
+
+최종 frontend cleanup push에서
+migration-ledger check / typecheck / build가 모두 성공했다.
