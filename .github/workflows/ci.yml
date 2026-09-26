@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "gpt/**"
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Check migration versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -printf '%f\n' | sort)
+
+          bad=0
+          versions=()
+          for file in "${files[@]}"; do
+            if [[ ! "$file" =~ ^[0-9]{14}_.+\.sql$ ]]; then
+              echo "::error::Invalid migration filename: $file"
+              bad=1
+              continue
+            fi
+            versions+=("${file:0:14}")
+          done
+
+          duplicates="$(printf '%s\n' "${versions[@]}" | sort | uniq -d)"
+          if [[ -n "$duplicates" ]]; then
+            echo "::error::Duplicate migration version(s): $duplicates"
+            bad=1
+          fi
+
+          if [[ "$bad" -ne 0 ]]; then
+            exit 1
+          fi
+
+          echo "Migration versions are unique: ${#versions[@]} files"
+
+      - name: Check migration ledger
+        run: npm run check:migration-ledger
+
+      - name: Check migration tool syntax
+        run: node --check scripts/migrate-sp-external-identities.mjs
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build

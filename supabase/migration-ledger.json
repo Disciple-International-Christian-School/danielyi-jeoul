@@ -1,0 +1,342 @@
+{
+  "schema_version": 1,
+  "supabase_project_ref": "jgrzsfomcwfiukkaqtos",
+  "purpose": "Snapshot of the production migration ledger. TRACKED migrations must exist in Git with the exact live version/name. LIVE_ONLY_DATA entries intentionally have no SQL file in the public repository.",
+  "statuses": {
+    "TRACKED": "Structural migration tracked in Git and required for schema reconstruction.",
+    "LIVE_ONLY_DATA": "Historical/operational data migration intentionally not committed to Git."
+  },
+  "migrations": [
+    {
+      "version": "20260921082928",
+      "name": "schema",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260921082928_schema.sql"
+    },
+    {
+      "version": "20260921082956",
+      "name": "logic",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260921082956_logic.sql"
+    },
+    {
+      "version": "20260921083005",
+      "name": "rls",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260921083005_rls.sql"
+    },
+    {
+      "version": "20260921083025",
+      "name": "seed_dev_fictional",
+      "status": "LIVE_ONLY_DATA",
+      "rationale": "Historical fictional/demo seed data. Not required for schema reconstruction."
+    },
+    {
+      "version": "20260921083116",
+      "name": "fix_function_search_path",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260921083116_fix_function_search_path.sql"
+    },
+    {
+      "version": "20260921094518",
+      "name": "link_admin_roles",
+      "status": "LIVE_ONLY_DATA",
+      "rationale": "Operational Auth-to-admin binding. Auth UUID bindings are environment data and must not be committed."
+    },
+    {
+      "version": "20260924174458",
+      "name": "grade_1_to_12",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260924174458_grade_1_to_12.sql"
+    },
+    {
+      "version": "20260924174526",
+      "name": "import_fall_2026_enrolled_roster",
+      "status": "LIVE_ONLY_DATA",
+      "rationale": "Private Fall 2026 student roster import. Real student rows remain in Supabase only."
+    },
+    {
+      "version": "20260924174748",
+      "status": "LIVE_ONLY_DATA",
+      "name_redacted": true,
+      "private_label": "private_roster_correction",
+      "rationale": "Private roster correction tied to live student data. The live migration name and SQL are intentionally not committed."
+    },
+    {
+      "version": "20260924192642",
+      "name": "dics_core_student_bootstrap",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260924192642_dics_core_student_bootstrap.sql"
+    },
+    {
+      "version": "20260924192707",
+      "name": "settlement_and_net_scoring",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260924192707_settlement_and_net_scoring.sql"
+    },
+    {
+      "version": "20260924192710",
+      "name": "reflection_due_times",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260924192710_reflection_due_times.sql"
+    },
+    {
+      "version": "20260924192754",
+      "name": "core_aware_student_summary_v2",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260924192754_core_aware_student_summary_v2.sql"
+    },
+    {
+      "version": "20260924192838",
+      "name": "core_hardening",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260924192838_core_hardening.sql"
+    },
+    {
+      "version": "20260924200314",
+      "name": "notice_and_weekly_report_views",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260924200314_notice_and_weekly_report_views.sql"
+    },
+    {
+      "version": "20260924201501",
+      "name": "department_weekly_merits",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260924201501_department_weekly_merits.sql"
+    },
+    {
+      "version": "20260924201918",
+      "name": "admin_responsibility_scopes",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260924201918_admin_responsibility_scopes.sql"
+    },
+    {
+      "version": "20260924202303",
+      "name": "auth_provenance_audit",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260924202303_auth_provenance_audit.sql"
+    },
+    {
+      "version": "20260925004004",
+      "name": "lead_audit_view",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925004004_lead_audit_view.sql"
+    },
+    {
+      "version": "20260925004257",
+      "name": "current_term_setup",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925004257_current_term_setup.sql"
+    },
+    {
+      "version": "20260925004557",
+      "name": "core_migration_readiness",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925004557_core_migration_readiness.sql"
+    },
+    {
+      "version": "20260925004655",
+      "name": "fix_current_term_setup_runtime",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925004655_fix_current_term_setup_runtime.sql"
+    },
+    {
+      "version": "20260925004934",
+      "name": "parallel_db_reconciliation",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925004934_parallel_db_reconciliation.sql"
+    },
+    {
+      "version": "20260925005111",
+      "name": "computer_lab_p0",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925005111_computer_lab_p0.sql"
+    },
+    {
+      "version": "20260925005238",
+      "name": "study_planner_target_schema",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925005238_study_planner_target_schema.sql"
+    },
+    {
+      "version": "20260925005346",
+      "name": "external_auth_identity_bridge",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925005346_external_auth_identity_bridge.sql"
+    },
+    {
+      "version": "20260925005501",
+      "name": "study_planner_fk_indexes",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925005501_study_planner_fk_indexes.sql"
+    },
+    {
+      "version": "20260925005646",
+      "name": "external_auth_identity_bridge_reconcile",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925005646_external_auth_identity_bridge_reconcile.sql"
+    },
+    {
+      "version": "20260925005951",
+      "name": "split_core_external_auth_readiness_v3",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925005951_split_core_external_auth_readiness_v3.sql"
+    },
+    {
+      "version": "20260925010624",
+      "name": "external_auth_link_rpc",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925010624_external_auth_link_rpc.sql"
+    },
+    {
+      "version": "20260925010653",
+      "name": "core_admin_rpc_privilege_hardening",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925010653_core_admin_rpc_privilege_hardening.sql"
+    },
+    {
+      "version": "20260925010655",
+      "name": "study_planner_staff_identity_bridge",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925010655_study_planner_staff_identity_bridge.sql"
+    },
+    {
+      "version": "20260925010726",
+      "name": "external_auth_mapping_status",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925010726_external_auth_mapping_status.sql"
+    },
+    {
+      "version": "20260925011028",
+      "name": "study_planner_target_inventory",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925011028_study_planner_target_inventory.sql"
+    },
+    {
+      "version": "20260925011629",
+      "name": "department_merit_admin",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925011629_department_merit_admin.sql"
+    },
+    {
+      "version": "20260925012012",
+      "name": "department_merit_security_hardening",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925012012_department_merit_security_hardening.sql"
+    },
+    {
+      "version": "20260925081601",
+      "name": "admin_account_provisioning",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925081601_admin_account_provisioning.sql"
+    },
+    {
+      "version": "20260925081932",
+      "name": "admin_account_security_hardening",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925081932_admin_account_security_hardening.sql"
+    },
+    {
+      "version": "20260925082418",
+      "name": "discipline_core_student_dual_key",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925082418_discipline_core_student_dual_key.sql"
+    },
+    {
+      "version": "20260925082530",
+      "name": "discipline_core_write_rpcs",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260925082530_discipline_core_write_rpcs.sql"
+    },
+    {
+      "version": "20260926085123",
+      "name": "reflection_core_uuid_read_path",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926085123_reflection_core_uuid_read_path.sql"
+    },
+    {
+      "version": "20260926085457",
+      "name": "core_uuid_score_shadow_parity",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926085457_core_uuid_score_shadow_parity.sql"
+    },
+    {
+      "version": "20260926085608",
+      "name": "promote_core_uuid_score_views",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926085608_promote_core_uuid_score_views.sql"
+    },
+    {
+      "version": "20260926085700",
+      "name": "student_summary_core_shadow",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926085700_student_summary_core_shadow.sql"
+    },
+    {
+      "version": "20260926085808",
+      "name": "promote_core_student_summary",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926085808_promote_core_student_summary.sql"
+    },
+    {
+      "version": "20260926085952",
+      "name": "core_uuid_read_join_promotion",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926085952_core_uuid_read_join_promotion.sql"
+    },
+    {
+      "version": "20260926170743",
+      "name": "core_authoritative_discipline_writes",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926170743_core_authoritative_discipline_writes.sql"
+    },
+    {
+      "version": "20260926170921",
+      "name": "derive_legacy_ids_from_core",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926170921_derive_legacy_ids_from_core.sql"
+    },
+    {
+      "version": "20260926171221",
+      "name": "core_cutover_evidence",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926171221_core_cutover_evidence.sql"
+    },
+    {
+      "version": "20260926171350",
+      "name": "drop_legacy_discipline_student_ids",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926171350_drop_legacy_discipline_student_ids.sql"
+    },
+    {
+      "version": "20260926171512",
+      "name": "post_cutover_status",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926171512_post_cutover_status.sql"
+    },
+    {
+      "version": "20260926172018",
+      "name": "admin_rls_initplan_optimization",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926172018_admin_rls_initplan_optimization.sql"
+    },
+    {
+      "version": "20260926173405",
+      "name": "grade9_core_assignment_rpc",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926173405_grade9_core_assignment_rpc.sql"
+    },
+    {
+      "version": "20260926175058",
+      "name": "legacy_students_read_only",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926175058_legacy_students_read_only.sql"
+    },
+    {
+      "version": "20260926175410",
+      "name": "grade9_legacy_wrapper_invoker",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926175410_grade9_legacy_wrapper_invoker.sql"
+    }
+  ]
+}

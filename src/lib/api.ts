@@ -13,21 +13,47 @@ import { supabase } from './supabase';
 export type Role = 'SEONDO' | 'SASAENG';
 export type PointType = 'POSITIVE' | 'NEGATIVE';
 export type ReflectionStatus = 'SUBMITTED' | 'MISSING' | 'DOUBLE';
+export type DisciplineScope = 'ALL' | 'ELEMENTARY' | 'MIDDLE' | 'HIGH';
 
 export const PUNISHMENT_TYPES = ['운동금지', '간식금지', '면회금지'] as const;
 export type PunishmentType = (typeof PUNISHMENT_TYPES)[number];
 
 export interface StudentSummary {
+  /** Legacy integer route id until discipline FK cut-over. */
   id: number;
+  /** Canonical DICS Core student UUID; null until legacy mapping is complete. */
+  coreStudentId: string | null;
+  studentNo: string | null;
   name: string;
   grade: number;
+  homeroom: string | null;
   createdAt: string;
   updatedAt: string;
+
+  // Lifetime raw totals.
   positivePoints: number;
   negativePoints: number;
+
+  // Current Monday-based week.
+  weeklyPositivePoints: number;
   weeklyPenaltyPoints: number;
-  monthlyPenaltyPoints: number;
+  weeklyNetPenaltyPoints: number;
   weeklyRecordCount: number;
+  physicalTrainingRequired: boolean;
+
+  // Current admin-controlled settlement period.
+  settlementPeriodId: number | null;
+  settlementPeriodLabel: string | null;
+  settlementStartsOn: string | null;
+  settlementPositivePoints: number;
+  settlementPenaltyPoints: number;
+  settlementNetPenaltyPoints: number;
+  physicalTrainingWeeks: number;
+  committeeRequired: boolean;
+
+  /** Legacy compatibility alias. Do not use for new UI. */
+  monthlyPenaltyPoints: number;
+
   punishment: string | null;
   statuses: string[];
 }
@@ -47,6 +73,7 @@ export interface PointRecordReflection {
 export interface PointRecord {
   id: number;
   studentId: number;
+  coreStudentId: string;
   studentName: string;
   type: PointType;
   item: string;
@@ -61,6 +88,7 @@ export interface Reflection {
   id: number;
   pointRecordId: number;
   studentId: number;
+  coreStudentId: string;
   studentName: string;
   grade: number;
   item: string;
@@ -68,13 +96,17 @@ export interface Reflection {
   recordedAt: string;
   submitted: boolean;
   submissionDeadline: string;
+  dueAt: string;
+  deadlineChangeReason: string | null;
   submittedAt: string | null;
   status: ReflectionStatus;
+  assignedScope: Exclude<DisciplineScope, 'ALL'>;
 }
 
 export interface DashboardCounts {
   students: number;
   weeklyTargets: number;
+  committeeTargets: number;
   missingReflections: number;
   doubleReflections: number;
   activePunishments: number;
@@ -85,9 +117,228 @@ export interface Dashboard {
   students: StudentSummary[];
 }
 
+export interface CoreSetupStatus {
+  termId: string;
+  termCode: string;
+  termName: string;
+  startsOn: string;
+  endsOn: string;
+  classCount: number;
+  enrollmentCount: number;
+  grade9Total: number;
+  grade9Assigned: number;
+  grade9Pending: number;
+}
+
+export interface Grade9Assignment {
+  studentId: number;
+  coreStudentId: string;
+  studentName: string;
+  grade: number;
+  section: string | null;
+  homeroom: string | null;
+}
+
+export interface SettlementPeriod {
+  id: number;
+  label: string;
+  startsOn: string;
+  endsOn: string | null;
+  createdAt: string;
+}
+
+export interface DailyDisciplineNotice {
+  pointRecordId: number;
+  recordedAt: string;
+  studentId: number;
+  coreStudentId: string | null;
+  studentNo: string | null;
+  studentName: string;
+  grade: number;
+  homeroom: string | null;
+  item: string;
+  points: number;
+  reflectionId: number | null;
+  reflectionSubmitted: boolean | null;
+  reflectionDueAt: string | null;
+  reflectionStatus: ReflectionStatus | null;
+}
+
+export interface AdminAccount {
+  id: number;
+  loginId: string;
+  displayName: string;
+  role: Role;
+  disciplineScope: DisciplineScope | null;
+  isLead: boolean;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  lastPasswordChangedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  isSelf: boolean;
+}
+
+export interface ProvisionedAdminCredential {
+  adminId: number;
+  loginId: string;
+  temporaryPassword: string;
+  mustChangePassword: boolean;
+}
+
+export interface DisciplineAuditLog {
+  id: number;
+  actorUserId: string | null;
+  actorName: string;
+  actorRole: Role | null;
+  action: 'INSERT' | 'UPDATE' | 'DELETE';
+  entityType: string;
+  entityId: string | null;
+  beforeData: Record<string, unknown> | null;
+  afterData: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface DisciplineCoreCutoverStatus {
+  stage: string;
+  capturedAt: string;
+  legacyColumnsRemoved: boolean;
+  pointRecordsTotal: number;
+  pointRecordsCoreLinked: number;
+  pointRecordsMismatch: number;
+  punishmentsTotal: number;
+  punishmentsCoreLinked: number;
+  punishmentsMismatch: number;
+  weeklyMismatches: number;
+  weeklyPenaltyMismatches: number;
+  settlementMismatches: number;
+  summaryMismatches: number;
+  cutoverCompleted: boolean;
+}
+
+export interface DisciplineCoreCalcParity {
+  weeklyLegacyRows: number;
+  weeklyCoreRows: number;
+  weeklyMismatches: number;
+  weeklyPenaltyLegacyRows: number;
+  weeklyPenaltyCoreRows: number;
+  weeklyPenaltyMismatches: number;
+  settlementLegacyRows: number;
+  settlementCoreRows: number;
+  settlementMismatches: number;
+}
+
+export interface StudentSummaryCoreParity {
+  legacyRows: number;
+  coreRows: number;
+  mismatches: number;
+}
+
+export interface DisciplineCoreFkReadiness {
+  pointRecordsTotal: number;
+  pointRecordsCoreLinked: number;
+  pointRecordsMismatch: number;
+  punishmentsTotal: number;
+  punishmentsCoreLinked: number;
+  punishmentsMismatch: number;
+}
+
+export interface CoreMigrationReadiness {
+  coreTotal: number;
+  activeStudents: number;
+  studentNoAssigned: number;
+  authLinked: number;
+  externalAuthLinked: number;
+  termCount: number;
+  currentTermCount: number;
+  classCount: number;
+  currentEnrollmentCount: number;
+  danielBridgeCount: number;
+}
+
+export interface CoreStudentReadiness {
+  coreStudentId: string;
+  studentNo: string | null;
+  name: string;
+  grade: number;
+  hasStudentNo: boolean;
+  hasAuthLink: boolean;
+  hasExternalAuthLink: boolean;
+  hasCurrentEnrollment: boolean;
+  homeroom: string | null;
+  readinessStatus: 'READY' | 'PARTIAL' | 'CORE_ONLY';
+}
+
+export interface DepartmentMeritAdmin {
+  departmentId: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+  ruleId: string | null;
+  points: number | null;
+  itemLabel: string | null;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  currentMemberCount: number;
+}
+
+export interface DepartmentCurrentMember {
+  membershipId: string;
+  departmentId: string;
+  coreStudentId: string;
+  studentNo: string | null;
+  studentName: string;
+  grade: number | null;
+  homeroom: string | null;
+  startsOn: string;
+  endsOn: string | null;
+}
+
+export interface DepartmentMeritStatus {
+  weekStart: string;
+  departmentId: string;
+  departmentCode: string;
+  departmentName: string;
+  membershipId: string;
+  coreStudentId: string;
+  studentNo: string | null;
+  studentName: string;
+  grade: number | null;
+  homeroom: string | null;
+  points: number;
+  itemLabel: string;
+  pointRecordId: number | null;
+  generated: boolean;
+}
+
+export interface WeeklyDisciplineReport {
+  weekStart: string;
+  studentId: number;
+  coreStudentId: string | null;
+  studentNo: string | null;
+  studentName: string;
+  grade: number;
+  homeroom: string | null;
+  weeklyPositivePoints: number;
+  weeklyPenaltyPoints: number;
+  weeklyNetPenaltyPoints: number;
+  penaltyIncidentCount: number;
+  physicalTrainingRequired: boolean;
+  settlementPeriodId: number | null;
+  settlementPeriodLabel: string | null;
+  settlementStartsOn: string | null;
+  settlementPositivePoints: number;
+  settlementPenaltyPoints: number;
+  settlementNetPenaltyPoints: number;
+  physicalTrainingWeeks: number;
+  committeeRequired: boolean;
+  statuses: string[];
+}
+
 export interface Punishment {
   id: number;
   studentId: number;
+  coreStudentId: string;
   studentName: string;
   grade: number;
   types: string[];
@@ -110,7 +361,6 @@ export interface PointItem {
 }
 
 // Write payloads
-export interface StudentInput { name: string; grade: number; }
 export interface PointItemInput {
   name: string;
   type: PointType;
@@ -120,7 +370,7 @@ export interface PointItemInput {
 }
 export interface PointItemImportRow { name: string; fixedPoints: number | null; }
 export interface PointRecordInput {
-  studentId: number;
+  coreStudentId: string;
   type: PointType;
   item: string;
   points: number;
@@ -137,7 +387,7 @@ export interface PointRecordUpdateInput {
   reflectionSubmitted?: boolean | null;
 }
 export interface PunishmentInput {
-  studentId: number;
+  coreStudentId: string;
   types: string[];
   startDate: string;
   endDate: string;
@@ -149,28 +399,271 @@ export interface PunishmentInput {
 // ---------------------------------------------------------------------------
 
 interface StudentSummaryRow {
-  id: number; name: string; grade: number; created_at: string; updated_at: string;
-  positive_points: number; negative_points: number; weekly_penalty_points: number;
-  monthly_penalty_points: number; weekly_record_count: number;
-  punishment: string | null; statuses: string[] | null;
+  id: number;
+  core_student_id: string | null;
+  student_no: string | null;
+  name: string;
+  grade: number;
+  homeroom: string | null;
+  created_at: string;
+  updated_at: string;
+
+  positive_points: number;
+  negative_points: number;
+
+  weekly_positive_points: number;
+  weekly_penalty_points: number;
+  weekly_net_penalty_points: number;
+  weekly_record_count: number;
+  physical_training_required: boolean;
+
+  settlement_period_id: number | null;
+  settlement_period_label: string | null;
+  settlement_starts_on: string | null;
+  settlement_positive_points: number;
+  settlement_penalty_points: number;
+  settlement_net_penalty_points: number;
+  physical_training_weeks: number;
+  committee_required: boolean;
+
+  monthly_penalty_points: number;
+  punishment: string | null;
+  statuses: string[] | null;
 }
 interface ReflectionRow {
-  id: number; point_record_id: number; student_id: number; student_name: string;
+  id: number; point_record_id: number; student_id: number; core_student_id: string; student_name: string;
   grade: number; item: string; points: number; recorded_at: string;
-  submitted: boolean; submission_deadline: string; submitted_at: string | null;
+  submitted: boolean; submission_deadline: string; due_at: string;
+  deadline_change_reason: string | null; submitted_at: string | null;
   status: ReflectionStatus;
+  assigned_scope: Exclude<DisciplineScope, 'ALL'>;
 }
 interface DashboardCountsRow {
-  students: number; weekly_targets: number; missing_reflections: number;
-  double_reflections: number; active_punishments: number;
+  students: number;
+  weekly_targets: number;
+  committee_targets: number;
+  missing_reflections: number;
+  double_reflections: number;
+  active_punishments: number;
+}
+
+interface CoreSetupStatusRow {
+  term_id: string;
+  term_code: string;
+  term_name: string;
+  starts_on: string;
+  ends_on: string;
+  class_count: number;
+  enrollment_count: number;
+  grade9_total: number;
+  grade9_assigned: number;
+  grade9_pending: number;
+}
+
+interface Grade9AssignmentRow {
+  student_id: number;
+  core_student_id: string;
+  student_name: string;
+  grade: number;
+  section: string | null;
+  homeroom: string | null;
+}
+
+interface SettlementPeriodRow {
+  id: number;
+  label: string;
+  starts_on: string;
+  ends_on: string | null;
+  created_at: string;
+}
+
+interface DisciplineCoreCutoverStatusRow {
+  stage: string;
+  captured_at: string;
+  legacy_columns_removed: boolean;
+  point_records_total: number;
+  point_records_core_linked: number;
+  point_records_mismatch: number;
+  punishments_total: number;
+  punishments_core_linked: number;
+  punishments_mismatch: number;
+  weekly_mismatches: number;
+  weekly_penalty_mismatches: number;
+  settlement_mismatches: number;
+  summary_mismatches: number;
+  cutover_completed: boolean;
+}
+
+interface DisciplineCoreCalcParityRow {
+  weekly_legacy_rows: number;
+  weekly_core_rows: number;
+  weekly_mismatches: number;
+  weekly_penalty_legacy_rows: number;
+  weekly_penalty_core_rows: number;
+  weekly_penalty_mismatches: number;
+  settlement_legacy_rows: number;
+  settlement_core_rows: number;
+  settlement_mismatches: number;
+}
+
+interface StudentSummaryCoreParityRow {
+  legacy_rows: number;
+  core_rows: number;
+  mismatches: number;
+}
+
+interface DisciplineCoreFkReadinessRow {
+  point_records_total: number;
+  point_records_core_linked: number;
+  point_records_mismatch: number;
+  punishments_total: number;
+  punishments_core_linked: number;
+  punishments_mismatch: number;
+}
+
+interface CoreMigrationReadinessRow {
+  core_total: number;
+  active_students: number;
+  student_no_assigned: number;
+  auth_linked: number;
+  term_count: number;
+  external_auth_linked: number;
+  current_term_count: number;
+  class_count: number;
+  current_enrollment_count: number;
+  daniel_bridge_count: number;
+}
+
+interface CoreStudentReadinessRow {
+  core_student_id: string;
+  student_no: string | null;
+  name: string;
+  grade: number;
+  has_student_no: boolean;
+  has_auth_link: boolean;
+  has_current_enrollment: boolean;
+  has_external_auth_link: boolean;
+  homeroom: string | null;
+  readiness_status: 'READY' | 'PARTIAL' | 'CORE_ONLY';
+}
+
+interface DailyDisciplineNoticeRow {
+  point_record_id: number;
+  recorded_at: string;
+  student_id: number;
+  core_student_id: string | null;
+  student_no: string | null;
+  student_name: string;
+  grade: number;
+  homeroom: string | null;
+  item: string;
+  points: number;
+  reflection_id: number | null;
+  reflection_submitted: boolean | null;
+  reflection_due_at: string | null;
+  reflection_status: ReflectionStatus | null;
+}
+
+interface AdminAccountRow {
+  id: number;
+  login_id: string;
+  display_name: string;
+  role: Role;
+  discipline_scope: DisciplineScope | null;
+  is_lead: boolean;
+  is_active: boolean;
+  must_change_password: boolean;
+  last_password_changed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  is_self: boolean;
+}
+
+interface DisciplineAuditLogRow {
+  id: number;
+  actor_user_id: string | null;
+  actor_name: string;
+  actor_role: Role | null;
+  action: 'INSERT' | 'UPDATE' | 'DELETE';
+  entity_type: string;
+  entity_id: string | null;
+  before_data: Record<string, unknown> | null;
+  after_data: Record<string, unknown> | null;
+  created_at: string;
+}
+
+interface DepartmentMeritAdminRow {
+  department_id: string;
+  code: string;
+  name: string;
+  is_active: boolean;
+  rule_id: string | null;
+  points: number | null;
+  item_label: string | null;
+  effective_from: string | null;
+  effective_to: string | null;
+  current_member_count: number;
+}
+
+interface DepartmentCurrentMemberRow {
+  membership_id: string;
+  department_id: string;
+  core_student_id: string;
+  student_no: string | null;
+  student_name: string;
+  grade: number | null;
+  homeroom: string | null;
+  starts_on: string;
+  ends_on: string | null;
+}
+
+interface DepartmentMeritStatusRow {
+  week_start: string;
+  department_id: string;
+  department_code: string;
+  department_name: string;
+  membership_id: string;
+  core_student_id: string;
+  student_no: string | null;
+  student_name: string;
+  grade: number | null;
+  homeroom: string | null;
+  points: number;
+  item_label: string;
+  point_record_id: number | null;
+  generated: boolean;
+}
+
+interface WeeklyDisciplineReportRow {
+  week_start: string;
+  student_id: number;
+  core_student_id: string | null;
+  student_no: string | null;
+  student_name: string;
+  grade: number;
+  homeroom: string | null;
+  weekly_positive_points: number;
+  weekly_penalty_points: number;
+  weekly_net_penalty_points: number;
+  penalty_incident_count: number;
+  physical_training_required: boolean;
+  settlement_period_id: number | null;
+  settlement_period_label: string | null;
+  settlement_starts_on: string | null;
+  settlement_positive_points: number;
+  settlement_penalty_points: number;
+  settlement_net_penalty_points: number;
+  physical_training_weeks: number;
+  committee_required: boolean;
+  statuses: string[] | null;
 }
 interface PunishmentRow {
-  id: number; student_id: number; student_name: string; grade: number;
+  id: number; student_id: number; core_student_id: string; student_name: string; grade: number;
   types: string[] | null; start_date: string; end_date: string;
   entered_by_name: string; violated: boolean; created_at: string;
 }
 interface PointRecordRow {
-  id: number; student_id: number; student_name: string; type: PointType;
+  id: number; student_id: number; core_student_id: string; student_name: string; type: PointType;
   item: string; points: number; recorded_at: string; entered_by_name: string;
   created_at: string; reflection_id: number | null;
   reflection_submitted: boolean | null; reflection_deadline: string | null;
@@ -188,15 +681,33 @@ interface PointItemRow {
 function mapStudent(row: StudentSummaryRow): StudentSummary {
   return {
     id: row.id,
+    coreStudentId: row.core_student_id,
+    studentNo: row.student_no,
     name: row.name,
     grade: row.grade,
+    homeroom: row.homeroom,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+
     positivePoints: row.positive_points,
     negativePoints: row.negative_points,
+
+    weeklyPositivePoints: row.weekly_positive_points,
     weeklyPenaltyPoints: row.weekly_penalty_points,
-    monthlyPenaltyPoints: row.monthly_penalty_points,
+    weeklyNetPenaltyPoints: row.weekly_net_penalty_points,
     weeklyRecordCount: row.weekly_record_count,
+    physicalTrainingRequired: row.physical_training_required,
+
+    settlementPeriodId: row.settlement_period_id,
+    settlementPeriodLabel: row.settlement_period_label,
+    settlementStartsOn: row.settlement_starts_on,
+    settlementPositivePoints: row.settlement_positive_points,
+    settlementPenaltyPoints: row.settlement_penalty_points,
+    settlementNetPenaltyPoints: row.settlement_net_penalty_points,
+    physicalTrainingWeeks: row.physical_training_weeks,
+    committeeRequired: row.committee_required,
+
+    monthlyPenaltyPoints: row.monthly_penalty_points,
     punishment: row.punishment,
     statuses: row.statuses ?? [],
   };
@@ -207,6 +718,7 @@ function mapReflection(row: ReflectionRow): Reflection {
     id: row.id,
     pointRecordId: row.point_record_id,
     studentId: row.student_id,
+    coreStudentId: row.core_student_id,
     studentName: row.student_name,
     grade: row.grade,
     item: row.item,
@@ -214,8 +726,254 @@ function mapReflection(row: ReflectionRow): Reflection {
     recordedAt: row.recorded_at,
     submitted: row.submitted,
     submissionDeadline: row.submission_deadline,
+    dueAt: row.due_at,
+    deadlineChangeReason: row.deadline_change_reason,
     submittedAt: row.submitted_at,
     status: row.status,
+    assignedScope: row.assigned_scope,
+  };
+}
+
+function mapAdminAccount(row: AdminAccountRow): AdminAccount {
+  return {
+    id: row.id,
+    loginId: row.login_id,
+    displayName: row.display_name,
+    role: row.role,
+    disciplineScope: row.discipline_scope,
+    isLead: row.is_lead,
+    isActive: row.is_active,
+    mustChangePassword: row.must_change_password,
+    lastPasswordChangedAt: row.last_password_changed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    isSelf: row.is_self,
+  };
+}
+
+function mapDisciplineAuditLog(row: DisciplineAuditLogRow): DisciplineAuditLog {
+  return {
+    id: row.id,
+    actorUserId: row.actor_user_id,
+    actorName: row.actor_name,
+    actorRole: row.actor_role,
+    action: row.action,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    beforeData: row.before_data,
+    afterData: row.after_data,
+    createdAt: row.created_at,
+  };
+}
+
+function mapDisciplineCoreCutoverStatus(row: DisciplineCoreCutoverStatusRow): DisciplineCoreCutoverStatus {
+  return {
+    stage: row.stage,
+    capturedAt: row.captured_at,
+    legacyColumnsRemoved: row.legacy_columns_removed,
+    pointRecordsTotal: row.point_records_total,
+    pointRecordsCoreLinked: row.point_records_core_linked,
+    pointRecordsMismatch: row.point_records_mismatch,
+    punishmentsTotal: row.punishments_total,
+    punishmentsCoreLinked: row.punishments_core_linked,
+    punishmentsMismatch: row.punishments_mismatch,
+    weeklyMismatches: row.weekly_mismatches,
+    weeklyPenaltyMismatches: row.weekly_penalty_mismatches,
+    settlementMismatches: row.settlement_mismatches,
+    summaryMismatches: row.summary_mismatches,
+    cutoverCompleted: row.cutover_completed,
+  };
+}
+
+function mapDisciplineCoreCalcParity(row: DisciplineCoreCalcParityRow): DisciplineCoreCalcParity {
+  return {
+    weeklyLegacyRows: row.weekly_legacy_rows,
+    weeklyCoreRows: row.weekly_core_rows,
+    weeklyMismatches: row.weekly_mismatches,
+    weeklyPenaltyLegacyRows: row.weekly_penalty_legacy_rows,
+    weeklyPenaltyCoreRows: row.weekly_penalty_core_rows,
+    weeklyPenaltyMismatches: row.weekly_penalty_mismatches,
+    settlementLegacyRows: row.settlement_legacy_rows,
+    settlementCoreRows: row.settlement_core_rows,
+    settlementMismatches: row.settlement_mismatches,
+  };
+}
+
+function mapStudentSummaryCoreParity(row: StudentSummaryCoreParityRow): StudentSummaryCoreParity {
+  return {
+    legacyRows: row.legacy_rows,
+    coreRows: row.core_rows,
+    mismatches: row.mismatches,
+  };
+}
+
+function mapDisciplineCoreFkReadiness(row: DisciplineCoreFkReadinessRow): DisciplineCoreFkReadiness {
+  return {
+    pointRecordsTotal: row.point_records_total,
+    pointRecordsCoreLinked: row.point_records_core_linked,
+    pointRecordsMismatch: row.point_records_mismatch,
+    punishmentsTotal: row.punishments_total,
+    punishmentsCoreLinked: row.punishments_core_linked,
+    punishmentsMismatch: row.punishments_mismatch,
+  };
+}
+
+function mapCoreMigrationReadiness(row: CoreMigrationReadinessRow): CoreMigrationReadiness {
+  return {
+    coreTotal: row.core_total,
+    activeStudents: row.active_students,
+    studentNoAssigned: row.student_no_assigned,
+    authLinked: row.auth_linked,
+    externalAuthLinked: row.external_auth_linked,
+    termCount: row.term_count,
+    currentTermCount: row.current_term_count,
+    classCount: row.class_count,
+    currentEnrollmentCount: row.current_enrollment_count,
+    danielBridgeCount: row.daniel_bridge_count,
+  };
+}
+
+function mapCoreStudentReadiness(row: CoreStudentReadinessRow): CoreStudentReadiness {
+  return {
+    coreStudentId: row.core_student_id,
+    studentNo: row.student_no,
+    name: row.name,
+    grade: row.grade,
+    hasStudentNo: row.has_student_no,
+    hasAuthLink: row.has_auth_link,
+    hasExternalAuthLink: row.has_external_auth_link,
+    hasCurrentEnrollment: row.has_current_enrollment,
+    homeroom: row.homeroom,
+    readinessStatus: row.readiness_status,
+  };
+}
+
+function mapDepartmentMeritAdmin(row: DepartmentMeritAdminRow): DepartmentMeritAdmin {
+  return {
+    departmentId: row.department_id,
+    code: row.code,
+    name: row.name,
+    isActive: row.is_active,
+    ruleId: row.rule_id,
+    points: row.points,
+    itemLabel: row.item_label,
+    effectiveFrom: row.effective_from,
+    effectiveTo: row.effective_to,
+    currentMemberCount: row.current_member_count,
+  };
+}
+
+function mapDepartmentCurrentMember(row: DepartmentCurrentMemberRow): DepartmentCurrentMember {
+  return {
+    membershipId: row.membership_id,
+    departmentId: row.department_id,
+    coreStudentId: row.core_student_id,
+    studentNo: row.student_no,
+    studentName: row.student_name,
+    grade: row.grade,
+    homeroom: row.homeroom,
+    startsOn: row.starts_on,
+    endsOn: row.ends_on,
+  };
+}
+
+function mapDepartmentMeritStatus(row: DepartmentMeritStatusRow): DepartmentMeritStatus {
+  return {
+    weekStart: row.week_start,
+    departmentId: row.department_id,
+    departmentCode: row.department_code,
+    departmentName: row.department_name,
+    membershipId: row.membership_id,
+    coreStudentId: row.core_student_id,
+    studentNo: row.student_no,
+    studentName: row.student_name,
+    grade: row.grade,
+    homeroom: row.homeroom,
+    points: row.points,
+    itemLabel: row.item_label,
+    pointRecordId: row.point_record_id,
+    generated: row.generated,
+  };
+}
+
+function mapDailyDisciplineNotice(row: DailyDisciplineNoticeRow): DailyDisciplineNotice {
+  return {
+    pointRecordId: row.point_record_id,
+    recordedAt: row.recorded_at,
+    studentId: row.student_id,
+    coreStudentId: row.core_student_id,
+    studentNo: row.student_no,
+    studentName: row.student_name,
+    grade: row.grade,
+    homeroom: row.homeroom,
+    item: row.item,
+    points: row.points,
+    reflectionId: row.reflection_id,
+    reflectionSubmitted: row.reflection_submitted,
+    reflectionDueAt: row.reflection_due_at,
+    reflectionStatus: row.reflection_status,
+  };
+}
+
+function mapWeeklyDisciplineReport(row: WeeklyDisciplineReportRow): WeeklyDisciplineReport {
+  return {
+    weekStart: row.week_start,
+    studentId: row.student_id,
+    coreStudentId: row.core_student_id,
+    studentNo: row.student_no,
+    studentName: row.student_name,
+    grade: row.grade,
+    homeroom: row.homeroom,
+    weeklyPositivePoints: row.weekly_positive_points,
+    weeklyPenaltyPoints: row.weekly_penalty_points,
+    weeklyNetPenaltyPoints: row.weekly_net_penalty_points,
+    penaltyIncidentCount: row.penalty_incident_count,
+    physicalTrainingRequired: row.physical_training_required,
+    settlementPeriodId: row.settlement_period_id,
+    settlementPeriodLabel: row.settlement_period_label,
+    settlementStartsOn: row.settlement_starts_on,
+    settlementPositivePoints: row.settlement_positive_points,
+    settlementPenaltyPoints: row.settlement_penalty_points,
+    settlementNetPenaltyPoints: row.settlement_net_penalty_points,
+    physicalTrainingWeeks: row.physical_training_weeks,
+    committeeRequired: row.committee_required,
+    statuses: row.statuses ?? [],
+  };
+}
+
+function mapCoreSetupStatus(row: CoreSetupStatusRow): CoreSetupStatus {
+  return {
+    termId: row.term_id,
+    termCode: row.term_code,
+    termName: row.term_name,
+    startsOn: row.starts_on,
+    endsOn: row.ends_on,
+    classCount: row.class_count,
+    enrollmentCount: row.enrollment_count,
+    grade9Total: row.grade9_total,
+    grade9Assigned: row.grade9_assigned,
+    grade9Pending: row.grade9_pending,
+  };
+}
+
+function mapGrade9Assignment(row: Grade9AssignmentRow): Grade9Assignment {
+  return {
+    studentId: row.student_id,
+    coreStudentId: row.core_student_id,
+    studentName: row.student_name,
+    grade: row.grade,
+    section: row.section,
+    homeroom: row.homeroom,
+  };
+}
+
+function mapSettlementPeriod(row: SettlementPeriodRow): SettlementPeriod {
+  return {
+    id: row.id,
+    label: row.label,
+    startsOn: row.starts_on,
+    endsOn: row.ends_on,
+    createdAt: row.created_at,
   };
 }
 
@@ -223,6 +981,7 @@ function mapPunishment(row: PunishmentRow): Punishment {
   return {
     id: row.id,
     studentId: row.student_id,
+    coreStudentId: row.core_student_id,
     studentName: row.student_name,
     grade: row.grade,
     types: row.types ?? [],
@@ -238,6 +997,7 @@ function mapPointRecord(row: PointRecordRow): PointRecord {
   return {
     id: row.id,
     studentId: row.student_id,
+    coreStudentId: row.core_student_id,
     studentName: row.student_name,
     type: row.type,
     item: row.item,
@@ -282,13 +1042,29 @@ function unwrap<T>(result: { data: T | null; error: { message: string } | null }
 
 export const getGetDashboardQueryKey = () => ['dashboard'] as const;
 export const getListStudentsQueryKey = () => ['students'] as const;
-export const getGetStudentQueryKey = (id: number) => ['students', id] as const;
-export const getListPointRecordsQueryKey = (params: { studentId: number; limit?: number }) =>
+export const getGetStudentQueryKey = (studentRef: string) => ['students', studentRef] as const;
+export const getListPointRecordsQueryKey = (params: { studentRef: string; limit?: number }) =>
   ['point-records', params] as const;
 export const getListPointItemsQueryKey = (params?: { type?: PointType; includeInactive?: boolean }) =>
   ['point-items', params ?? {}] as const;
 export const getListReflectionsQueryKey = () => ['reflections'] as const;
 export const getListPunishmentsQueryKey = () => ['punishments'] as const;
+export const getCurrentSettlementQueryKey = () => ['settlement', 'current'] as const;
+export const getDailyDisciplineNoticeQueryKey = (recordedAt: string) => ['reports', 'daily-notice', recordedAt] as const;
+export const getWeeklyDisciplineReportQueryKey = () => ['reports', 'weekly'] as const;
+export const getDepartmentMeritStatusQueryKey = () => ['department-merits', 'current-week'] as const;
+export const getDepartmentMeritAdminQueryKey = () => ['department-merits', 'admin'] as const;
+export const getDepartmentMembersQueryKey = () => ['department-merits', 'members'] as const;
+export const getCoreMigrationReadinessQueryKey = () => ['core', 'migration-readiness'] as const;
+export const getDisciplineCoreFkReadinessQueryKey = () => ['core', 'discipline-fk-readiness'] as const;
+export const getDisciplineCoreCalcParityQueryKey = () => ['core', 'discipline-calc-parity'] as const;
+export const getDisciplineCoreCutoverStatusQueryKey = () => ['core', 'discipline-cutover-status'] as const;
+export const getStudentSummaryCoreParityQueryKey = () => ['core', 'student-summary-parity'] as const;
+export const getCoreStudentReadinessQueryKey = () => ['core', 'student-readiness'] as const;
+export const getDisciplineAuditLogsQueryKey = () => ['audit-logs', 'discipline'] as const;
+export const getAdminAccountsQueryKey = () => ['admin-accounts'] as const;
+export const getCoreSetupStatusQueryKey = () => ['core-setup', 'status'] as const;
+export const getGrade9AssignmentsQueryKey = () => ['core-setup', 'grade9'] as const;
 
 // ---------------------------------------------------------------------------
 // Reads
@@ -296,7 +1072,7 @@ export const getListPunishmentsQueryKey = () => ['punishments'] as const;
 
 async function fetchStudentSummaries(): Promise<StudentSummary[]> {
   const rows = unwrap<StudentSummaryRow[]>(
-    await supabase.from('v_student_summary').select('*').order('negative_points', { ascending: false }),
+    await supabase.from('v_student_summary').select('*').order('weekly_net_penalty_points', { ascending: false }),
   );
   return rows.map(mapStudent);
 }
@@ -318,6 +1094,7 @@ export function useGetDashboard() {
         counts: {
           students: counts.students,
           weeklyTargets: counts.weekly_targets,
+          committeeTargets: counts.committee_targets,
           missingReflections: counts.missing_reflections,
           doubleReflections: counts.double_reflections,
           activePunishments: counts.active_punishments,
@@ -328,37 +1105,57 @@ export function useGetDashboard() {
   });
 }
 
-export function useGetStudent(id: number) {
+function isLegacyStudentRef(studentRef: string) {
+  return /^\d+$/.test(studentRef);
+}
+
+export function useGetStudent(studentRef: string) {
   return useQuery({
-    queryKey: getGetStudentQueryKey(id),
+    queryKey: getGetStudentQueryKey(studentRef),
     queryFn: async (): Promise<StudentDetail> => {
+      const legacy = isLegacyStudentRef(studentRef);
+
+      let summaryQuery = supabase.from('v_student_summary').select('*');
+      summaryQuery = legacy
+        ? summaryQuery.eq('id', Number(studentRef))
+        : summaryQuery.eq('core_student_id', studentRef);
+
+      let punishmentQuery = supabase.from('v_punishments').select('*');
+      punishmentQuery = legacy
+        ? punishmentQuery.eq('student_id', Number(studentRef))
+        : punishmentQuery.eq('core_student_id', studentRef);
+
       const [summaryRes, punishmentsRes] = await Promise.all([
-        supabase.from('v_student_summary').select('*').eq('id', id).single(),
-        supabase.from('v_punishments').select('*').eq('student_id', id).order('created_at', { ascending: false }),
+        summaryQuery.single(),
+        punishmentQuery.order('created_at', { ascending: false }),
       ]);
+
       const summary = unwrap<StudentSummaryRow>(summaryRes as { data: StudentSummaryRow | null; error: { message: string } | null });
       const punishments = unwrap<PunishmentRow[]>(punishmentsRes);
       return { ...mapStudent(summary), punishments: punishments.map(mapPunishment) };
     },
-    enabled: Number.isFinite(id),
+    enabled: studentRef.length > 0,
   });
 }
 
-export function useListPointRecords(params: { studentId: number; limit?: number }) {
+export function useListPointRecords(params: { studentRef: string; limit?: number }) {
   return useQuery({
     queryKey: getListPointRecordsQueryKey(params),
     queryFn: async (): Promise<PointRecord[]> => {
+      const legacy = isLegacyStudentRef(params.studentRef);
+      let query = supabase.from('v_point_records').select('*');
+      query = legacy
+        ? query.eq('student_id', Number(params.studentRef))
+        : query.eq('core_student_id', params.studentRef);
+
       const rows = unwrap<PointRecordRow[]>(
-        await supabase
-          .from('v_point_records')
-          .select('*')
-          .eq('student_id', params.studentId)
+        await query
           .order('recorded_at', { ascending: false })
           .limit(params.limit ?? 100),
       );
       return rows.map(mapPointRecord);
     },
-    enabled: Number.isFinite(params.studentId),
+    enabled: params.studentRef.length > 0,
   });
 }
 
@@ -401,34 +1198,465 @@ export function useListPunishments() {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Writes — students
-// ---------------------------------------------------------------------------
+export function useAdminAccounts() {
+  return useQuery({
+    queryKey: getAdminAccountsQueryKey(),
+    queryFn: async (): Promise<AdminAccount[]> => {
+      const rows = unwrap<AdminAccountRow[]>(
+        await supabase
+          .from('v_admin_accounts')
+          .select('*')
+          .order('is_active', { ascending: false })
+          .order('display_name', { ascending: true }),
+      );
+      return rows.map(mapAdminAccount);
+    },
+  });
+}
 
-export function useCreateStudent() {
+export function useProvisionAdminAccount() {
   return useMutation({
-    mutationFn: async ({ data }: { data: StudentInput }) => {
-      const { error } = await supabase.from('students').insert({ name: data.name, grade: data.grade });
+    mutationFn: async ({
+      loginId,
+      displayName,
+      role,
+      disciplineScope,
+      isLead,
+    }: {
+      loginId: string;
+      displayName: string;
+      role: Role;
+      disciplineScope: DisciplineScope | null;
+      isLead: boolean;
+    }): Promise<ProvisionedAdminCredential> => {
+      const { data, error } = await supabase.functions.invoke('provision-admin-account', {
+        body: { loginId, displayName, role, disciplineScope, isLead },
+      });
+      if (error) throw new Error(error.message);
+      if (!data || typeof data !== 'object') throw new Error('계정 생성 응답을 확인할 수 없습니다.');
+      if ('error' in data && data.error) throw new Error(String(data.error));
+      return data as ProvisionedAdminCredential;
+    },
+  });
+}
+
+export function useUpdateAdminProfile() {
+  return useMutation({
+    mutationFn: async ({
+      adminId,
+      displayName,
+      role,
+      disciplineScope,
+      isLead,
+      isActive,
+    }: {
+      adminId: number;
+      displayName: string;
+      role: Role;
+      disciplineScope: DisciplineScope | null;
+      isLead: boolean;
+      isActive: boolean;
+    }) => {
+      const { error } = await supabase.rpc('update_admin_profile', {
+        p_admin_id: adminId,
+        p_display_name: displayName,
+        p_role: role,
+        p_scope: disciplineScope,
+        p_is_lead: isLead,
+        p_is_active: isActive,
+      });
       if (error) throw new Error(error.message);
     },
   });
 }
 
-export function useUpdateStudent() {
+export function useChangeAdminPassword() {
   return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: StudentInput }) => {
-      const { error } = await supabase.from('students').update({ name: data.name, grade: data.grade }).eq('id', id);
+    mutationFn: async (password: string) => {
+      const { data, error } = await supabase.functions.invoke('change-admin-password', {
+        body: { password },
+      });
+      if (error) throw new Error(error.message);
+      if (!data || typeof data !== 'object') throw new Error('비밀번호 변경 응답을 확인할 수 없습니다.');
+      if ('error' in data && data.error) throw new Error(String(data.error));
+      return data as { ok: boolean; passwordChanged: boolean };
+    },
+  });
+}
+
+export function useDisciplineAuditLogs() {
+  return useQuery({
+    queryKey: getDisciplineAuditLogsQueryKey(),
+    queryFn: async (): Promise<DisciplineAuditLog[]> => {
+      const rows = unwrap<DisciplineAuditLogRow[]>(
+        await supabase
+          .from('v_discipline_audit_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(200),
+      );
+      return rows.map(mapDisciplineAuditLog);
+    },
+  });
+}
+
+export function useDisciplineCoreCutoverStatus() {
+  return useQuery({
+    queryKey: getDisciplineCoreCutoverStatusQueryKey(),
+    queryFn: async (): Promise<DisciplineCoreCutoverStatus> => {
+      const rows = unwrap<DisciplineCoreCutoverStatusRow[]>(
+        await supabase.from('v_discipline_core_cutover_status').select('*').limit(1),
+      );
+      if (rows.length === 0) throw new Error('Discipline Core cut-over 상태를 확인할 수 없습니다.');
+      return mapDisciplineCoreCutoverStatus(rows[0]);
+    },
+  });
+}
+
+export function useDisciplineCoreCalcParity() {
+  return useQuery({
+    queryKey: getDisciplineCoreCalcParityQueryKey(),
+    queryFn: async (): Promise<DisciplineCoreCalcParity> => {
+      const rows = unwrap<DisciplineCoreCalcParityRow[]>(
+        await supabase.from('v_discipline_core_calc_parity').select('*').limit(1),
+      );
+      if (rows.length === 0) throw new Error('Discipline 계산 parity를 확인할 수 없습니다.');
+      return mapDisciplineCoreCalcParity(rows[0]);
+    },
+  });
+}
+
+export function useStudentSummaryCoreParity() {
+  return useQuery({
+    queryKey: getStudentSummaryCoreParityQueryKey(),
+    queryFn: async (): Promise<StudentSummaryCoreParity> => {
+      const rows = unwrap<StudentSummaryCoreParityRow[]>(
+        await supabase.from('v_student_summary_core_parity').select('*').limit(1),
+      );
+      if (rows.length === 0) throw new Error('Student summary parity를 확인할 수 없습니다.');
+      return mapStudentSummaryCoreParity(rows[0]);
+    },
+  });
+}
+
+export function useDisciplineCoreFkReadiness() {
+  return useQuery({
+    queryKey: getDisciplineCoreFkReadinessQueryKey(),
+    queryFn: async (): Promise<DisciplineCoreFkReadiness> => {
+      const rows = unwrap<DisciplineCoreFkReadinessRow[]>(
+        await supabase.from('v_discipline_core_fk_readiness').select('*').limit(1),
+      );
+      if (rows.length === 0) throw new Error('Discipline Core FK 상태를 확인할 수 없습니다.');
+      return mapDisciplineCoreFkReadiness(rows[0]);
+    },
+  });
+}
+
+export function useCoreMigrationReadiness() {
+  return useQuery({
+    queryKey: getCoreMigrationReadinessQueryKey(),
+    queryFn: async (): Promise<CoreMigrationReadiness> => {
+      const row = unwrap<CoreMigrationReadinessRow>(
+        await supabase.from('v_core_migration_readiness').select('*').single(),
+      );
+      return mapCoreMigrationReadiness(row);
+    },
+  });
+}
+
+export function useCoreStudentReadiness() {
+  return useQuery({
+    queryKey: getCoreStudentReadinessQueryKey(),
+    queryFn: async (): Promise<CoreStudentReadiness[]> => {
+      const rows = unwrap<CoreStudentReadinessRow[]>(
+        await supabase
+          .from('v_core_student_readiness')
+          .select('*')
+          .order('grade', { ascending: true })
+          .order('name', { ascending: true }),
+      );
+      return rows.map(mapCoreStudentReadiness);
+    },
+  });
+}
+
+export function useDepartmentMeritAdmin() {
+  return useQuery({
+    queryKey: getDepartmentMeritAdminQueryKey(),
+    queryFn: async (): Promise<DepartmentMeritAdmin[]> => {
+      const rows = unwrap<DepartmentMeritAdminRow[]>(
+        await supabase
+          .from('v_department_merit_admin')
+          .select('*')
+          .order('name', { ascending: true }),
+      );
+      return rows.map(mapDepartmentMeritAdmin);
+    },
+  });
+}
+
+export function useDepartmentCurrentMembers() {
+  return useQuery({
+    queryKey: getDepartmentMembersQueryKey(),
+    queryFn: async (): Promise<DepartmentCurrentMember[]> => {
+      const rows = unwrap<DepartmentCurrentMemberRow[]>(
+        await supabase
+          .from('v_department_current_members')
+          .select('*')
+          .order('grade', { ascending: true, nullsFirst: false })
+          .order('student_name', { ascending: true }),
+      );
+      return rows.map(mapDepartmentCurrentMember);
+    },
+  });
+}
+
+export function useCreateDepartmentWithMeritRule() {
+  return useMutation({
+    mutationFn: async ({
+      code,
+      name,
+      points,
+      itemLabel,
+      effectiveFrom,
+    }: {
+      code: string;
+      name: string;
+      points: number;
+      itemLabel: string;
+      effectiveFrom: string;
+    }) => {
+      const { data, error } = await supabase.rpc('create_department_with_merit_rule', {
+        p_code: code,
+        p_name: name,
+        p_points: points,
+        p_item_label: itemLabel,
+        p_effective_from: effectiveFrom,
+      });
+      if (error) throw new Error(error.message);
+      return data as string;
+    },
+  });
+}
+
+export function useSetDepartmentStudentMembership() {
+  return useMutation({
+    mutationFn: async ({
+      departmentId,
+      studentId,
+      active,
+      effectiveOn,
+    }: {
+      departmentId: string;
+      studentId: string;
+      active: boolean;
+      effectiveOn: string;
+    }) => {
+      const { data, error } = await supabase.rpc('set_department_student_membership', {
+        p_department_id: departmentId,
+        p_student_id: studentId,
+        p_active: active,
+        p_effective_on: effectiveOn,
+      });
+      if (error) throw new Error(error.message);
+      return data as string;
+    },
+  });
+}
+
+export function useSetDepartmentActive() {
+  return useMutation({
+    mutationFn: async ({ departmentId, active }: { departmentId: string; active: boolean }) => {
+      const { error } = await supabase.rpc('set_department_active', {
+        p_department_id: departmentId,
+        p_active: active,
+      });
       if (error) throw new Error(error.message);
     },
   });
 }
 
-export function useDeleteStudent() {
+export function useDepartmentMeritStatus() {
+  return useQuery({
+    queryKey: getDepartmentMeritStatusQueryKey(),
+    queryFn: async (): Promise<DepartmentMeritStatus[]> => {
+      const rows = unwrap<DepartmentMeritStatusRow[]>(
+        await supabase
+          .from('v_department_merit_status')
+          .select('*')
+          .order('department_name', { ascending: true })
+          .order('student_name', { ascending: true }),
+      );
+      return rows.map(mapDepartmentMeritStatus);
+    },
+  });
+}
+
+export function useEnsureWeeklyDepartmentMerits() {
   return useMutation({
-    mutationFn: async ({ id }: { id: number }) => {
-      // Soft delete — history must stay queryable.
-      const { error } = await supabase.from('students').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('ensure_weekly_department_merits');
       if (error) throw new Error(error.message);
+      return data as number;
+    },
+  });
+}
+
+export function useDailyDisciplineNotice(recordedAt: string) {
+  return useQuery({
+    queryKey: getDailyDisciplineNoticeQueryKey(recordedAt),
+    queryFn: async (): Promise<DailyDisciplineNotice[]> => {
+      const rows = unwrap<DailyDisciplineNoticeRow[]>(
+        await supabase
+          .from('v_daily_discipline_notice')
+          .select('*')
+          .eq('recorded_at', recordedAt)
+          .order('grade', { ascending: true })
+          .order('homeroom', { ascending: true, nullsFirst: false })
+          .order('student_name', { ascending: true }),
+      );
+      return rows.map(mapDailyDisciplineNotice);
+    },
+    enabled: Boolean(recordedAt),
+  });
+}
+
+export function useWeeklyDisciplineReport() {
+  return useQuery({
+    queryKey: getWeeklyDisciplineReportQueryKey(),
+    queryFn: async (): Promise<WeeklyDisciplineReport[]> => {
+      const rows = unwrap<WeeklyDisciplineReportRow[]>(
+        await supabase
+          .from('v_weekly_discipline_report')
+          .select('*')
+          .order('grade', { ascending: true })
+          .order('homeroom', { ascending: true, nullsFirst: false })
+          .order('student_name', { ascending: true }),
+      );
+      return rows.map(mapWeeklyDisciplineReport);
+    },
+  });
+}
+
+export function useCoreSetupStatus() {
+  return useQuery({
+    queryKey: getCoreSetupStatusQueryKey(),
+    queryFn: async (): Promise<CoreSetupStatus | null> => {
+      const { data, error } = await supabase
+        .from('v_core_setup_status')
+        .select('*')
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data ? mapCoreSetupStatus(data as CoreSetupStatusRow) : null;
+    },
+  });
+}
+
+export function useGrade9Assignments() {
+  return useQuery({
+    queryKey: getGrade9AssignmentsQueryKey(),
+    queryFn: async (): Promise<Grade9Assignment[]> => {
+      const rows = unwrap<Grade9AssignmentRow[]>(
+        await supabase
+          .from('v_grade9_current_assignments')
+          .select('*')
+          .order('student_name', { ascending: true }),
+      );
+      return rows.map(mapGrade9Assignment);
+    },
+  });
+}
+
+export function useInitializeCurrentAcademicTerm() {
+  return useMutation({
+    mutationFn: async ({
+      code,
+      name,
+      startsOn,
+      endsOn,
+    }: {
+      code: string;
+      name: string;
+      startsOn: string;
+      endsOn: string;
+    }) => {
+      const { data, error } = await supabase.rpc('initialize_current_academic_term', {
+        p_code: code,
+        p_name: name,
+        p_starts_on: startsOn,
+        p_ends_on: endsOn,
+      });
+      if (error) throw new Error(error.message);
+      return data as {
+        term_id: string;
+        classes_created: number;
+        enrollments_created: number;
+        grade9_pending: number;
+      };
+    },
+  });
+}
+
+export function useAssignCurrentGrade9Section() {
+  return useMutation({
+    mutationFn: async ({ coreStudentId, section }: { coreStudentId: string; section: 'A' | 'B' }) => {
+      const { error } = await supabase.rpc('assign_current_grade9_section_core', {
+        p_core_student_id: coreStudentId,
+        p_section: section,
+      });
+      if (error) throw new Error(error.message);
+    },
+  });
+}
+
+export function useCurrentSettlement() {
+  return useQuery({
+    queryKey: getCurrentSettlementQueryKey(),
+    queryFn: async (): Promise<SettlementPeriod | null> => {
+      const { data, error } = await supabase
+        .from('v_current_settlement')
+        .select('id,label,starts_on,ends_on,created_at')
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data ? mapSettlementPeriod(data as SettlementPeriodRow) : null;
+    },
+  });
+}
+
+export function useStartSettlementPeriod() {
+  return useMutation({
+    mutationFn: async ({ startsOn, label }: { startsOn: string; label: string }) => {
+      const { data, error } = await supabase.rpc('start_settlement_period', {
+        p_starts_on: startsOn,
+        p_label: label,
+      });
+      if (error) throw new Error(error.message);
+      return data as number;
+    },
+  });
+}
+
+export function useCloseSettlementPeriod() {
+  return useMutation({
+    mutationFn: async ({
+      periodId,
+      endDate,
+      openNext = true,
+      nextLabel = null,
+    }: {
+      periodId: number;
+      endDate: string;
+      openNext?: boolean;
+      nextLabel?: string | null;
+    }) => {
+      const { data, error } = await supabase.rpc('close_settlement_period', {
+        p_period_id: periodId,
+        p_end_date: endDate,
+        p_open_next: openNext,
+        p_next_label: nextLabel,
+      });
+      if (error) throw new Error(error.message);
+      return data as number | null;
     },
   });
 }
@@ -440,8 +1668,8 @@ export function useDeleteStudent() {
 export function useCreatePointRecord() {
   return useMutation({
     mutationFn: async ({ data }: { data: PointRecordInput }) => {
-      const { data: id, error } = await supabase.rpc('create_point_record', {
-        p_student_id: data.studentId,
+      const { data: id, error } = await supabase.rpc('create_point_record_core', {
+        p_core_student_id: data.coreStudentId,
         p_type: data.type,
         p_item: data.item,
         p_points: data.points,
@@ -484,6 +1712,19 @@ export function useDeletePointRecord() {
 // Writes — reflections
 // ---------------------------------------------------------------------------
 
+export function useExtendReflectionTo21() {
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: number; reason: string }) => {
+      const { data, error } = await supabase.rpc('extend_reflection_to_21', {
+        p_reflection_id: id,
+        p_reason: reason,
+      });
+      if (error) throw new Error(error.message);
+      return data as string;
+    },
+  });
+}
+
 export function useUpdateReflection() {
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: { submitted: boolean } }) => {
@@ -503,8 +1744,8 @@ export function useUpdateReflection() {
 export function useCreatePunishment() {
   return useMutation({
     mutationFn: async ({ data }: { data: PunishmentInput }) => {
-      const { error } = await supabase.rpc('create_punishment', {
-        p_student_id: data.studentId,
+      const { error } = await supabase.rpc('create_punishment_core', {
+        p_core_student_id: data.coreStudentId,
         p_types: data.types,
         p_start_date: data.startDate,
         p_end_date: data.endDate,
