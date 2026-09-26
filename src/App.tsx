@@ -41,6 +41,8 @@ import {
   getCurrentSettlementQueryKey,
   getCoreMigrationReadinessQueryKey,
   getDisciplineCoreFkReadinessQueryKey,
+  getDisciplineCoreCalcParityQueryKey,
+  getStudentSummaryCoreParityQueryKey,
   getCoreStudentReadinessQueryKey,
   getCoreSetupStatusQueryKey,
   getDepartmentMeritStatusQueryKey,
@@ -53,6 +55,8 @@ import {
   useAssignCurrentGrade9Section,
   useCoreMigrationReadiness,
   useDisciplineCoreFkReadiness,
+  useDisciplineCoreCalcParity,
+  useStudentSummaryCoreParity,
   useCoreStudentReadiness,
   useCoreSetupStatus,
   useCreateDepartmentWithMeritRule,
@@ -1172,6 +1176,8 @@ function CoreSetupPage() {
   const status = useCoreSetupStatus();
   const readiness = useCoreMigrationReadiness();
   const disciplineFk = useDisciplineCoreFkReadiness();
+  const calcParity = useDisciplineCoreCalcParity();
+  const summaryParity = useStudentSummaryCoreParity();
   const studentReadiness = useCoreStudentReadiness();
   const grade9 = useGrade9Assignments();
   const initializeTerm = useInitializeCurrentAcademicTerm();
@@ -1187,6 +1193,8 @@ function CoreSetupPage() {
     queryClient.invalidateQueries({ queryKey: getCoreSetupStatusQueryKey() });
     queryClient.invalidateQueries({ queryKey: getCoreMigrationReadinessQueryKey() });
     queryClient.invalidateQueries({ queryKey: getDisciplineCoreFkReadinessQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getDisciplineCoreCalcParityQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getStudentSummaryCoreParityQueryKey() });
     queryClient.invalidateQueries({ queryKey: getCoreStudentReadinessQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGrade9AssignmentsQueryKey() });
     queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
@@ -1231,17 +1239,36 @@ function CoreSetupPage() {
     });
   };
 
-  if (status.isLoading || readiness.isLoading || disciplineFk.isLoading || studentReadiness.isLoading || grade9.isLoading) return <LoadingState />;
-  if (status.isError || readiness.isError || disciplineFk.isError || studentReadiness.isError || grade9.isError) {
+  if (status.isLoading || readiness.isLoading || disciplineFk.isLoading || calcParity.isLoading || summaryParity.isLoading || studentReadiness.isLoading || grade9.isLoading) return <LoadingState />;
+  if (status.isError || readiness.isError || disciplineFk.isError || calcParity.isError || summaryParity.isError || studentReadiness.isError || grade9.isError) {
     return <ErrorState
-      error={status.error ?? readiness.error ?? disciplineFk.error ?? studentReadiness.error ?? grade9.error}
-      retry={() => { status.refetch(); readiness.refetch(); disciplineFk.refetch(); studentReadiness.refetch(); grade9.refetch(); }}
+      error={status.error ?? readiness.error ?? disciplineFk.error ?? calcParity.error ?? summaryParity.error ?? studentReadiness.error ?? grade9.error}
+      retry={() => { status.refetch(); readiness.refetch(); disciplineFk.refetch(); calcParity.refetch(); summaryParity.refetch(); studentReadiness.refetch(); grade9.refetch(); }}
     />;
   }
 
   const current = status.data;
   const core = readiness.data;
   const discipline = disciplineFk.data;
+  const calculations = calcParity.data;
+  const summary = summaryParity.data;
+  const cutoverReady = Boolean(
+    discipline
+    && calculations
+    && summary
+    && discipline.pointRecordsMismatch === 0
+    && discipline.punishmentsMismatch === 0
+    && discipline.pointRecordsCoreLinked === discipline.pointRecordsTotal
+    && discipline.punishmentsCoreLinked === discipline.punishmentsTotal
+    && calculations.weeklyMismatches === 0
+    && calculations.weeklyPenaltyMismatches === 0
+    && calculations.settlementMismatches === 0
+    && calculations.weeklyLegacyRows === calculations.weeklyCoreRows
+    && calculations.weeklyPenaltyLegacyRows === calculations.weeklyPenaltyCoreRows
+    && calculations.settlementLegacyRows === calculations.settlementCoreRows
+    && summary.mismatches === 0
+    && summary.legacyRows === summary.coreRows
+  );
   const readinessRows = studentReadiness.data ?? [];
   const readyStudents = readinessRows.filter((row) => row.readinessStatus === 'READY').length;
   const partialStudents = readinessRows.filter((row) => row.readinessStatus === 'PARTIAL').length;
@@ -1332,10 +1359,31 @@ function CoreSetupPage() {
         </div>
       </div>
 
+      <div className="metric-grid" style={{ marginTop: 16 }}>
+        <div className="card metric-card">
+          <div className="metric-label">주간 계산 parity</div>
+          <div className={calculations?.weeklyMismatches === 0 ? 'metric-value success-text' : 'metric-value danger-text'}>{calculations?.weeklyMismatches ?? '—'}</div>
+          <div className="muted" style={{ fontSize: 10 }}>legacy {calculations?.weeklyLegacyRows ?? 0} / Core {calculations?.weeklyCoreRows ?? 0}</div>
+        </div>
+        <div className="card metric-card">
+          <div className="metric-label">정산 계산 parity</div>
+          <div className={calculations?.settlementMismatches === 0 ? 'metric-value success-text' : 'metric-value danger-text'}>{calculations?.settlementMismatches ?? '—'}</div>
+          <div className="muted" style={{ fontSize: 10 }}>legacy {calculations?.settlementLegacyRows ?? 0} / Core {calculations?.settlementCoreRows ?? 0}</div>
+        </div>
+        <div className="card metric-card">
+          <div className="metric-label">Student Summary parity</div>
+          <div className={summary?.mismatches === 0 ? 'metric-value success-text' : 'metric-value danger-text'}>{summary?.mismatches ?? '—'}</div>
+          <div className="muted" style={{ fontSize: 10 }}>legacy {summary?.legacyRows ?? 0} / Core {summary?.coreRows ?? 0}</div>
+        </div>
+      </div>
+
       <div className="side-note" style={{ marginTop: 16 }}>
-        <strong>최종 integer FK 제거 gate</strong>
+        <strong>{cutoverReady ? 'Core cut-over 준비됨' : '최종 integer FK 제거 gate'}</strong>
+        <span className={'pill ' + (cutoverReady ? 'pill-positive' : 'pill-warning')} style={{ marginLeft: 10 }}>
+          {cutoverReady ? 'ALL GREEN' : '확인 중'}
+        </span>
         <div style={{ marginTop: 5 }}>
-          모든 기존 record Core 연결 100% · mismatch 0 · 신규 write Core UUID only · 주요 read/report 결과 동일 조건을 계속 만족할 때만 final cut-over를 진행합니다.
+          모든 기존 record Core 연결 100% · mismatch 0 · 신규 write Core UUID only · legacy/Core 계산 및 summary 결과 동일 조건을 계속 만족할 때만 final cut-over를 진행합니다.
         </div>
       </div>
     </div>}
