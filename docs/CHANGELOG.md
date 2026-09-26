@@ -957,6 +957,72 @@ Identity ≠ Role
 - new punishment writes send canonical Core UUID.
 - legacy integer route/read compatibility intentionally remains until final FK cut-over.
 
+### Discipline canonical Core UUID final cut-over — 2026-09-27
+
+**Production DB completed**
+
+- `point_records.student_id` 물리 컬럼 제거.
+- `punishments.student_id` 물리 컬럼 제거.
+- 두 테이블의 유일한 학생 FK는 `core_student_id UUID NOT NULL`.
+- legacy integer ID는 public view에서 Core UUID → legacy bridge로 계산하는 compatibility 값으로만 유지.
+- `create_point_record_core(...)` / `create_punishment_core(...)`를 authoritative business-rule implementation으로 승격.
+- 기존 integer RPC는 Core UUID를 resolve한 뒤 authoritative RPC에 delegate하는 compatibility wrapper로 전환.
+- 부서 자동상점도 physical write 시 Core UUID만 저장.
+- 반성문 자동생성 trigger의 학년 lookup을 `new.core_student_id` 기준으로 전환.
+
+**Read / calculation cut-over**
+
+- student detail route의 신규 링크를 Core UUID로 전환.
+- legacy numeric URL은 fallback lookup으로 유지.
+- weekly / weekly penalty / settlement Core shadow 계산 추가 후 parity 검증.
+- production parity:
+  - weekly 1 legacy / 1 Core / mismatch 0
+  - weekly penalty 1 / 1 / mismatch 0
+  - settlement 0 / 0 / mismatch 0
+- student summary Core shadow:
+  - 175 legacy / 175 Core / mismatch 0
+- public `v_weekly_scores`, `v_weekly_penalties`, `v_settlement_scores`, `v_student_summary`를 Core UUID implementation으로 promotion.
+- point/reflection/punishment/daily-notice read join을 Core UUID 기준으로 promotion.
+
+**Destructive migration safety**
+
+- PostgreSQL `pg_depend`로 실제 physical-column dependency를 식별.
+- 반성문 trigger의 숨은 legacy dependency를 별도 발견 후 수정.
+- drop 직전 aggregate evidence를 `discipline.core_cutover_evidence`에 저장.
+- evidence에는 이름/학번/Auth UUID/개별 mapping 없음.
+- post-drop status:
+  - `legacy_columns_removed = true`
+  - `cutover_completed = true`
+- post-cutover rollback tests:
+  - Core point write 성공
+  - legacy point wrapper 성공
+  - reflection trigger 성공
+  - Core punishment write 성공
+  - legacy punishment wrapper 성공
+  - 테스트 row는 모두 rollback
+
+**Production state preserved**
+
+- point records 1
+- point sum 5
+- reflection records 1
+- punishments 0
+- weekly report rows 175
+- Dashboard counts unchanged
+
+**Migration governance**
+
+- recent Core-cutover migration 15개를 live Supabase version과 Git filename 1:1 reconciliation.
+- admin RLS optimization migration도 live version에 맞춰 filename reconciliation.
+- Git migration content는 변경하지 않고 version/path만 production ledger와 정렬.
+- CI migration version uniqueness 유지.
+
+**Advisor follow-up**
+
+- `admins_read_self_or_lead` RLS를 initplan-friendly form으로 변경.
+- Supabase `auth_rls_initplan` performance warning 제거.
+- 남은 performance findings는 현재 모두 unused-index INFO로, usage history가 충분하지 않아 삭제하지 않음.
+
 ### Frontend in branch — deployment pending
 
 - 학생 명부를 DICS Core read-only roster 관점으로 변경.
