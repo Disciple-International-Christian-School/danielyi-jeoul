@@ -1,184 +1,335 @@
 # Discipline Core UUID Cut-over Runbook
 
 > Purpose: safely retire the legacy integer student FK from Daniel's Scale after the discipline domain is fully anchored to `core.students.id`.
+>
+> Status: **COMPLETED / VERIFIED**
 
-## Current architecture
-
-Transition state:
+## Final architecture
 
 ```text
 core.students.id (uuid)
         ↑ canonical identity
 
-public.students.id (integer)
-        ↑ legacy compatibility bridge
-
 point_records
-  student_id       integer   ← compatibility
-  core_student_id  uuid      ← canonical
+  core_student_id uuid NOT NULL
 
 punishments
-  student_id       integer   ← compatibility
-  core_student_id  uuid      ← canonical
+  core_student_id uuid NOT NULL
 ```
 
-New point and punishment writes already start from the Core UUID.
+Physical legacy columns removed:
 
-## Why the integer FK is not dropped yet
+```text
+point_records.student_id   REMOVED
+punishments.student_id     REMOVED
+```
 
-The integer ID still appears in:
+Legacy integer IDs are no longer stored on discipline records.
 
-- student detail routes,
-- some existing aggregation views,
-- compatibility query keys,
-- legacy RPC internals,
-- older report contracts.
+Compatibility for older UI/contracts is derived only when needed:
 
-Dropping it before these are migrated would create unnecessary operational risk without improving current user behavior.
+```text
+core_student_id
+   ↓
+public.students.core_student_id
+   ↓
+public.students.id
+   ↓
+derived compatibility student_id
+```
 
-## Production readiness view
+## Production status
 
 Use:
 
 ```sql
-select * from public.v_discipline_core_fk_readiness;
+select * from public.v_discipline_core_cutover_status;
 ```
 
-Required before final cut-over:
+Verified production result:
 
 ```text
-point_records_core_linked = point_records_total
-point_records_mismatch    = 0
+stage                  POST_LEGACY_COLUMN_DROP_VERIFIED
+legacy_columns_removed true
+cutover_completed      true
 
-punishments_core_linked   = punishments_total
-punishments_mismatch      = 0
+point records          1 / 1 Core linked
+point mismatch         0
+
+punishments            0 / 0 Core linked
+punishment mismatch    0
+
+weekly mismatch        0
+weekly penalty mismatch 0
+settlement mismatch    0
+summary mismatch       0
 ```
 
-The same values are visible in the lead-only Core Setup page.
+## Gate A — Write path — DONE
 
-## Gate A — Write path
-
-Required:
-
-- new point records use `create_point_record_core(...)`,
-- new punishments use `create_punishment_core(...)`,
-- browser code does not send legacy integer ID for new discipline creation,
-- dual-key trigger still rejects mismatches.
-
-Status: implemented.
-
-## Gate B — Historical data
-
-Required:
-
-- every historical point record has Core UUID,
-- every punishment has Core UUID,
-- no mismatched pair,
-- reflection linkage remains valid through point_record_id,
-- audit logs preserve historical before/after data.
-
-Status at initial dual-key migration:
+Authoritative implementations:
 
 ```text
-point records: 1/1 Core linked, mismatch 0
-punishments:   0/0 Core linked, mismatch 0
+create_point_record_core(core_student_id, ...)
+create_punishment_core(core_student_id, ...)
 ```
 
-Re-check immediately before final cut-over because production counts will grow.
+The integer RPCs remain compatibility wrappers only:
 
-## Gate C — Read path
+```text
+create_point_record(integer, ...)
+  → resolve Core UUID
+  → create_point_record_core(...)
 
-Before dropping legacy FK, migrate and verify:
+create_punishment(integer, ...)
+  → resolve Core UUID
+  → create_punishment_core(...)
+```
+
+Frontend new writes send Core UUID.
+
+Department weekly merit generation also stores only Core UUID.
+
+## Gate B — Historical data — DONE
+
+Before destructive cut-over:
+
+```text
+point_records total        1
+Core linked                1
+mismatch                   0
+
+punishments total          0
+Core linked                0
+mismatch                   0
+```
+
+All existing discipline records had canonical Core identity before the integer columns were removed.
+
+Reflection linkage remains through:
+
+```text
+reflection_records.point_record_id
+```
+
+and was unaffected by the student FK change.
+
+## Gate C — Read path — DONE
+
+Migrated to Core UUID internally:
 
 - student detail lookup,
-- point-record list filtering,
-- punishment list/detail joins,
-- weekly scoring,
-- settlement scoring,
+- point-record filtering,
+- punishment lookup,
+- reflection lookup,
 - daily notices,
+- weekly scoring,
+- weekly penalty history,
+- settlement scoring,
+- student summary,
 - weekly reports,
-- dashboard summary,
-- reflection operational views.
+- dashboard counts.
 
-For each changed view/query, compare results before and after using aggregate counts and controlled samples.
+Public view contracts may still expose a derived integer `student_id` for compatibility, but they no longer depend on a physical discipline-table integer FK.
 
-Do not use names as migration join keys.
+## Gate D — Routes and API contracts — DONE
 
-## Gate D — Routes and API contracts
-
-Preferred final route identity:
+New student links use:
 
 ```text
 /students/:coreStudentId
 ```
 
-or another canonical-ID route contract.
+The route shape was intentionally unchanged while the identifier semantics moved to Core UUID.
 
-Do not expose a migration that makes old bookmarked integer routes silently point to another student.
-
-A temporary redirect/compatibility resolver may be used during the route transition.
-
-## Gate E — Department merit automation
-
-Department memberships already use canonical Core UUID.
-
-Before final cut-over confirm that generated:
+Legacy numeric URLs remain temporarily supported:
 
 ```text
-DEPARTMENT_WEEKLY
+numeric ref → legacy lookup
+UUID ref    → canonical Core lookup
 ```
 
-point records contain matching canonical UUIDs and remain idempotent.
+This prevents old bookmarks from silently breaking during transition.
 
-## Gate F — Rollback plan
+## Gate E — Department merit automation — DONE
 
-Before destructive schema changes:
-
-1. record current relation/view definitions,
-2. record readiness counts,
-3. confirm latest database backup/recovery strategy,
-4. deploy read-path changes first,
-5. observe normal school workflow,
-6. only then remove legacy dependency.
-
-The final destructive migration should be separate from preparatory migrations.
-
-## Proposed final sequence
+Department membership identity already uses:
 
 ```text
-1. Core UUID dual-key             DONE
-2. New writes Core UUID           DONE
-3. Readiness dashboard            DONE
-4. Migrate read/report contracts  NEXT
-5. Migrate routes/query keys
-6. Observe production
-7. Remove legacy RPC dependency
-8. Drop legacy discipline FK
-9. Keep public.students bridge only if another legacy lane still needs it
+core.department_memberships.student_id
+→ core.students.id
 ```
 
-## Stop conditions
+Weekly merit generation now inserts:
 
-Do not run final cut-over if any of these is true:
+```text
+point_records.core_student_id
+```
 
-- mismatch > 0,
-- linked < total,
-- unresolved Core student mapping exists for a discipline record,
-- CI is red,
-- daily/weekly report output differs unexpectedly,
-- SP/Core identity migration is in a state that would make student identity ambiguous,
-- backup/recovery is not acceptable for the intended change.
+without a physical integer student FK.
+
+The deterministic `source_key` remains the idempotency guard.
+
+## Gate F — Reflection trigger — DONE
+
+A late dependency audit found that:
+
+```text
+private.create_reflection_for_penalty()
+```
+
+still used:
+
+```text
+new.student_id
+```
+
+to look up grade.
+
+Before the destructive cut-over it was changed to:
+
+```text
+new.core_student_id
+→ public.students.core_student_id
+→ grade
+```
+
+Post-cutover rollback testing confirmed that new negative point records still generate reflection rows.
+
+## Gate G — Calculation parity — DONE
+
+Core shadow calculations were created before promotion.
+
+Pre-promotion evidence:
+
+```text
+weekly
+legacy 1 / Core 1 / mismatch 0
+
+weekly penalties
+legacy 1 / Core 1 / mismatch 0
+
+settlement
+legacy 0 / Core 0 / mismatch 0
+
+student summary
+legacy 175 / Core 175 / mismatch 0
+```
+
+Only after mismatch=0 were the stable public contracts promoted to the Core implementations.
+
+## Aggregate evidence ledger
+
+Before the destructive migration, aggregate evidence was stored in:
+
+```text
+discipline.core_cutover_evidence
+```
+
+No student names, student numbers, Auth UUIDs, or per-student mappings are stored there.
+
+The pre-drop evidence remains available even after the old shadow views and physical integer columns were removed.
+
+## Post-cutover rollback tests
+
+After the physical columns were removed:
+
+### Point write
+
+```text
+Core RPC           Core UUID match true
+Legacy wrapper     Core UUID match true
+Reflection created true / true
+```
+
+### Punishment write
+
+```text
+Core RPC           Core UUID match true
+Legacy wrapper     Core UUID match true
+```
+
+All test transactions were rolled back. No test discipline rows remain in production.
+
+## Production state preserved
+
+Before and after cut-over:
+
+```text
+point records        1
+point sum            5
+reflection records   1
+punishments          0
+weekly report rows 175
+```
+
+Dashboard counts remained unchanged.
+
+## PostgreSQL dependency verification
+
+String search was not used as the final dependency authority because `core_student_id` itself contains the substring `student_id`.
+
+Physical column dependencies were resolved with PostgreSQL `pg_depend`.
+
+This exposed only the true legacy shadow/readiness dependencies.
+
+A separate trigger audit then found the runtime reflection dependency.
+
+Both schema dependencies and trigger dependencies were removed before the column drop.
+
+## Migration ledger reconciliation
+
+Live Supabase history and Git migration filenames were reconciled after the cut-over.
+
+Recent migration filename versions now match the actual production migration versions one-to-one.
+
+This prevents a future CLI migration run from treating an already-applied migration as new solely because the Git timestamp differs.
+
+## Current compatibility boundary
+
+The discipline record tables are fully Core-native.
+
+The remaining legacy compatibility boundary is:
+
+```text
+public.students.id
+```
+
+which may still be used by:
+
+- legacy numeric student URLs,
+- Core setup / G9 transitional tools,
+- older client contracts,
+- integer compatibility RPCs.
+
+This bridge can be retired separately once no other DICS lane depends on it.
+
+It is no longer a physical FK of discipline records.
+
+## Current stop conditions for any future cleanup
+
+Do not remove the remaining compatibility layer unless:
+
+- no active frontend sends or expects numeric student IDs,
+- old bookmarked numeric routes have an explicit migration/redirect policy,
+- G9/Core setup tools use canonical Core UUID directly,
+- SP and other domains do not depend on the same bridge,
+- CI is green,
+- production status view remains `cutover_completed=true`,
+- backup/recovery strategy is acceptable.
 
 ## Evidence to preserve
 
-For the project development narrative preserve:
+Keep:
 
 - readiness snapshots,
 - mismatch counts,
 - migration commits,
 - CI results,
 - rollback test results,
-- any discovered dependency that delayed the destructive cut-over,
-- final before/after report parity evidence.
+- pre-drop evidence rows,
+- PostgreSQL dependency findings,
+- final production state comparison,
+- Git ↔ live migration reconciliation records.
 
-No student PII is required in this evidence.
+No student PII is required for this evidence.
