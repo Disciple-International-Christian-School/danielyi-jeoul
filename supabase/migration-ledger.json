@@ -331,6 +331,12 @@
       "name": "legacy_students_read_only",
       "status": "TRACKED",
       "file": "supabase/migrations/20260926175058_legacy_students_read_only.sql"
+    },
+    {
+      "version": "20260926175410",
+      "name": "grade9_legacy_wrapper_invoker",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926175410_grade9_legacy_wrapper_invoker.sql"
     }
   ]
 }
