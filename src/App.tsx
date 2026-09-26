@@ -1233,8 +1233,8 @@ function CoreSetupPage() {
     });
   };
 
-  const assign = (studentId: number, section: 'A' | 'B', studentName: string) => {
-    assignGrade9.mutate({ studentId, section }, {
+  const assign = (coreStudentId: string, section: 'A' | 'B', studentName: string) => {
+    assignGrade9.mutate({ coreStudentId, section }, {
       onSuccess: () => {
         refreshCore();
         notify(studentName + ' → G9-' + section + ' 배정 완료');
@@ -1452,11 +1452,11 @@ function CoreSetupPage() {
           <div className="table-wrap">
             <table className="data-table">
               <thead><tr><th>학생</th><th>현재 배정</th><th>G9-A</th><th>G9-B</th></tr></thead>
-              <tbody>{grade9Rows.map((row) => <tr key={row.studentId} data-testid={'row-core-grade9-' + row.studentId}>
+              <tbody>{grade9Rows.map((row) => <tr key={row.coreStudentId} data-testid={'row-core-grade9-' + row.coreStudentId}>
                 <td><strong>{row.studentName}</strong></td>
                 <td>{row.homeroom ?? <span className="pill pill-warning">미배정</span>}</td>
-                <td><button className={'btn ' + (row.section === 'A' ? 'btn-primary' : 'btn-outline')} disabled={assignGrade9.isPending} onClick={() => assign(row.studentId, 'A', row.studentName)} data-testid={'button-core-grade9-a-' + row.studentId}>{row.section === 'A' && <Check size={13} />} G9-A</button></td>
-                <td><button className={'btn ' + (row.section === 'B' ? 'btn-primary' : 'btn-outline')} disabled={assignGrade9.isPending} onClick={() => assign(row.studentId, 'B', row.studentName)} data-testid={'button-core-grade9-b-' + row.studentId}>{row.section === 'B' && <Check size={13} />} G9-B</button></td>
+                <td><button className={'btn ' + (row.section === 'A' ? 'btn-primary' : 'btn-outline')} disabled={assignGrade9.isPending} onClick={() => assign(row.coreStudentId, 'A', row.studentName)} data-testid={'button-core-grade9-a-' + row.coreStudentId}>{row.section === 'A' && <Check size={13} />} G9-A</button></td>
+                <td><button className={'btn ' + (row.section === 'B' ? 'btn-primary' : 'btn-outline')} disabled={assignGrade9.isPending} onClick={() => assign(row.coreStudentId, 'B', row.studentName)} data-testid={'button-core-grade9-b-' + row.coreStudentId}>{row.section === 'B' && <Check size={13} />} G9-B</button></td>
               </tr>)}</tbody>
             </table>
           </div>}
