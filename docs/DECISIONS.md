@@ -30,7 +30,9 @@
 | D-017 | ACCEPTED | 외부 Auth mapping 값은 Git/Issue/채팅 handoff 대신 secure migration path로 이동 | Auth UUID·student_no 매핑은 운영 identity data이며 공개 개발 기록과 분리해야 함 |
 | D-018 | ACCEPTED | 공유 관리자 계정은 즉시 삭제하지 않고 개인계정으로 staged transition | 운영 연속성을 보존하면서 audit actor를 개인화하기 위함 |
 | D-019 | ACCEPTED | 개인계정 Auth 생성과 첫 비밀번호 변경 완료 처리는 Edge Function에서 수행 | service credential을 브라우저에 노출하지 않고 실제 Auth 변경 성공을 server-side에서 검증해야 함 |
-| D-020 | TRANSITION | discipline student FK는 dual-key 후 Core UUID write-first로 전환 | 운영 중인 legacy integer 관계를 즉시 제거하지 않고 canonical identity로 안전하게 이동 |
+| D-020 | ACCEPTED | discipline 원본 FK는 canonical Core UUID 하나만 사용 | dual-key·parity 검증 후 물리 integer FK 제거 완료, legacy ID는 derived compatibility로만 유지 |
+| D-021 | ACCEPTED | destructive identity cut-over 전 aggregate parity evidence를 보존 | live 운영 데이터 손실 없이 전환 근거를 재구성하고 rollback 판단 근거를 남기기 위함 |
+| D-022 | ACCEPTED | Git migration filename version은 live Supabase history와 일치 | 이미 적용된 migration의 재적용/ordering drift를 방지하고 중앙 ledger 재현성을 보장 |
 
 ---
 
@@ -332,7 +334,7 @@ Edge Function에서만 Auth Admin API를 호출한다.
 
 ---
 
-## D-020 — Discipline Student FK Cut-over Strategy
+## D-020 — Discipline Student FK Cut-over Strategy — COMPLETED
 
 선택:
 
@@ -364,3 +366,109 @@ legacy integer dependency 제거
 - 각 phase마다 mismatch=0을 완료선으로 설정 가능
 
 dual-key trigger는 두 identity가 서로 다른 학생을 가리키는 상태를 허용하지 않는다.
+
+
+---
+
+## D-021 — Cut-over Evidence Before Destructive Change
+
+discipline identity migration은 단순히:
+
+```text
+ALTER TABLE ... DROP COLUMN student_id
+```
+
+로 끝내지 않았다.
+
+최종 destructive migration 직전 production에서 다음을 확인했다.
+
+```text
+point_records          1 / 1 Core linked
+point mismatch         0
+
+punishments            0 / 0 Core linked
+punishment mismatch    0
+
+weekly rows            1 legacy / 1 Core
+weekly mismatch        0
+
+weekly penalty rows    1 legacy / 1 Core
+weekly penalty mismatch 0
+
+settlement rows        0 legacy / 0 Core
+settlement mismatch    0
+
+student summary        175 legacy / 175 Core
+summary mismatch       0
+```
+
+이 aggregate state를:
+
+```text
+discipline.core_cutover_evidence
+```
+
+에 저장한 뒤에만 physical integer FK를 제거했다.
+
+학생 이름, 학번, Auth UUID, mapping row는 evidence에 포함하지 않는다.
+
+최종 결과:
+
+```text
+point_records.student_id  → removed
+punishments.student_id    → removed
+
+point_records.core_student_id UUID NOT NULL
+punishments.core_student_id   UUID NOT NULL
+```
+
+legacy integer ID가 필요한 기존 화면은:
+
+```text
+core_student_id
+→ public.students bridge
+→ derived compatibility student_id
+```
+
+로 계산한다.
+
+따라서 저장 identity는 하나지만 기존 API contract는 단계적으로 유지할 수 있다.
+
+---
+
+## D-022 — Migration Version은 Live Ledger와 맞춘다
+
+Supabase connector로 migration을 live 적용할 때,
+Git에서 미리 정한 timestamp와 live history가 실제로 기록한 version이 달라질 수 있었다.
+
+예:
+
+```text
+Git draft
+20260927022500_drop_legacy_discipline_student_ids.sql
+
+Live Supabase history
+20260926171350_drop_legacy_discipline_student_ids
+```
+
+내용이 같더라도 version이 다르면 향후 CLI에서:
+
+```text
+Git에는 미적용 migration
+Live에는 다른 version의 같은 migration
+```
+
+처럼 인식될 수 있다.
+
+따라서 live 적용 후:
+
+1. migration name 확인
+2. production version 확인
+3. Git filename을 live version으로 rename
+4. CI의 version uniqueness 재검증
+
+을 수행한다.
+
+Core cut-over 구간 15개 migration과 admin RLS optimization migration은 이 방식으로 reconciliation했다.
+
+이 원칙은 향후 별도 `DICS-Core` 중앙 migration repository에서도 그대로 적용한다.
