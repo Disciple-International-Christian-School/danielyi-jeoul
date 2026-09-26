@@ -199,6 +199,23 @@ export interface DisciplineAuditLog {
   createdAt: string;
 }
 
+export interface DisciplineCoreCutoverStatus {
+  stage: string;
+  capturedAt: string;
+  legacyColumnsRemoved: boolean;
+  pointRecordsTotal: number;
+  pointRecordsCoreLinked: number;
+  pointRecordsMismatch: number;
+  punishmentsTotal: number;
+  punishmentsCoreLinked: number;
+  punishmentsMismatch: number;
+  weeklyMismatches: number;
+  weeklyPenaltyMismatches: number;
+  settlementMismatches: number;
+  summaryMismatches: number;
+  cutoverCompleted: boolean;
+}
+
 export interface DisciplineCoreCalcParity {
   weeklyLegacyRows: number;
   weeklyCoreRows: number;
@@ -459,6 +476,23 @@ interface SettlementPeriodRow {
   starts_on: string;
   ends_on: string | null;
   created_at: string;
+}
+
+interface DisciplineCoreCutoverStatusRow {
+  stage: string;
+  captured_at: string;
+  legacy_columns_removed: boolean;
+  point_records_total: number;
+  point_records_core_linked: number;
+  point_records_mismatch: number;
+  punishments_total: number;
+  punishments_core_linked: number;
+  punishments_mismatch: number;
+  weekly_mismatches: number;
+  weekly_penalty_mismatches: number;
+  settlement_mismatches: number;
+  summary_mismatches: number;
+  cutover_completed: boolean;
 }
 
 interface DisciplineCoreCalcParityRow {
@@ -730,6 +764,25 @@ function mapDisciplineAuditLog(row: DisciplineAuditLogRow): DisciplineAuditLog {
     beforeData: row.before_data,
     afterData: row.after_data,
     createdAt: row.created_at,
+  };
+}
+
+function mapDisciplineCoreCutoverStatus(row: DisciplineCoreCutoverStatusRow): DisciplineCoreCutoverStatus {
+  return {
+    stage: row.stage,
+    capturedAt: row.captured_at,
+    legacyColumnsRemoved: row.legacy_columns_removed,
+    pointRecordsTotal: row.point_records_total,
+    pointRecordsCoreLinked: row.point_records_core_linked,
+    pointRecordsMismatch: row.point_records_mismatch,
+    punishmentsTotal: row.punishments_total,
+    punishmentsCoreLinked: row.punishments_core_linked,
+    punishmentsMismatch: row.punishments_mismatch,
+    weeklyMismatches: row.weekly_mismatches,
+    weeklyPenaltyMismatches: row.weekly_penalty_mismatches,
+    settlementMismatches: row.settlement_mismatches,
+    summaryMismatches: row.summary_mismatches,
+    cutoverCompleted: row.cutover_completed,
   };
 }
 
@@ -1006,6 +1059,7 @@ export const getDepartmentMembersQueryKey = () => ['department-merits', 'members
 export const getCoreMigrationReadinessQueryKey = () => ['core', 'migration-readiness'] as const;
 export const getDisciplineCoreFkReadinessQueryKey = () => ['core', 'discipline-fk-readiness'] as const;
 export const getDisciplineCoreCalcParityQueryKey = () => ['core', 'discipline-calc-parity'] as const;
+export const getDisciplineCoreCutoverStatusQueryKey = () => ['core', 'discipline-cutover-status'] as const;
 export const getStudentSummaryCoreParityQueryKey = () => ['core', 'student-summary-parity'] as const;
 export const getCoreStudentReadinessQueryKey = () => ['core', 'student-readiness'] as const;
 export const getDisciplineAuditLogsQueryKey = () => ['audit-logs', 'discipline'] as const;
@@ -1243,6 +1297,19 @@ export function useDisciplineAuditLogs() {
           .limit(200),
       );
       return rows.map(mapDisciplineAuditLog);
+    },
+  });
+}
+
+export function useDisciplineCoreCutoverStatus() {
+  return useQuery({
+    queryKey: getDisciplineCoreCutoverStatusQueryKey(),
+    queryFn: async (): Promise<DisciplineCoreCutoverStatus> => {
+      const rows = unwrap<DisciplineCoreCutoverStatusRow[]>(
+        await supabase.from('v_discipline_core_cutover_status').select('*').limit(1),
+      );
+      if (rows.length === 0) throw new Error('Discipline Core cut-over 상태를 확인할 수 없습니다.');
+      return mapDisciplineCoreCutoverStatus(rows[0]);
     },
   });
 }
