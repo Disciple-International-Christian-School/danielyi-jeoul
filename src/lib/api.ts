@@ -199,6 +199,24 @@ export interface DisciplineAuditLog {
   createdAt: string;
 }
 
+export interface DisciplineCoreCalcParity {
+  weeklyLegacyRows: number;
+  weeklyCoreRows: number;
+  weeklyMismatches: number;
+  weeklyPenaltyLegacyRows: number;
+  weeklyPenaltyCoreRows: number;
+  weeklyPenaltyMismatches: number;
+  settlementLegacyRows: number;
+  settlementCoreRows: number;
+  settlementMismatches: number;
+}
+
+export interface StudentSummaryCoreParity {
+  legacyRows: number;
+  coreRows: number;
+  mismatches: number;
+}
+
 export interface DisciplineCoreFkReadiness {
   pointRecordsTotal: number;
   pointRecordsCoreLinked: number;
@@ -441,6 +459,24 @@ interface SettlementPeriodRow {
   starts_on: string;
   ends_on: string | null;
   created_at: string;
+}
+
+interface DisciplineCoreCalcParityRow {
+  weekly_legacy_rows: number;
+  weekly_core_rows: number;
+  weekly_mismatches: number;
+  weekly_penalty_legacy_rows: number;
+  weekly_penalty_core_rows: number;
+  weekly_penalty_mismatches: number;
+  settlement_legacy_rows: number;
+  settlement_core_rows: number;
+  settlement_mismatches: number;
+}
+
+interface StudentSummaryCoreParityRow {
+  legacy_rows: number;
+  core_rows: number;
+  mismatches: number;
 }
 
 interface DisciplineCoreFkReadinessRow {
@@ -697,6 +733,28 @@ function mapDisciplineAuditLog(row: DisciplineAuditLogRow): DisciplineAuditLog {
   };
 }
 
+function mapDisciplineCoreCalcParity(row: DisciplineCoreCalcParityRow): DisciplineCoreCalcParity {
+  return {
+    weeklyLegacyRows: row.weekly_legacy_rows,
+    weeklyCoreRows: row.weekly_core_rows,
+    weeklyMismatches: row.weekly_mismatches,
+    weeklyPenaltyLegacyRows: row.weekly_penalty_legacy_rows,
+    weeklyPenaltyCoreRows: row.weekly_penalty_core_rows,
+    weeklyPenaltyMismatches: row.weekly_penalty_mismatches,
+    settlementLegacyRows: row.settlement_legacy_rows,
+    settlementCoreRows: row.settlement_core_rows,
+    settlementMismatches: row.settlement_mismatches,
+  };
+}
+
+function mapStudentSummaryCoreParity(row: StudentSummaryCoreParityRow): StudentSummaryCoreParity {
+  return {
+    legacyRows: row.legacy_rows,
+    coreRows: row.core_rows,
+    mismatches: row.mismatches,
+  };
+}
+
 function mapDisciplineCoreFkReadiness(row: DisciplineCoreFkReadinessRow): DisciplineCoreFkReadiness {
   return {
     pointRecordsTotal: row.point_records_total,
@@ -947,6 +1005,8 @@ export const getDepartmentMeritAdminQueryKey = () => ['department-merits', 'admi
 export const getDepartmentMembersQueryKey = () => ['department-merits', 'members'] as const;
 export const getCoreMigrationReadinessQueryKey = () => ['core', 'migration-readiness'] as const;
 export const getDisciplineCoreFkReadinessQueryKey = () => ['core', 'discipline-fk-readiness'] as const;
+export const getDisciplineCoreCalcParityQueryKey = () => ['core', 'discipline-calc-parity'] as const;
+export const getStudentSummaryCoreParityQueryKey = () => ['core', 'student-summary-parity'] as const;
 export const getCoreStudentReadinessQueryKey = () => ['core', 'student-readiness'] as const;
 export const getDisciplineAuditLogsQueryKey = () => ['audit-logs', 'discipline'] as const;
 export const getAdminAccountsQueryKey = () => ['admin-accounts'] as const;
@@ -1183,6 +1243,32 @@ export function useDisciplineAuditLogs() {
           .limit(200),
       );
       return rows.map(mapDisciplineAuditLog);
+    },
+  });
+}
+
+export function useDisciplineCoreCalcParity() {
+  return useQuery({
+    queryKey: getDisciplineCoreCalcParityQueryKey(),
+    queryFn: async (): Promise<DisciplineCoreCalcParity> => {
+      const rows = unwrap<DisciplineCoreCalcParityRow[]>(
+        await supabase.from('v_discipline_core_calc_parity').select('*').limit(1),
+      );
+      if (rows.length === 0) throw new Error('Discipline 계산 parity를 확인할 수 없습니다.');
+      return mapDisciplineCoreCalcParity(rows[0]);
+    },
+  });
+}
+
+export function useStudentSummaryCoreParity() {
+  return useQuery({
+    queryKey: getStudentSummaryCoreParityQueryKey(),
+    queryFn: async (): Promise<StudentSummaryCoreParity> => {
+      const rows = unwrap<StudentSummaryCoreParityRow[]>(
+        await supabase.from('v_student_summary_core_parity').select('*').limit(1),
+      );
+      if (rows.length === 0) throw new Error('Student summary parity를 확인할 수 없습니다.');
+      return mapStudentSummaryCoreParity(rows[0]);
     },
   });
 }
