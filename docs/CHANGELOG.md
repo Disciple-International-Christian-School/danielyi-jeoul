@@ -1083,6 +1083,19 @@ Identity ≠ Role
   - LIVE_ONLY_DATA 4
 - final frontend cleanup push CI green.
 
+### G9 legacy wrapper privilege reduction — 2026-09-27
+
+- legacy `assign_current_grade9_section(int,text)`를 `SECURITY DEFINER` → `SECURITY INVOKER`로 변경.
+- Core UUID authoritative RPC는 privileged write + lead check 때문에 `SECURITY DEFINER` 유지.
+- legacy wrapper compatibility는 유지하면서 불필요한 privileged surface 제거.
+- Supabase authenticated SECURITY DEFINER advisor warning 11 → 10.
+- live migration:
+  - `20260926175410_grade9_legacy_wrapper_invoker.sql`
+- migration ledger:
+  - production 55
+  - TRACKED 51
+  - LIVE_ONLY_DATA 4
+
 ### Frontend in branch — deployment pending
 
 - 학생 명부를 DICS Core read-only roster 관점으로 변경.
