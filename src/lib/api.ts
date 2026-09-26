@@ -88,6 +88,7 @@ export interface Reflection {
   id: number;
   pointRecordId: number;
   studentId: number;
+  coreStudentId: string;
   studentName: string;
   grade: number;
   item: string;
@@ -396,7 +397,7 @@ interface StudentSummaryRow {
   statuses: string[] | null;
 }
 interface ReflectionRow {
-  id: number; point_record_id: number; student_id: number; student_name: string;
+  id: number; point_record_id: number; student_id: number; core_student_id: string; student_name: string;
   grade: number; item: string; points: number; recorded_at: string;
   submitted: boolean; submission_deadline: string; due_at: string;
   deadline_change_reason: string | null; submitted_at: string | null;
@@ -648,6 +649,7 @@ function mapReflection(row: ReflectionRow): Reflection {
     id: row.id,
     pointRecordId: row.point_record_id,
     studentId: row.student_id,
+    coreStudentId: row.core_student_id,
     studentName: row.student_name,
     grade: row.grade,
     item: row.item,
@@ -930,8 +932,8 @@ function unwrap<T>(result: { data: T | null; error: { message: string } | null }
 
 export const getGetDashboardQueryKey = () => ['dashboard'] as const;
 export const getListStudentsQueryKey = () => ['students'] as const;
-export const getGetStudentQueryKey = (id: number) => ['students', id] as const;
-export const getListPointRecordsQueryKey = (params: { studentId: number; limit?: number }) =>
+export const getGetStudentQueryKey = (studentRef: string) => ['students', studentRef] as const;
+export const getListPointRecordsQueryKey = (params: { studentRef: string; limit?: number }) =>
   ['point-records', params] as const;
 export const getListPointItemsQueryKey = (params?: { type?: PointType; includeInactive?: boolean }) =>
   ['point-items', params ?? {}] as const;
@@ -990,37 +992,57 @@ export function useGetDashboard() {
   });
 }
 
-export function useGetStudent(id: number) {
+function isLegacyStudentRef(studentRef: string) {
+  return /^\d+$/.test(studentRef);
+}
+
+export function useGetStudent(studentRef: string) {
   return useQuery({
-    queryKey: getGetStudentQueryKey(id),
+    queryKey: getGetStudentQueryKey(studentRef),
     queryFn: async (): Promise<StudentDetail> => {
+      const legacy = isLegacyStudentRef(studentRef);
+
+      let summaryQuery = supabase.from('v_student_summary').select('*');
+      summaryQuery = legacy
+        ? summaryQuery.eq('id', Number(studentRef))
+        : summaryQuery.eq('core_student_id', studentRef);
+
+      let punishmentQuery = supabase.from('v_punishments').select('*');
+      punishmentQuery = legacy
+        ? punishmentQuery.eq('student_id', Number(studentRef))
+        : punishmentQuery.eq('core_student_id', studentRef);
+
       const [summaryRes, punishmentsRes] = await Promise.all([
-        supabase.from('v_student_summary').select('*').eq('id', id).single(),
-        supabase.from('v_punishments').select('*').eq('student_id', id).order('created_at', { ascending: false }),
+        summaryQuery.single(),
+        punishmentQuery.order('created_at', { ascending: false }),
       ]);
+
       const summary = unwrap<StudentSummaryRow>(summaryRes as { data: StudentSummaryRow | null; error: { message: string } | null });
       const punishments = unwrap<PunishmentRow[]>(punishmentsRes);
       return { ...mapStudent(summary), punishments: punishments.map(mapPunishment) };
     },
-    enabled: Number.isFinite(id),
+    enabled: studentRef.length > 0,
   });
 }
 
-export function useListPointRecords(params: { studentId: number; limit?: number }) {
+export function useListPointRecords(params: { studentRef: string; limit?: number }) {
   return useQuery({
     queryKey: getListPointRecordsQueryKey(params),
     queryFn: async (): Promise<PointRecord[]> => {
+      const legacy = isLegacyStudentRef(params.studentRef);
+      let query = supabase.from('v_point_records').select('*');
+      query = legacy
+        ? query.eq('student_id', Number(params.studentRef))
+        : query.eq('core_student_id', params.studentRef);
+
       const rows = unwrap<PointRecordRow[]>(
-        await supabase
-          .from('v_point_records')
-          .select('*')
-          .eq('student_id', params.studentId)
+        await query
           .order('recorded_at', { ascending: false })
           .limit(params.limit ?? 100),
       );
       return rows.map(mapPointRecord);
     },
-    enabled: Number.isFinite(params.studentId),
+    enabled: params.studentRef.length > 0,
   });
 }
 
