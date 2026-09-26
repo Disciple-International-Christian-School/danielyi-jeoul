@@ -57,9 +57,10 @@
     },
     {
       "version": "20260924174748",
-      "name": "drop_typo_student_bae_hayeon",
       "status": "LIVE_ONLY_DATA",
-      "rationale": "Private roster correction tied to live student data. The correction remains in production history only."
+      "name_redacted": true,
+      "private_label": "private_roster_correction",
+      "rationale": "Private roster correction tied to live student data. The live migration name and SQL are intentionally not committed."
     },
     {
       "version": "20260924192642",
