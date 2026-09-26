@@ -361,7 +361,6 @@ export interface PointItem {
 }
 
 // Write payloads
-export interface StudentInput { name: string; grade: number; }
 export interface PointItemInput {
   name: string;
   type: PointType;
@@ -1658,38 +1657,6 @@ export function useCloseSettlementPeriod() {
       });
       if (error) throw new Error(error.message);
       return data as number | null;
-    },
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Writes — students
-// ---------------------------------------------------------------------------
-
-export function useCreateStudent() {
-  return useMutation({
-    mutationFn: async ({ data }: { data: StudentInput }) => {
-      const { error } = await supabase.from('students').insert({ name: data.name, grade: data.grade });
-      if (error) throw new Error(error.message);
-    },
-  });
-}
-
-export function useUpdateStudent() {
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: StudentInput }) => {
-      const { error } = await supabase.from('students').update({ name: data.name, grade: data.grade }).eq('id', id);
-      if (error) throw new Error(error.message);
-    },
-  });
-}
-
-export function useDeleteStudent() {
-  return useMutation({
-    mutationFn: async ({ id }: { id: number }) => {
-      // Soft delete — history must stay queryable.
-      const { error } = await supabase.from('students').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-      if (error) throw new Error(error.message);
     },
   });
 }
