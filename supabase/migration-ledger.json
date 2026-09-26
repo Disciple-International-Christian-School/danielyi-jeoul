@@ -319,6 +319,12 @@
       "name": "admin_rls_initplan_optimization",
       "status": "TRACKED",
       "file": "supabase/migrations/20260926172018_admin_rls_initplan_optimization.sql"
+    },
+    {
+      "version": "20260926173405",
+      "name": "grade9_core_assignment_rpc",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260926173405_grade9_core_assignment_rpc.sql"
     }
   ]
 }
