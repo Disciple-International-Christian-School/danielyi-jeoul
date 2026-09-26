@@ -1058,6 +1058,31 @@ Identity ≠ Role
 - API-only intermediate commit의 typecheck failure를 stale integer call-site가 감지.
 - App Core UUID 전환 후 CI green.
 
+### Legacy student bridge browser read-only — 2026-09-27
+
+- `public.students`를 canonical master가 아닌 legacy compatibility bridge로 확정.
+- browser roles에서 `public.students` write 권한 제거.
+- authenticated:
+  - SELECT true
+  - INSERT/UPDATE/DELETE false
+- anon:
+  - SELECT/INSERT/UPDATE/DELETE false
+- `students_write`, `students_update` RLS policy 제거.
+- legacy `students_id_seq` browser usage 제거.
+- 미사용 frontend/API legacy student mutation 제거:
+  - `StudentInput`
+  - `useCreateStudent`
+  - `useUpdateStudent`
+  - `useDeleteStudent`
+- 새 학생 master 생성/수정은 DICS Core provisioning/import 경로에서만 수행.
+- live migration:
+  - `20260926175058_legacy_students_read_only.sql`
+- migration ledger:
+  - production 54
+  - TRACKED 50
+  - LIVE_ONLY_DATA 4
+- final frontend cleanup push CI green.
+
 ### Frontend in branch — deployment pending
 
 - 학생 명부를 DICS Core read-only roster 관점으로 변경.
