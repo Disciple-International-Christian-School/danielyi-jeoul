@@ -1600,9 +1600,9 @@ export function useInitializeCurrentAcademicTerm() {
 
 export function useAssignCurrentGrade9Section() {
   return useMutation({
-    mutationFn: async ({ studentId, section }: { studentId: number; section: 'A' | 'B' }) => {
-      const { error } = await supabase.rpc('assign_current_grade9_section', {
-        p_student_id: studentId,
+    mutationFn: async ({ coreStudentId, section }: { coreStudentId: string; section: 'A' | 'B' }) => {
+      const { error } = await supabase.rpc('assign_current_grade9_section_core', {
+        p_core_student_id: coreStudentId,
         p_section: section,
       });
       if (error) throw new Error(error.message);
