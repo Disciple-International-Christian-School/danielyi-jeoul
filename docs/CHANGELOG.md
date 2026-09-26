@@ -1023,6 +1023,25 @@ Identity ≠ Role
 - Supabase `auth_rls_initplan` performance warning 제거.
 - 남은 performance findings는 현재 모두 unused-index INFO로, usage history가 충분하지 않아 삭제하지 않음.
 
+### Production migration ledger enforcement — 2026-09-27
+
+- 전체 production migration history를 Git과 재대조.
+- 구조 migration 16개의 historical timestamp/name drift 추가 reconciliation.
+- 최종 상태:
+  - production migrations 52
+  - TRACKED structural migrations 48
+  - LIVE_ONLY_DATA migrations 4
+  - extra Git migrations 0
+- `supabase/migration-ledger.json` 추가.
+- `scripts/check-migration-ledger.mjs` 추가.
+- `npm run check:migration-ledger` 추가.
+- GitHub Actions에서 migration ledger contract 자동 검증.
+- TRACKED migration은 live version/name과 exact Git filename을 강제.
+- LIVE_ONLY_DATA version에 SQL 파일이 Git에 들어오면 CI 실패.
+- private roster correction처럼 migration name 자체가 민감할 수 있는 경우 name redaction 허용.
+- 초기 ledger 작성 중 민감 가능 migration name을 발견해 즉시 redacted entry로 교정.
+- ledger CI 첫 실행 성공.
+
 ### Frontend in branch — deployment pending
 
 - 학생 명부를 DICS Core read-only roster 관점으로 변경.
