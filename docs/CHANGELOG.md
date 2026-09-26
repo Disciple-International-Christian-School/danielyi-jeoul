@@ -1042,6 +1042,22 @@ Identity ≠ Role
 - 초기 ledger 작성 중 민감 가능 migration name을 발견해 즉시 redacted entry로 교정.
 - ledger CI 첫 실행 성공.
 
+### G9 section assignment Core UUID cut-over — 2026-09-27
+
+- `assign_current_grade9_section_core(uuid,text)`를 authoritative assignment RPC로 사용.
+- integer `assign_current_grade9_section(int,text)`는 compatibility wrapper로 유지.
+- G9 Core Setup frontend write를 `studentId:number` → `coreStudentId:string`으로 전환.
+- row key / test id도 Core UUID 기준으로 전환.
+- live migration version `20260926173405_grade9_core_assignment_rpc.sql`로 Git filename reconciliation.
+- migration ledger TRACKED 항목 추가.
+- rollback 검증:
+  - Core RPC G9-A 배정 성공
+  - legacy wrapper G9-B 배정 성공
+  - 두 경로 동일 Core 학생 확인
+  - transaction rollback으로 실제 반 배정 변화 없음
+- API-only intermediate commit의 typecheck failure를 stale integer call-site가 감지.
+- App Core UUID 전환 후 CI green.
+
 ### Frontend in branch — deployment pending
 
 - 학생 명부를 DICS Core read-only roster 관점으로 변경.
