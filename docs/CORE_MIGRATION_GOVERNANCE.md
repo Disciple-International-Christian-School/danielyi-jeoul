@@ -28,8 +28,9 @@ Until a dedicated DICS-Core repository exists:
 
     shualoalumin/danielyi-jeoul
     supabase/migrations/
+    supabase/migration-ledger.json
 
-acts as the interim version-controlled migration ledger for the shared Core project.
+act as the interim version-controlled migration ledger for the shared Core project.
 
 This is an operational compromise, not the final ownership model.
 
@@ -84,10 +85,11 @@ Cross-domain migrations must be coordinated through the Core migration ledger.
 A structural live-DB change is incomplete until:
 
 1. a migration exists in version control,
-2. the migration is idempotent or has a clear one-time ordering,
-3. the live migration name is recorded,
-4. the migration can recreate the structure in a fresh environment,
-5. relevant docs/change history are updated.
+2. its Git filename matches the actual live version/name,
+3. the migration ledger marks it TRACKED,
+4. the migration is idempotent or has a clear one-time ordering,
+5. the migration can recreate the structure in a fresh environment,
+6. relevant docs/change history are updated.
 
 If a parallel session changes live DB first, the next session must create a reconciliation migration.
 
@@ -117,7 +119,7 @@ Examples:
 - class roster rows
 - verified identity mappings
 
-Operational data changes may be executed directly in Supabase, but the method and aggregate result should be recorded.
+Operational data changes may be executed directly in Supabase, but the method and aggregate result should be recorded. If such a change appears in Supabase migration history, record only a privacy-safe LIVE_ONLY_DATA ledger entry rather than committing the data SQL.
 
 ## 6. Migration naming
 
