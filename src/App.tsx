@@ -155,7 +155,7 @@ function dashboardCalendar() {
   }).format(new Date(date + 'T12:00:00+09:00'));
   return { date, label, weekLabel: `${year}년 ${month}월 ${week}주차 · 월요일 시작` };
 }
-function matchesDisciplineScope(grade: number, scope: DisciplineScope | undefined) {
+function matchesDisciplineScope(grade: number, scope: DisciplineScope | null | undefined) {
   return !scope || scope === 'ALL'
     || (scope === 'ELEMENTARY' && grade <= 6)
     || (scope === 'MIDDLE' && grade >= 7 && grade <= 9)
