@@ -327,13 +327,15 @@ function DashboardPage() {
   const departmentStatus = useDepartmentMeritStatus();
   const { admin } = useAuth();
   const [search, setSearch] = useState('');
-    const [sort, setSort] = useState<'net' | 'grade' | 'name'>('net');
-  const [, setLocation] = useLocation();
+  const [sort, setSort] = useState<'net' | 'grade' | 'name'>('net');
+  const [targetFilter, setTargetFilter] = useState<'ALL' | 'PHYSICAL' | 'COMMITTEE'>('ALL');
 
   const rows = useMemo(() => {
     const needle = search.trim().toLowerCase();
     const list = (dashboard.data?.students ?? []).filter((student) =>
-      matchesDisciplineScope(student.grade, admin?.disciplineScope) && (!needle
+      matchesDisciplineScope(student.grade, admin?.disciplineScope)
+      && (targetFilter === 'ALL' || (targetFilter === 'PHYSICAL' ? student.physicalTrainingRequired : student.committeeRequired))
+      && (!needle
       || student.name.toLowerCase().includes(needle)
       || (student.studentNo ?? '').toLowerCase().includes(needle)
       || (student.homeroom ?? '').toLowerCase().includes(needle))
@@ -345,7 +347,7 @@ function DashboardPage() {
           ? a.grade - b.grade || (a.homeroom ?? '').localeCompare(b.homeroom ?? '', 'ko')
           : b.weeklyNetPenaltyPoints - a.weeklyNetPenaltyPoints
     );
-  }, [dashboard.data?.students, admin?.disciplineScope, search, sort]);
+  }, [dashboard.data?.students, admin?.disciplineScope, search, sort, targetFilter]);
 
   if (dashboard.isLoading || reflections.isLoading) return <LoadingState />;
   if (dashboard.isError || reflections.isError || !dashboard.data) return <ErrorState error={dashboard.error ?? reflections.error} retry={() => { dashboard.refetch(); reflections.refetch(); }} />;
@@ -356,11 +358,11 @@ function DashboardPage() {
   const personCount = (predicate: (reflection: (typeof scopeReflections)[number]) => boolean) => new Set(scopeReflections.filter(predicate).map((reflection) => reflection.coreStudentId)).size;
   const settlementLabel = dashboard.data.students.find((student) => student.settlementPeriodLabel)?.settlementPeriodLabel ?? '정산기간 미설정';
   const metrics = [
-    ['반성문 대상자', personCount((reflection) => reflection.recordedAt.slice(0, 10) === calendar.date), '오늘 벌점으로 반성문이 생성된 학생', BookOpenCheck],
-    ['반성문 미제출자', personCount((reflection) => reflection.status !== 'SUBMITTED'), '이전 날짜 포함 · 아직 제출하지 않은 학생', BookOpenCheck],
-    ['2배 제출 대상자', personCount((reflection) => reflection.status === 'DOUBLE'), '미제출자 중 마감이 지난 학생', AlertTriangle],
-    ['체력훈련 대상자', scopeStudents.filter((student) => student.physicalTrainingRequired).length, '이번 주 3회 또는 NET 8점 이상', ShieldAlert],
-    ['징계위원회 대상자', scopeStudents.filter((student) => student.committeeRequired).length, '현재 정산기간 판정', ShieldAlert],
+    ['반성문 대상자', personCount((reflection) => reflection.recordedAt.slice(0, 10) === calendar.date), '오늘 벌점으로 반성문이 생성된 학생', BookOpenCheck, 'TODAY'],
+    ['반성문 미제출자', personCount((reflection) => reflection.status !== 'SUBMITTED'), '이전 날짜 포함 · 아직 제출하지 않은 학생', BookOpenCheck, 'MISSING'],
+    ['2배 제출 대상자', personCount((reflection) => reflection.status === 'DOUBLE'), '미제출자 중 마감이 지난 학생', AlertTriangle, 'DOUBLE'],
+    ['체력훈련 대상자', scopeStudents.filter((student) => student.physicalTrainingRequired).length, '이번 주 3회 또는 NET 8점 이상', ShieldAlert, 'PHYSICAL'],
+    ['징계위원회 대상자', scopeStudents.filter((student) => student.committeeRequired).length, '현재 정산기간 판정', ShieldAlert, 'COMMITTEE'],
   ] as const;
 
   return <div>
@@ -372,12 +374,12 @@ function DashboardPage() {
     />
 
     <div className="metric-grid" style={{ marginTop: 30 }}>
-      {metrics.map(([label, value, note, Icon], index) => <div className="card metric-card" key={label} data-testid={'card-metric-' + index}>
-        <Icon size={17} />
-        <div className="metric-value">{value}</div>
-        <div className="metric-label">{label}</div>
-        <div className="metric-note">{note}</div>
-      </div>)}
+      {metrics.map(([label, value, note, Icon, view], index) => {
+        const content = <><Icon size={17} /><div className="metric-value">{value}</div><div className="metric-label">{label}</div><div className="metric-note">{note}</div></>;
+        return view === 'PHYSICAL' || view === 'COMMITTEE'
+          ? <button type="button" className="card metric-card metric-action" key={label} onClick={() => { setTargetFilter(view); document.getElementById('dashboard-students')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} data-testid={'card-metric-' + index}>{content}</button>
+          : <Link href={`/reflections?view=${view}`} className="card metric-card metric-action" key={label} data-testid={'card-metric-' + index}>{content}</Link>;
+      })}
     </div>
 
     {admin?.isLead && <div className="side-note" style={{ marginTop: 20 }}>
@@ -388,12 +390,17 @@ function DashboardPage() {
       {admin?.isLead && <Link href="/points/positive/departments" className="inline-link">반영 내역·규칙 관리</Link>}
     </div>}
 
-    <div className="section-row">
+    <div className="section-row" id="dashboard-students">
       <div>
         <h2 className="section-title">학생 상태 목록</h2>
         <p className="section-copy">상점·벌점 원점수는 보존하고, 처벌 판단에는 벌점 - 상점 NET을 사용합니다.</p>
       </div>
       <div className="toolbar-right">
+        <select className="select" value={targetFilter} onChange={(event) => setTargetFilter(event.target.value as 'ALL' | 'PHYSICAL' | 'COMMITTEE')} aria-label="대상자 필터" data-testid="select-dashboard-target">
+          <option value="ALL">전체 학생</option>
+          <option value="PHYSICAL">체력훈련 대상자</option>
+          <option value="COMMITTEE">징계위원회 대상자</option>
+        </select>
         <div className="search-box"><Search size={15} /><input
           className="input"
           value={search}
@@ -452,10 +459,9 @@ function DashboardPage() {
           </tr>)}
         </tbody>
       </table>
-      {rows.length === 0 && <EmptyState title="검색 결과가 없습니다" copy="다른 이름, 학번 또는 반으로 다시 검색해 보세요." />}
+      {rows.length === 0 && <EmptyState title="해당 학생이 없습니다" copy={search ? '검색어나 대상자 필터를 바꿔 보세요.' : '선택한 상태의 대상자가 없습니다.'} />}
     </div>
 
-    <button type="button" onClick={() => setLocation('/students')} style={{ display: 'none' }} data-testid="button-dashboard-hidden-navigation" />
   </div>;
 }
 
@@ -796,7 +802,10 @@ function ReflectionsPage() {
   const queryClient = useQueryClient();
   const notify = useContext(NoticeContext);
   const { admin } = useAuth();
-  const [filter, setFilter] = useState<'ALL' | 'SUBMITTED' | 'MISSING' | 'DOUBLE'>('ALL');
+  const [filter, setFilter] = useState<'ALL' | 'TODAY' | 'SUBMITTED' | 'MISSING' | 'DOUBLE'>(() => {
+    const view = new URLSearchParams(window.location.search).get('view');
+    return view === 'TODAY' || view === 'MISSING' || view === 'DOUBLE' ? view : 'ALL';
+  });
   const [scopeFilter, setScopeFilter] = useState<DisciplineScope>(admin?.disciplineScope ?? 'ALL');
   const reflections = useListReflections();
   const update = useUpdateReflection();
@@ -805,7 +814,7 @@ function ReflectionsPage() {
   if (reflections.isLoading) return <LoadingState />;
   if (reflections.isError) return <ErrorState error={reflections.error} retry={() => reflections.refetch()} />;
 
-  const filterLabels = [['ALL', '전체'], ['SUBMITTED', '제출 완료'], ['MISSING', '미제출'], ['DOUBLE', '2배 제출 대상']] as const;
+  const filterLabels = [['ALL', '전체'], ['TODAY', '오늘 대상'], ['MISSING', '미제출 전체'], ['DOUBLE', '2배 제출 대상'], ['SUBMITTED', '제출 완료']] as const;
   const scopeLabels: Array<[DisciplineScope, string]> = [
     ['ALL', '전체 학년'],
     ['ELEMENTARY', '초등 G1–6'],
@@ -817,7 +826,8 @@ function ReflectionsPage() {
     : scopeLabels.filter(([value]) => value === admin?.disciplineScope);
 
   const rows = (reflections.data ?? []).filter((reflection) =>
-    (filter === 'ALL' || reflection.status === filter)
+    (filter === 'ALL' || (filter === 'TODAY' ? reflection.recordedAt.slice(0, 10) === today() : filter === 'MISSING' ? reflection.status !== 'SUBMITTED' : reflection.status === filter))
+    && matchesDisciplineScope(reflection.grade, admin?.disciplineScope)
     && (scopeFilter === 'ALL' || reflection.assignedScope === scopeFilter)
   );
 
