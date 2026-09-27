@@ -246,7 +246,7 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
     { href: '/settlement', label: '정산 관리', icon: CalendarRange, roles: ['SEONDO'] as Role[], leadOnly: true, group: 'work', child: false },
     { href: '/punishments', label: '기숙사 처분', icon: BedDouble, roles: ['SASAENG'] as Role[], leadOnly: false, group: 'work', child: false },
     { href: '/admins', label: '관리자 계정', icon: ShieldAlert, roles: ['SEONDO'] as Role[], leadOnly: true, group: 'manage', child: false },
-    { href: '/students', label: '학생 명부', icon: Users, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'manage', child: false },
+    { href: '/students', label: '학생 명부', icon: Users, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'manage', child: Boolean(admin?.isLead) },
     { href: '/core-setup', label: 'Core 설정', icon: Users, roles: ['SEONDO'] as Role[], leadOnly: true, group: 'manage', child: false },
     { href: '/audit', label: '감사 로그', icon: Database, roles: ['SEONDO'] as Role[], leadOnly: true, group: 'manage', child: false },
   ];
