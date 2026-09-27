@@ -337,6 +337,12 @@
       "name": "grade9_legacy_wrapper_invoker",
       "status": "TRACKED",
       "file": "supabase/migrations/20260926175410_grade9_legacy_wrapper_invoker.sql"
+    },
+    {
+      "version": "20260927153350",
+      "name": "department_merits_monday_cron",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20260927153350_department_merits_monday_cron.sql"
     }
   ]
 }
