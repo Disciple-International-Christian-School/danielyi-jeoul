@@ -590,3 +590,10 @@ body::before { opacity: .06; }
 }
 @media (max-width: 390px) { .metric-grid, .sasaeng-metrics { grid-template-columns: 1fr; } }
 @media print { body::before { display: none; } }
+
+/* Dashboard status cards open the corresponding operational list. */
+.metric-action { display: block; width: 100%; text-align: left; color: inherit; font: inherit; text-decoration: none; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.metric-action:hover { transform: translateY(-2px); border-color: hsl(var(--primary) / .48); box-shadow: 0 14px 30px hsl(183 22% 25% / .1); }
+.metric-action:active { transform: translateY(0); }
+#dashboard-students { scroll-margin-top: 76px; }
+@media (prefers-reduced-motion: reduce) { .metric-action { transition: none; } .metric-action:hover { transform: none; } }
