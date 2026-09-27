@@ -22,6 +22,9 @@ import {
   Search,
   ShieldAlert,
   SlidersHorizontal,
+  Moon,
+  Sun,
+  Menu,
   Trash2,
   Users,
   X,
@@ -142,6 +145,22 @@ function currentWeekMonday() {
     day: '2-digit',
   }).format(value);
 }
+function dashboardCalendar() {
+  const date = today();
+  const [year, month, day] = date.split('-').map(Number);
+  const firstDayOffset = (new Date(Date.UTC(year, month - 1, 1)).getUTCDay() + 6) % 7;
+  const week = Math.ceil((day + firstDayOffset) / 7);
+  const label = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long',
+  }).format(new Date(date + 'T12:00:00+09:00'));
+  return { date, label, weekLabel: `${year}년 ${month}월 ${week}주차 · 월요일 시작` };
+}
+function matchesDisciplineScope(grade: number, scope: DisciplineScope | null | undefined) {
+  return !scope || scope === 'ALL'
+    || (scope === 'ELEMENTARY' && grade <= 6)
+    || (scope === 'MIDDLE' && grade >= 7 && grade <= 9)
+    || (scope === 'HIGH' && grade >= 10);
+}
 function errText(error: unknown) { return error instanceof Error ? error.message : '요청을 처리하지 못했습니다.'; }
 
 function Brand() {
@@ -165,40 +184,92 @@ function Toast({ message, tone, onClose }: { message: string; tone: NoticeTone; 
   </div>;
 }
 
+const ThemeContext = createContext({ dark: false, toggle: () => {} });
+function ThemeProvider({ children }: { children: ReactNode }) {
+  const [dark, setDark] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem('dics-theme');
+      return saved === 'dark' || (saved == null && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+    document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+    try { window.localStorage.setItem('dics-theme', dark ? 'dark' : 'light'); } catch { /* Storage may be unavailable. */ }
+  }, [dark]);
+  return <ThemeContext.Provider value={{ dark, toggle: () => setDark((value) => !value) }}>{children}</ThemeContext.Provider>;
+}
+function useTheme() { return useContext(ThemeContext); }
+function ThemeToggle({ dark, toggle }: { dark: boolean; toggle: () => void }) {
+  return <button type="button" className="theme-toggle" onClick={toggle} aria-label={dark ? '라이트 모드로 전환' : '다크 모드로 전환'} aria-pressed={dark} title={dark ? '라이트 모드' : '다크 모드'} data-testid="button-toggle-theme">
+    {dark ? <Sun size={17} /> : <Moon size={17} />}<span>{dark ? '라이트' : '다크'}</span>
+  </button>;
+}
+function WeeklyMeritBootstrap() {
+  const ensure = useEnsureWeeklyDepartmentMerits();
+  const queryClient = useQueryClient();
+  const notify = useContext(NoticeContext);
+  useEffect(() => {
+    ensure.mutate(undefined, {
+      onSuccess: (inserted) => {
+        queryClient.invalidateQueries({ queryKey: getDepartmentMeritStatusQueryKey() });
+        if (inserted > 0) {
+          queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
+          notify(`이번 주 부서활동 상점 ${inserted}건을 자동 반영했습니다.`);
+        }
+      },
+    });
+    // The RPC is idempotent; run on entry to the operations console.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}
 function AppShell({ children, role }: { children: ReactNode; role: Role }) {
   const [location] = useLocation();
   const { admin, signOut } = useAuth();
+  const { dark, toggle } = useTheme();
   const [, setLocation] = useLocation();
   const [notice, setNotice] = useState<{ message: string; tone: NoticeTone } | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const nav = [
-    { href: '/dashboard', label: '대시보드', icon: LayoutDashboard, roles: ['SEONDO', 'SASAENG'] as Role[], leadOnly: false },
-    { href: '/students', label: '학생 관리', icon: Users, roles: ['SEONDO'] as Role[], leadOnly: false },
-    { href: '/points/negative', label: '벌점 입력', icon: ArrowDownRight, roles: ['SEONDO'] as Role[], leadOnly: false },
-    { href: '/points/positive', label: '상점 입력', icon: ArrowUpRight, roles: ['SEONDO'] as Role[], leadOnly: false },
-    { href: '/reflections', label: '반성문', icon: BookOpenCheck, roles: ['SEONDO'] as Role[], leadOnly: false },
-    { href: '/reports', label: '공지·출력', icon: Printer, roles: ['SEONDO'] as Role[], leadOnly: false },
-    { href: '/settlement', label: '정산 관리', icon: CalendarRange, roles: ['SEONDO'] as Role[], leadOnly: true },
-    { href: '/audit', label: '감사 로그', icon: Database, roles: ['SEONDO'] as Role[], leadOnly: true },
-    { href: '/admins', label: '관리자 계정', icon: ShieldAlert, roles: ['SEONDO'] as Role[], leadOnly: true },
-    { href: '/core-setup', label: 'Core 설정', icon: Users, roles: ['SEONDO'] as Role[], leadOnly: true },
-    { href: '/department-merits', label: '부서 상점', icon: ArrowUpRight, roles: ['SEONDO'] as Role[], leadOnly: true },
-    { href: '/punishments', label: '기숙사 처분', icon: BedDouble, roles: ['SASAENG'] as Role[], leadOnly: false },
-    { href: '/point-items', label: '점수 항목', icon: SlidersHorizontal, roles: ['SEONDO'] as Role[], leadOnly: false },
+    { href: '/dashboard', label: '대시보드', icon: LayoutDashboard, roles: ['SEONDO', 'SASAENG'] as Role[], leadOnly: false, group: 'work', child: false },
+    { href: '/points/positive', label: '상점 입력', icon: ArrowUpRight, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: false },
+    { href: '/points/positive/departments', label: '부서상점 자동반영', icon: RefreshCw, roles: ['SEONDO'] as Role[], leadOnly: true, group: 'work', child: true },
+    { href: '/points/positive/items', label: '상점항목관리', icon: SlidersHorizontal, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: true },
+    { href: '/points/negative', label: '벌점 입력', icon: ArrowDownRight, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: false },
+    { href: '/points/negative/items', label: '벌점항목관리', icon: SlidersHorizontal, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: true },
+    { href: '/reflections', label: '반성문 대상자', icon: BookOpenCheck, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: false },
+    { href: '/reports', label: '공지·출력', icon: Printer, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: false },
+    { href: '/settlement', label: '정산 관리', icon: CalendarRange, roles: ['SEONDO'] as Role[], leadOnly: true, group: 'work', child: false },
+    { href: '/punishments', label: '기숙사 처분', icon: BedDouble, roles: ['SASAENG'] as Role[], leadOnly: false, group: 'work', child: false },
+    { href: '/admins', label: '관리자 계정', icon: ShieldAlert, roles: ['SEONDO'] as Role[], leadOnly: true, group: 'manage', child: false },
+    { href: '/students', label: '학생 명부', icon: Users, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'manage', child: false },
+    { href: '/core-setup', label: 'Core 설정', icon: Users, roles: ['SEONDO'] as Role[], leadOnly: true, group: 'manage', child: false },
+    { href: '/audit', label: '감사 로그', icon: Database, roles: ['SEONDO'] as Role[], leadOnly: true, group: 'manage', child: false },
   ];
-  const title = nav.find((item) => location.startsWith(item.href))?.label ?? '대시보드';
+  const visibleNav = nav.filter((item) => item.roles.includes(role) && (!item.leadOnly || admin?.isLead));
+  const title = [...nav].reverse().find((item) => location === item.href || location.startsWith(item.href + '/'))?.label ?? '대시보드';
   const displayName = admin?.displayName ?? '관리자';
   const roleLabel = admin?.roleLabel ?? (role === 'SASAENG' ? '사생회' : '선도부');
   const handleSignOut = async () => { await signOut(); setLocation('/'); };
   return <NoticeContext.Provider value={(message, tone = 'success') => setNotice({ message, tone })}><div className="app-shell">
-    <aside className="sidebar">
+    {role === 'SEONDO' && <WeeklyMeritBootstrap />}
+    <aside className={`sidebar ${mobileMenuOpen ? 'is-open' : ''}`}>
       <Brand />
       <div className="nav-label">운영 메뉴</div>
       <nav className="nav-list" aria-label="주요 메뉴">
-        {nav.filter((item) => item.roles.includes(role) && (!item.leadOnly || admin?.isLead)).map((item) => {
+        {visibleNav.map((item, index) => {
           const Icon = item.icon;
-          return <Link key={item.href} href={item.href} className={`nav-link ${location.startsWith(item.href) ? 'active' : ''}`} data-testid={`link-nav-${item.href.slice(1).replace('/', '-')}`}>
-            <Icon size={16} strokeWidth={1.7} /><span>{item.label}</span>
-          </Link>;
+          const active = location === item.href || (location.startsWith(item.href + '/') && !visibleNav.some((other) => other.href !== item.href && other.href.startsWith(item.href + '/') && (location === other.href || location.startsWith(other.href + '/'))));
+          return <div key={item.href}>
+            {item.group === 'manage' && visibleNav[index - 1]?.group !== 'manage' && <div className="nav-label nav-section-label">관리·기준</div>}
+            <Link href={item.href} className={`nav-link ${item.child ? 'nav-child ' : ''}${active ? 'active' : ''}`} title={item.label} onClick={() => setMobileMenuOpen(false)} aria-current={active ? 'page' : undefined} data-testid={`link-nav-${item.href.slice(1).replaceAll('/', '-')}`}>
+              <Icon size={16} strokeWidth={1.8} /><span>{item.label}</span>
+            </Link>
+          </div>;
         })}
       </nav>
       <div className="sidebar-bottom">
@@ -210,11 +281,13 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
         <button className="nav-link" onClick={handleSignOut} data-testid="button-sign-out"><LogOut size={16} /><span>로그아웃</span></button>
       </div>
     </aside>
+    {mobileMenuOpen && <button type="button" className="sidebar-backdrop" aria-label="메뉴 닫기" onClick={() => setMobileMenuOpen(false)} />}
     <main className="main-area">
       <header className="topbar">
+        <button type="button" className="mobile-menu-toggle" onClick={() => setMobileMenuOpen((open) => !open)} aria-label={mobileMenuOpen ? '메뉴 닫기' : '메뉴 열기'} aria-expanded={mobileMenuOpen}>{mobileMenuOpen ? <X size={21} /> : <Menu size={21} />}</button>
         <div className="mobile-brand"><span className="brand-mark">저울</span><span>다니엘의 저울</span></div>
         <div className="topbar-title">{title}</div>
-        <div className="topbar-actions"><span className="topbar-date">{new Intl.DateTimeFormat('ko-KR', { dateStyle: 'full', timeZone: 'Asia/Seoul' }).format(new Date())}</span><span className="pill pill-positive" data-testid="status-health"><Gauge size={12} /> 운영 중</span></div>
+        <div className="topbar-actions"><span className="topbar-date">{new Intl.DateTimeFormat('ko-KR', { dateStyle: 'full', timeZone: 'Asia/Seoul' }).format(new Date())}</span><ThemeToggle dark={dark} toggle={toggle} /><span className="pill pill-positive" data-testid="status-health"><Gauge size={12} /> 운영 중</span></div>
       </header>
       <div className="content page-enter">{children}<BuildVersion mobile /></div>
     </main>
@@ -250,39 +323,20 @@ function LeadGate({ children }: { children: ReactNode }) {
 
 function DashboardPage() {
   const dashboard = useGetDashboard();
+  const reflections = useListReflections();
   const departmentStatus = useDepartmentMeritStatus();
-  const ensureDepartmentMerits = useEnsureWeeklyDepartmentMerits();
-  const queryClient = useQueryClient();
-  const notify = useContext(NoticeContext);
   const { admin } = useAuth();
   const [search, setSearch] = useState('');
-
-  useEffect(() => {
-    if (admin?.role !== 'SEONDO') return;
-    ensureDepartmentMerits.mutate(undefined, {
-      onSuccess: (inserted) => {
-        queryClient.invalidateQueries({ queryKey: getDepartmentMeritStatusQueryKey() });
-        if (inserted > 0) {
-          queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
-          notify(`이번 주 부서활동 상점 ${inserted}건을 자동 반영했습니다.`);
-        }
-      },
-    });
-    // RPC is idempotent; run once per dashboard mount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [admin?.role]);
-
-  const [sort, setSort] = useState<'net' | 'grade' | 'name'>('net');
+    const [sort, setSort] = useState<'net' | 'grade' | 'name'>('net');
   const [, setLocation] = useLocation();
 
   const rows = useMemo(() => {
     const needle = search.trim().toLowerCase();
     const list = (dashboard.data?.students ?? []).filter((student) =>
-      !needle
+      matchesDisciplineScope(student.grade, admin?.disciplineScope) && (!needle
       || student.name.toLowerCase().includes(needle)
       || (student.studentNo ?? '').toLowerCase().includes(needle)
-      || (student.homeroom ?? '').toLowerCase().includes(needle)
+      || (student.homeroom ?? '').toLowerCase().includes(needle))
     );
     return [...list].sort((a, b) =>
       sort === 'name'
@@ -291,27 +345,30 @@ function DashboardPage() {
           ? a.grade - b.grade || (a.homeroom ?? '').localeCompare(b.homeroom ?? '', 'ko')
           : b.weeklyNetPenaltyPoints - a.weeklyNetPenaltyPoints
     );
-  }, [dashboard.data?.students, search, sort]);
+  }, [dashboard.data?.students, admin?.disciplineScope, search, sort]);
 
-  if (dashboard.isLoading) return <LoadingState />;
-  if (dashboard.isError || !dashboard.data) return <ErrorState error={dashboard.error} retry={() => dashboard.refetch()} />;
+  if (dashboard.isLoading || reflections.isLoading) return <LoadingState />;
+  if (dashboard.isError || reflections.isError || !dashboard.data) return <ErrorState error={dashboard.error ?? reflections.error} retry={() => { dashboard.refetch(); reflections.refetch(); }} />;
 
-  const counts = dashboard.data.counts;
+  const calendar = dashboardCalendar();
+  const scopeStudents = dashboard.data.students.filter((student) => matchesDisciplineScope(student.grade, admin?.disciplineScope));
+  const scopeReflections = (reflections.data ?? []).filter((reflection) => matchesDisciplineScope(reflection.grade, admin?.disciplineScope));
+  const personCount = (predicate: (reflection: (typeof scopeReflections)[number]) => boolean) => new Set(scopeReflections.filter(predicate).map((reflection) => reflection.coreStudentId)).size;
   const settlementLabel = dashboard.data.students.find((student) => student.settlementPeriodLabel)?.settlementPeriodLabel ?? '정산기간 미설정';
   const metrics = [
-    ['등록 학생', counts.students, 'DICS Core 현재 학적', Users],
-    ['체력훈련 대상', counts.weeklyTargets, '주 3회 또는 NET 8+', ShieldAlert],
-    ['징계위원회 대상', counts.committeeTargets, '정산기간 기준', AlertTriangle],
-    ['미제출 반성문', counts.missingReflections, '현재 마감 전 미제출', BookOpenCheck],
-    ['2배 제출 대상', counts.doubleReflections, '마감 경과', BookOpenCheck],
+    ['반성문 대상자', personCount((reflection) => reflection.recordedAt.slice(0, 10) === calendar.date), '오늘 벌점으로 반성문이 생성된 학생', BookOpenCheck],
+    ['반성문 미제출자', personCount((reflection) => reflection.status !== 'SUBMITTED'), '이전 날짜 포함 · 아직 제출하지 않은 학생', BookOpenCheck],
+    ['2배 제출 대상자', personCount((reflection) => reflection.status === 'DOUBLE'), '미제출자 중 마감이 지난 학생', AlertTriangle],
+    ['체력훈련 대상자', scopeStudents.filter((student) => student.physicalTrainingRequired).length, '이번 주 3회 또는 NET 8점 이상', ShieldAlert],
+    ['징계위원회 대상자', scopeStudents.filter((student) => student.committeeRequired).length, '현재 정산기간 판정', ShieldAlert],
   ] as const;
 
   return <div>
     <PageHeader
-      eyebrow="오늘의 운영 현황"
-      title="학생 생활점수, 한눈에."
-      copy={'주간 NET과 ' + settlementLabel + ' 누적을 기준으로 생활지도 신호를 보여줍니다.'}
-      action={<Link href="/points/negative" className="btn btn-primary" data-testid="link-quick-negative"><Plus size={15} /> 벌점 입력</Link>}
+      eyebrow="오늘의 생활지도 현황"
+      title={calendar.label}
+      copy={calendar.weekLabel + ' · ' + settlementLabel + ' 정산기간'}
+      action={<Link href="/points/positive" className="btn btn-primary" data-testid="link-quick-positive"><Plus size={15} /> 상점 입력</Link>}
     />
 
     <div className="metric-grid" style={{ marginTop: 30 }}>
@@ -319,15 +376,16 @@ function DashboardPage() {
         <Icon size={17} />
         <div className="metric-value">{value}</div>
         <div className="metric-label">{label}</div>
-        <div className="muted" style={{ fontSize: 10, marginTop: 6 }}>{note}</div>
+        <div className="metric-note">{note}</div>
       </div>)}
     </div>
 
-    {(departmentStatus.data?.length ?? 0) > 0 && <div className="side-note" style={{ marginTop: 20 }}>
-      <strong>부서활동 자동 상점</strong>
+    {admin?.isLead && <div className="side-note" style={{ marginTop: 20 }}>
+      <strong>부서상점 자동반영</strong>
       <span style={{ marginLeft: 10 }}>
-        이번 주 {departmentStatus.data?.filter((row) => row.generated).length ?? 0}/{departmentStatus.data?.length ?? 0}건 반영
+        {(departmentStatus.data?.length ?? 0) > 0 ? `이번 주 ${departmentStatus.data?.filter((row) => row.generated).length ?? 0}/${departmentStatus.data?.length ?? 0}건 반영` : '부서 규칙과 소속 학생을 설정해 주세요.'}
       </span>
+      {admin?.isLead && <Link href="/points/positive/departments" className="inline-link">반영 내역·규칙 관리</Link>}
     </div>}
 
     <div className="section-row">
@@ -375,7 +433,7 @@ function DashboardPage() {
           {rows.map((student) => <tr key={student.id} data-testid={'row-dashboard-student-' + student.id}>
             <td>
               <Link className="table-link" href={'/students/' + (student.coreStudentId ?? student.id)} data-testid={'link-dashboard-student-' + student.id}>{student.name}</Link>
-              <div className="muted" style={{ fontSize: 10, marginTop: 3 }}>{student.studentNo ?? 'Core 매핑 대기'}</div>
+              <div className="record-meta">{student.studentNo ?? 'Core 매핑 대기'}</div>
             </td>
             <td>{student.homeroom ?? (student.grade + '학년')}</td>
             <td className="weight-number success-text">+{student.weeklyPositivePoints}</td>
@@ -398,6 +456,27 @@ function DashboardPage() {
     </div>
 
     <button type="button" onClick={() => setLocation('/students')} style={{ display: 'none' }} data-testid="button-dashboard-hidden-navigation" />
+  </div>;
+}
+
+function SasaengDashboardPage() {
+  const punishments = useListPunishments();
+  const calendar = dashboardCalendar();
+  if (punishments.isLoading) return <LoadingState />;
+  if (punishments.isError) return <ErrorState error={punishments.error} retry={() => punishments.refetch()} />;
+  const active = (punishments.data ?? []).filter((row) => row.startDate <= calendar.date && row.endDate >= calendar.date);
+  const students = new Set(active.map((row) => row.coreStudentId)).size;
+  const violated = new Set(active.filter((row) => row.violated).map((row) => row.coreStudentId)).size;
+  return <div>
+    <PageHeader eyebrow="오늘의 사생회 현황" title={calendar.label} copy={calendar.weekLabel + ' · 기숙사 처분 진행 현황'} action={<Link href="/punishments" className="btn btn-primary"><Plus size={15} /> 기숙사 처분</Link>} />
+    <div className="metric-grid sasaeng-metrics" style={{ marginTop: 30 }}>
+      <div className="card metric-card"><BedDouble size={18} /><div className="metric-value">{students}</div><div className="metric-label">오늘 처분 중인 학생</div><div className="metric-note">기간에 오늘이 포함된 학생 수</div></div>
+      <div className="card metric-card"><ShieldAlert size={18} /><div className="metric-value">{violated}</div><div className="metric-label">위반 표시 학생</div><div className="metric-note">진행 중 처분의 위반 기록</div></div>
+    </div>
+    <div className="section-row"><div><h2 className="section-title">오늘 확인할 처분</h2><p className="section-copy">현재 처분 기간인 학생을 표시합니다.</p></div></div>
+    <div className="card card-pad">
+      {active.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>학생</th><th>처분</th><th>시작일</th><th>종료일</th><th>위반</th></tr></thead><tbody>{active.map((row) => <tr key={row.id}><td>{row.studentName}</td><td>{row.types.join(' · ')}</td><td>{row.startDate}</td><td>{row.endDate}</td><td>{row.violated ? '표시됨' : '없음'}</td></tr>)}</tbody></table></div> : <EmptyState title="진행 중인 기숙사 처분이 없습니다" copy="새 처분은 기숙사 처분 메뉴에서 등록합니다." />}
+    </div>
   </div>;
 }
 
@@ -582,7 +661,8 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
     <PageHeader
       eyebrow={negative ? '생활지도 기록' : '긍정 기록'}
       title={negative ? '벌점 입력' : '상점 입력'}
-      copy={negative ? '아침 종이 시트도 빠르게 옮길 수 있도록 연속 입력에 최적화했습니다.' : '학생의 좋은 행동을 놓치지 않고 상점으로 남깁니다.'}
+      copy={negative ? '아침 종이 시트도 빠르게 옮길 수 있도록 연속 입력에 최적화했습니다.' : '학생의 좋은 행동을 상점으로 남깁니다. 부서활동 상점은 아래 자동반영 관리에서 확인합니다.'}
+      action={<Link href={negative ? '/points/negative/items' : '/points/positive/departments'} className="btn btn-outline">{negative ? '벌점항목관리' : '부서상점 자동반영'}</Link>}
     />
 
     <div className="detail-grid" style={{ marginTop: 30 }}>
@@ -644,7 +724,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
               data-testid="select-point-item"
             >
               <option value="">항목 선택 또는 수기 입력</option>
-              {(items.data ?? []).map((item) => <option key={item.id} value={item.id}>
+              {(items.data ?? []).filter((item) => item.type === type).map((item) => <option key={item.id} value={item.id}>
                 {item.name + (item.fixedPoints != null ? ' · ' + item.fixedPoints + '점' : '')}
               </option>)}
             </select>
@@ -744,7 +824,7 @@ function ReflectionsPage() {
   return <div>
     <PageHeader
       eyebrow="반성문 관리"
-      title="반성문 현황"
+      title="반성문 대상자"
       copy="초등은 익일 등교, 중고등은 기본 17시·필요 시 21시 연장 기준으로 담당 범위별 제출 상태를 확인합니다."
     />
 
@@ -2053,8 +2133,8 @@ function DepartmentMeritAdminPage() {
   return <div>
     <PageHeader
       eyebrow="주간 자동 상점"
-      title="부서 상점 관리"
-      copy="실제 부서활동 명단과 주간 상점 규칙을 운영 DB에서 관리합니다. Git에는 학생 소속 데이터가 저장되지 않습니다."
+      title="부서상점 자동반영"
+      copy="부서 소속과 주간 상점 규칙을 관리합니다. 월요일 시작 주차의 상점은 선도부 첫 접속 때 중복 없이 자동 반영됩니다."
       action={<button className="btn btn-primary" onClick={resetNewDepartment} data-testid="button-new-department"><Plus size={15} /> 새 부서</button>}
     />
 
@@ -2221,10 +2301,10 @@ function DepartmentMeritAdminPage() {
   </div>;
 }
 
-function PointItemsPage() {
+function PointItemsPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
   const queryClient = useQueryClient();
   const notify = useContext(NoticeContext);
-  const items = useListPointItems({ includeInactive: true });
+  const items = useListPointItems({ type, includeInactive: true });
   const create = useCreatePointItem();
   const update = useUpdatePointItem();
   const remove = useDeletePointItem();
@@ -2232,16 +2312,16 @@ function PointItemsPage() {
   const [editing, setEditing] = useState<PointItem | null | undefined>(undefined);
   const [importText, setImportText] = useState('');
   const [showImport, setShowImport] = useState(false);
-  const [form, setForm] = useState({ name: '', type: 'NEGATIVE' as 'NEGATIVE' | 'POSITIVE', fixedPoints: '', isFixed: false, isActive: true });
+  const [form, setForm] = useState({ name: '', type, fixedPoints: '', isFixed: false, isActive: true });
   const list = useMemo(() => importText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => { const [name, score] = line.split(',').map((cell) => cell.trim()); return { name, fixedPoints: score ? Number(score) : null }; }), [importText]);
-  const refresh = () => queryClient.invalidateQueries({ queryKey: getListPointItemsQueryKey({ includeInactive: true }) });
-  const openNew = () => { setForm({ name: '', type: 'NEGATIVE', fixedPoints: '', isFixed: false, isActive: true }); setEditing(null); };
+  const refresh = () => queryClient.invalidateQueries({ queryKey: getListPointItemsQueryKey({ type, includeInactive: true }) });
+  const openNew = () => { setForm({ name: '', type, fixedPoints: '', isFixed: false, isActive: true }); setEditing(null); };
   const openEdit = (item: PointItem) => { setForm({ name: item.name, type: item.type, fixedPoints: item.fixedPoints == null ? '' : String(item.fixedPoints), isFixed: item.isFixed, isActive: item.isActive }); setEditing(item); };
-  const save = (event: FormEvent) => { event.preventDefault(); const data = { name: form.name.trim(), type: form.type, fixedPoints: form.fixedPoints ? Number(form.fixedPoints) : null, isFixed: form.isFixed, isActive: form.isActive }; const done = { onSuccess: () => { refresh(); setEditing(undefined); }, onError: (error: unknown) => notify(errText(error), 'error') }; if (editing) update.mutate({ id: editing.id, data }, done); else create.mutate({ data }, done); };
+  const save = (event: FormEvent) => { event.preventDefault(); const data = { name: form.name.trim(), type, fixedPoints: form.fixedPoints ? Number(form.fixedPoints) : null, isFixed: form.isFixed, isActive: form.isActive }; const done = { onSuccess: () => { refresh(); setEditing(undefined); }, onError: (error: unknown) => notify(errText(error), 'error') }; if (editing) update.mutate({ id: editing.id, data }, done); else create.mutate({ data }, done); };
   const importItems = () => { importer.mutate({ data: { items: list } }, { onSuccess: () => { refresh(); setShowImport(false); setImportText(''); }, onError: (error) => notify(errText(error), 'error') }); };
   if (items.isLoading) return <LoadingState />;
   if (items.isError) return <ErrorState error={items.error} retry={() => items.refetch()} />;
-  return <div><PageHeader eyebrow="기준 관리" title="점수 항목" copy="생활점수 입력에 쓰이는 항목과 고정 점수를 관리합니다." action={<><button className="btn btn-outline" onClick={() => setShowImport(true)} data-testid="button-open-import"><FileSpreadsheet size={15} /> 엑셀 가져오기</button><button className="btn btn-primary" onClick={openNew} data-testid="button-add-point-item"><Plus size={15} /> 항목 추가</button></>} /><div className="card card-pad" style={{ marginTop: 30 }}><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">활성 및 비활성 항목</h2><p className="section-copy">비활성화된 항목은 입력 화면에서 선택되지 않습니다.</p></div></div><div className="table-wrap"><table className="data-table"><thead><tr><th>항목명</th><th>구분</th><th>고정 점수</th><th>상태</th><th>관리</th></tr></thead><tbody>{(items.data ?? []).map((item) => <tr key={item.id} data-testid={`row-point-item-${item.id}`}><td>{item.name}</td><td><span className={`pill ${item.type === 'NEGATIVE' ? 'pill-negative' : 'pill-positive'}`}>{item.type === 'NEGATIVE' ? '벌점' : '상점'}</span></td><td>{item.isFixed ? `${item.fixedPoints ?? 0}점` : '수기 입력'}</td><td><span className={`pill ${item.isActive ? 'pill-positive' : 'pill-neutral'}`}>{item.isActive ? '활성' : '비활성'}</span></td><td><div className="toolbar-right"><button className="btn btn-icon btn-outline" onClick={() => openEdit(item)} aria-label={`${item.name} 수정`} data-testid={`button-edit-point-item-${item.id}`}><Pencil size={14} /></button><button className="btn btn-icon btn-danger" onClick={() => { if (window.confirm(`${item.name} 항목을 비활성화할까요?`)) remove.mutate({ id: item.id }, { onSuccess: refresh, onError: (error) => notify(errText(error), 'error') }); }} aria-label={`${item.name} 삭제`} data-testid={`button-delete-point-item-${item.id}`}><Trash2 size={14} /></button></div></td></tr>)}</tbody></table></div>{items.data?.length === 0 && <EmptyState title="점수 항목이 없습니다" copy="항목을 추가하면 기록 입력 화면에서 선택할 수 있습니다." />}</div>{editing !== undefined && <div className="modal-backdrop"><form className="modal" onSubmit={save}><div className="modal-header"><div><div className="eyebrow">기준 항목</div><h2 className="modal-title">{editing ? '항목 수정' : '새 항목'}</h2></div><button type="button" className="btn btn-icon btn-outline" onClick={() => setEditing(undefined)} aria-label="닫기" data-testid="button-close-point-item"><X size={16} /></button></div><div className="form-grid"><div className="field full"><label htmlFor="item-name">항목명</label><input id="item-name" className="input" required maxLength={80} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} data-testid="input-point-item-name" /></div><div className="field"><label htmlFor="item-type">구분</label><select id="item-type" className="select" value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as 'NEGATIVE' | 'POSITIVE' })} data-testid="select-point-item-type"><option value="NEGATIVE">벌점</option><option value="POSITIVE">상점</option></select></div><div className="field"><label htmlFor="item-score">고정 점수</label><input id="item-score" className="input" type="number" min="0" max="100" value={form.fixedPoints} onChange={(event) => setForm({ ...form, fixedPoints: event.target.value })} placeholder="비워두면 수기 입력" data-testid="input-point-item-score" /></div><label className="check-row field full"><input type="checkbox" checked={form.isFixed} onChange={(event) => setForm({ ...form, isFixed: event.target.checked })} data-testid="checkbox-point-item-fixed" /> 고정 점수 항목으로 사용</label><label className="check-row field full"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} data-testid="checkbox-point-item-active" /> 입력 화면에 활성화</label></div><div className="modal-actions"><button type="button" className="btn btn-outline" onClick={() => setEditing(undefined)} data-testid="button-cancel-point-item">취소</button><button className="btn btn-primary" disabled={create.isPending || update.isPending} data-testid="button-submit-point-item">저장하기</button></div></form></div>}{showImport && <div className="modal-backdrop"><div className="modal modal-wide"><div className="modal-header"><div><div className="eyebrow">대량 등록</div><h2 className="modal-title">엑셀 미리보기</h2></div><button className="btn btn-icon btn-outline" onClick={() => setShowImport(false)} aria-label="닫기" data-testid="button-close-import"><X size={16} /></button></div><div className="csv-hint"><span>첫 번째 열은 항목명, 두 번째 열은 고정 점수입니다.</span><label className="btn btn-outline" htmlFor="csv-file"><FileSpreadsheet size={14} /> 파일 선택</label><input id="csv-file" type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={(event) => { const file = event.target.files?.[0]; if (file) file.text().then(setImportText); }} data-testid="input-import-file" /></div><textarea className="input" style={{ marginTop: 15, width: '100%', minHeight: 100, resize: 'vertical' }} placeholder={'생활 태도, 2\n기숙사 정리, 1'} value={importText} onChange={(event) => setImportText(event.target.value)} data-testid="textarea-import-data" /><div className="import-preview" style={{ marginTop: 15 }}><table className="data-table"><thead><tr><th>항목명</th><th>고정 점수</th><th>검증</th></tr></thead><tbody>{list.map((item, index) => <tr key={`${item.name}-${index}`}><td>{item.name || '이름 없음'}</td><td>{Number.isFinite(item.fixedPoints) ? item.fixedPoints : '수기 입력'}</td><td>{item.name && (!item.fixedPoints || (item.fixedPoints >= 0 && item.fixedPoints <= 100)) ? <span className="success-text">유효</span> : <span className="danger-text">확인 필요</span>}</td></tr>)}</tbody></table></div><div className="modal-actions"><button className="btn btn-outline" onClick={() => setShowImport(false)} data-testid="button-cancel-import">취소</button><button className="btn btn-primary" disabled={importer.isPending || list.length === 0} onClick={importItems} data-testid="button-submit-import">{importer.isPending ? '가져오는 중' : `${list.length}개 가져오기`}</button></div></div></div>}</div>;
+  return <div><PageHeader eyebrow="기준 관리" title={type === 'NEGATIVE' ? '벌점항목관리' : '상점항목관리'} copy={(type === 'NEGATIVE' ? '벌점' : '상점') + ' 입력에 쓰이는 항목과 고정 점수를 관리합니다.'} action={<>{type === 'NEGATIVE' && <button className="btn btn-outline" onClick={() => setShowImport(true)} data-testid="button-open-import"><FileSpreadsheet size={15} /> 엑셀 가져오기</button>}<button className="btn btn-primary" onClick={openNew} data-testid="button-add-point-item"><Plus size={15} /> 항목 추가</button></>} /><div className="card card-pad" style={{ marginTop: 30 }}><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">활성 및 비활성 항목</h2><p className="section-copy">비활성화된 항목은 입력 화면에서 선택되지 않습니다.</p></div></div><div className="table-wrap"><table className="data-table"><thead><tr><th>항목명</th><th>구분</th><th>고정 점수</th><th>상태</th><th>관리</th></tr></thead><tbody>{(items.data ?? []).map((item) => <tr key={item.id} data-testid={`row-point-item-${item.id}`}><td>{item.name}</td><td><span className={`pill ${item.type === 'NEGATIVE' ? 'pill-negative' : 'pill-positive'}`}>{item.type === 'NEGATIVE' ? '벌점' : '상점'}</span></td><td>{item.isFixed ? `${item.fixedPoints ?? 0}점` : '수기 입력'}</td><td><span className={`pill ${item.isActive ? 'pill-positive' : 'pill-neutral'}`}>{item.isActive ? '활성' : '비활성'}</span></td><td><div className="toolbar-right"><button className="btn btn-icon btn-outline" onClick={() => openEdit(item)} aria-label={`${item.name} 수정`} data-testid={`button-edit-point-item-${item.id}`}><Pencil size={14} /></button><button className="btn btn-icon btn-danger" onClick={() => { if (window.confirm(`${item.name} 항목을 비활성화할까요?`)) remove.mutate({ id: item.id }, { onSuccess: refresh, onError: (error) => notify(errText(error), 'error') }); }} aria-label={`${item.name} 삭제`} data-testid={`button-delete-point-item-${item.id}`}><Trash2 size={14} /></button></div></td></tr>)}</tbody></table></div>{items.data?.length === 0 && <EmptyState title="항목이 없습니다" copy="항목을 추가하면 기록 입력 화면에서 선택할 수 있습니다." />}</div>{editing !== undefined && <div className="modal-backdrop"><form className="modal" onSubmit={save}><div className="modal-header"><div><div className="eyebrow">기준 항목</div><h2 className="modal-title">{editing ? '항목 수정' : '새 항목'}</h2></div><button type="button" className="btn btn-icon btn-outline" onClick={() => setEditing(undefined)} aria-label="닫기" data-testid="button-close-point-item"><X size={16} /></button></div><div className="form-grid"><div className="field full"><label htmlFor="item-name">항목명</label><input id="item-name" className="input" required maxLength={80} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} data-testid="input-point-item-name" /></div><div className="field"><label>구분</label><span className={'pill ' + (type === 'NEGATIVE' ? 'pill-negative' : 'pill-positive')}>{type === 'NEGATIVE' ? '벌점' : '상점'}</span></div><div className="field"><label htmlFor="item-score">고정 점수</label><input id="item-score" className="input" type="number" min="0" max="100" value={form.fixedPoints} onChange={(event) => setForm({ ...form, fixedPoints: event.target.value })} placeholder="비워두면 수기 입력" data-testid="input-point-item-score" /></div><label className="check-row field full"><input type="checkbox" checked={form.isFixed} onChange={(event) => setForm({ ...form, isFixed: event.target.checked })} data-testid="checkbox-point-item-fixed" /> 고정 점수 항목으로 사용</label><label className="check-row field full"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} data-testid="checkbox-point-item-active" /> 입력 화면에 활성화</label></div><div className="modal-actions"><button type="button" className="btn btn-outline" onClick={() => setEditing(undefined)} data-testid="button-cancel-point-item">취소</button><button className="btn btn-primary" disabled={create.isPending || update.isPending} data-testid="button-submit-point-item">저장하기</button></div></form></div>}{showImport && <div className="modal-backdrop"><div className="modal modal-wide"><div className="modal-header"><div><div className="eyebrow">대량 등록</div><h2 className="modal-title">엑셀 미리보기</h2></div><button className="btn btn-icon btn-outline" onClick={() => setShowImport(false)} aria-label="닫기" data-testid="button-close-import"><X size={16} /></button></div><div className="csv-hint"><span>첫 번째 열은 항목명, 두 번째 열은 고정 점수입니다.</span><label className="btn btn-outline" htmlFor="csv-file"><FileSpreadsheet size={14} /> 파일 선택</label><input id="csv-file" type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={(event) => { const file = event.target.files?.[0]; if (file) file.text().then(setImportText); }} data-testid="input-import-file" /></div><textarea className="input" style={{ marginTop: 15, width: '100%', minHeight: 100, resize: 'vertical' }} placeholder={'생활 태도, 2\n기숙사 정리, 1'} value={importText} onChange={(event) => setImportText(event.target.value)} data-testid="textarea-import-data" /><div className="import-preview" style={{ marginTop: 15 }}><table className="data-table"><thead><tr><th>항목명</th><th>고정 점수</th><th>검증</th></tr></thead><tbody>{list.map((item, index) => <tr key={`${item.name}-${index}`}><td>{item.name || '이름 없음'}</td><td>{Number.isFinite(item.fixedPoints) ? item.fixedPoints : '수기 입력'}</td><td>{item.name && (!item.fixedPoints || (item.fixedPoints >= 0 && item.fixedPoints <= 100)) ? <span className="success-text">유효</span> : <span className="danger-text">확인 필요</span>}</td></tr>)}</tbody></table></div><div className="modal-actions"><button className="btn btn-outline" onClick={() => setShowImport(false)} data-testid="button-cancel-import">취소</button><button className="btn btn-primary" disabled={importer.isPending || list.length === 0} onClick={importItems} data-testid="button-submit-import">{importer.isPending ? '가져오는 중' : `${list.length}개 가져오기`}</button></div></div></div>}</div>;
 }
 
 function PublicHome() {
@@ -2251,6 +2331,7 @@ function PublicHome() {
 
 function LoginPage() {
   const { session, loading } = useAuth();
+  const { dark, toggle } = useTheme();
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
@@ -2272,7 +2353,7 @@ function LoginPage() {
     }
     // On success the auth listener updates the session and the redirect above renders.
   };
-  return <div className="landing" style={{ display: 'grid', placeItems: 'center', minHeight: '100dvh', padding: 20 }}><div style={{ width: '100%', maxWidth: 460 }}><div style={{ textAlign: 'center', marginBottom: 24 }}><Brand /><p className="subheading">관리자 계정으로 운영 콘솔에 들어갑니다.</p></div><form className="card card-pad" onSubmit={submit}><div className="eyebrow">관리자 로그인</div><h1 className="modal-title" style={{ marginTop: 8 }}>다니엘의 저울</h1><p className="section-copy" style={{ marginTop: 6 }}>승인된 운영 담당자만 로그인할 수 있습니다.</p><div className="form-grid" style={{ marginTop: 22 }}><div className="field full"><label htmlFor="login-id">아이디</label><input id="login-id" className="input" required autoComplete="username" value={loginId} onChange={(event) => setLoginId(event.target.value)} data-testid="input-login-id" /></div><div className="field full"><label htmlFor="login-password">비밀번호</label><input id="login-password" className="input" type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} data-testid="input-login-password" /></div></div>{error && <p className="danger-text" style={{ fontSize: 12, marginTop: 14 }} role="alert" data-testid="text-login-error">{error}</p>}<div className="modal-actions"><button className="btn btn-primary" style={{ width: '100%' }} disabled={pending} data-testid="button-submit-login">{pending ? '로그인 중' : '로그인'}</button></div></form></div></div>;
+  return <div className="landing" style={{ display: 'grid', placeItems: 'center', minHeight: '100dvh', padding: 20 }}><div className="login-theme"><ThemeToggle dark={dark} toggle={toggle} /></div><div style={{ width: '100%', maxWidth: 460 }}><div style={{ textAlign: 'center', marginBottom: 24 }}><Brand /><p className="subheading">관리자 계정으로 운영 콘솔에 들어갑니다.</p></div><form className="card card-pad" onSubmit={submit}><div className="eyebrow">관리자 로그인</div><h1 className="modal-title" style={{ marginTop: 8 }}>다니엘의 저울</h1><p className="section-copy" style={{ marginTop: 6 }}>승인된 운영 담당자만 로그인할 수 있습니다.</p><div className="form-grid" style={{ marginTop: 22 }}><div className="field full"><label htmlFor="login-id">아이디</label><input id="login-id" className="input" required autoComplete="username" value={loginId} onChange={(event) => setLoginId(event.target.value)} data-testid="input-login-id" /></div><div className="field full"><label htmlFor="login-password">비밀번호</label><input id="login-password" className="input" type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} data-testid="input-login-password" /></div></div>{error && <p className="danger-text" style={{ fontSize: 12, marginTop: 14 }} role="alert" data-testid="text-login-error">{error}</p>}<div className="modal-actions"><button className="btn btn-primary" style={{ width: '100%' }} disabled={pending} data-testid="button-submit-login">{pending ? '로그인 중' : '로그인'}</button></div></form></div></div>;
 }
 
 function ChangePasswordPage() {
@@ -2375,7 +2456,26 @@ function ProtectedRoutes() {
   if (!admin) return <div className="app-loading"><div className="error-box"><AlertTriangle size={24} /><p>관리자 권한이 없는 계정입니다. 운영 담당자에게 문의해주세요.</p><button className="btn btn-outline" onClick={() => signOut()} data-testid="button-no-admin-sign-out"><LogOut size={14} /> 로그아웃</button></div></div>;
   if (!admin.isActive) return <div className="app-loading"><div className="error-box"><ShieldAlert size={24} /><p>비활성화된 관리자 계정입니다. 선도부장에게 문의해주세요.</p><button className="btn btn-outline" onClick={() => signOut()}><LogOut size={14} /> 로그아웃</button></div></div>;
   if (admin.mustChangePassword) return <ChangePasswordPage />;
-  return <AppShell role={admin.role}><Switch><Route path="/dashboard" component={DashboardPage} /><Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} /><Route path="/students/:id" component={StudentDetailPage} /><Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} /><Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} /><Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} /><Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} /><Route path="/settlement" component={() => <LeadGate><SettlementPage /></LeadGate>} /><Route path="/audit" component={() => <LeadGate><AuditLogPage /></LeadGate>} /><Route path="/admins" component={() => <LeadGate><AdminAccountsPage /></LeadGate>} /><Route path="/core-setup" component={() => <LeadGate><CoreSetupPage /></LeadGate>} /><Route path="/department-merits" component={() => <LeadGate><DepartmentMeritAdminPage /></LeadGate>} /><Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} /><Route path="/point-items" component={() => <RoleGate role="SEONDO"><PointItemsPage /></RoleGate>} /><Route path="/"><Redirect to="/dashboard" /></Route><Route component={NotFoundInline} /></Switch></AppShell>;
+  return <AppShell role={admin.role}><Switch>
+    <Route path="/dashboard" component={admin.role === 'SASAENG' ? SasaengDashboardPage : DashboardPage} />
+    <Route path="/students/:id" component={StudentDetailPage} />
+    <Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} />
+    <Route path="/points/positive/departments" component={() => <LeadGate><DepartmentMeritAdminPage /></LeadGate>} />
+    <Route path="/points/positive/items" component={() => <RoleGate role="SEONDO"><PointItemsPage type="POSITIVE" /></RoleGate>} />
+    <Route path="/points/positive" component={() => <RoleGate role="SEONDO"><PointEntryPage type="POSITIVE" /></RoleGate>} />
+    <Route path="/points/negative/items" component={() => <RoleGate role="SEONDO"><PointItemsPage type="NEGATIVE" /></RoleGate>} />
+    <Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} />
+    <Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} />
+    <Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} />
+    <Route path="/settlement" component={() => <LeadGate><SettlementPage /></LeadGate>} />
+    <Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} />
+    <Route path="/admins" component={() => <LeadGate><AdminAccountsPage /></LeadGate>} />
+    <Route path="/core-setup" component={() => <LeadGate><CoreSetupPage /></LeadGate>} />
+    <Route path="/audit" component={() => <LeadGate><AuditLogPage /></LeadGate>} />
+    <Route path="/department-merits"><Redirect to="/points/positive/departments" /></Route>
+    <Route path="/point-items"><Redirect to="/points/negative/items" /></Route>
+    <Route path="/"><Redirect to="/dashboard" /></Route>
+    <Route component={NotFoundInline} /></Switch></AppShell>;
 }
 
 function NotFoundInline() {
@@ -2392,7 +2492,7 @@ function MissingEnvScreen() {
 
 function App() {
   if (!supabaseConfigured) return <MissingEnvScreen />;
-  return <QueryClientProvider client={queryClient}><AuthProvider><WouterRouter base={basePath}><Router /></WouterRouter></AuthProvider></QueryClientProvider>;
+  return <QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><WouterRouter base={basePath}><Router /></WouterRouter></AuthProvider></ThemeProvider></QueryClientProvider>;
 }
 
 export default App;
