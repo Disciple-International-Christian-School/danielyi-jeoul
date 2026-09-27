@@ -2134,7 +2134,7 @@ function DepartmentMeritAdminPage() {
     <PageHeader
       eyebrow="주간 자동 상점"
       title="부서상점 자동반영"
-      copy="부서 소속과 주간 상점 규칙을 관리합니다. 월요일 시작 주차의 상점은 선도부 첫 접속 때 중복 없이 자동 반영됩니다."
+      copy="부서 소속과 주간 상점 규칙을 관리합니다. 매주 월요일 00:00(한국 시간) 자동 반영하고, 선도부 접속 시 누락 건을 다시 확인합니다."
       action={<button className="btn btn-primary" onClick={resetNewDepartment} data-testid="button-new-department"><Plus size={15} /> 새 부서</button>}
     />
 
