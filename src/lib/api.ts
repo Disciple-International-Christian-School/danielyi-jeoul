@@ -1177,6 +1177,7 @@ export function useListPointItems(params?: { type?: PointType; includeInactive?:
 export function useListReflections() {
   return useQuery({
     queryKey: getListReflectionsQueryKey(),
+    refetchInterval: 60_000, // Deadline-derived status can change while the console stays open.
     queryFn: async (): Promise<Reflection[]> => {
       const rows = unwrap<ReflectionRow[]>(
         await supabase.from('v_reflections').select('*').order('recorded_at', { ascending: false }),
