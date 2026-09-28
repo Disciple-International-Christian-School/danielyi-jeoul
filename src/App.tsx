@@ -110,6 +110,7 @@ import {
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
 import './index.css';
+import { DashboardView } from '@/components/dashboard';
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -325,144 +326,19 @@ function DashboardPage() {
   const dashboard = useGetDashboard();
   const reflections = useListReflections();
   const departmentStatus = useDepartmentMeritStatus();
+  const settlement = useCurrentSettlement();
   const { admin } = useAuth();
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<'net' | 'grade' | 'name'>('net');
-  const [targetFilter, setTargetFilter] = useState<'ALL' | 'PHYSICAL' | 'COMMITTEE'>('ALL');
-
-  const rows = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    const list = (dashboard.data?.students ?? []).filter((student) =>
-      matchesDisciplineScope(student.grade, admin?.disciplineScope)
-      && (targetFilter === 'ALL' || (targetFilter === 'PHYSICAL' ? student.physicalTrainingRequired : student.committeeRequired))
-      && (!needle
-      || student.name.toLowerCase().includes(needle)
-      || (student.studentNo ?? '').toLowerCase().includes(needle)
-      || (student.homeroom ?? '').toLowerCase().includes(needle))
-    );
-    return [...list].sort((a, b) =>
-      sort === 'name'
-        ? a.name.localeCompare(b.name, 'ko')
-        : sort === 'grade'
-          ? a.grade - b.grade || (a.homeroom ?? '').localeCompare(b.homeroom ?? '', 'ko')
-          : b.weeklyNetPenaltyPoints - a.weeklyNetPenaltyPoints
-    );
-  }, [dashboard.data?.students, admin?.disciplineScope, search, sort, targetFilter]);
-
   if (dashboard.isLoading || reflections.isLoading) return <LoadingState />;
   if (dashboard.isError || reflections.isError || !dashboard.data) return <ErrorState error={dashboard.error ?? reflections.error} retry={() => { dashboard.refetch(); reflections.refetch(); }} />;
-
-  const calendar = dashboardCalendar();
-  const scopeStudents = dashboard.data.students.filter((student) => matchesDisciplineScope(student.grade, admin?.disciplineScope));
-  const scopeReflections = (reflections.data ?? []).filter((reflection) => matchesDisciplineScope(reflection.grade, admin?.disciplineScope));
-  const personCount = (predicate: (reflection: (typeof scopeReflections)[number]) => boolean) => new Set(scopeReflections.filter(predicate).map((reflection) => reflection.coreStudentId)).size;
-  const settlementLabel = dashboard.data.students.find((student) => student.settlementPeriodLabel)?.settlementPeriodLabel ?? '정산기간 미설정';
-  const metrics = [
-    ['반성문 대상자', personCount((reflection) => reflection.recordedAt.slice(0, 10) === calendar.date), '오늘 벌점으로 반성문이 생성된 학생', BookOpenCheck, 'TODAY'],
-    ['반성문 미제출자', personCount((reflection) => reflection.status !== 'SUBMITTED'), '이전 날짜 포함 · 아직 제출하지 않은 학생', BookOpenCheck, 'MISSING'],
-    ['2배 제출 대상자', personCount((reflection) => reflection.status === 'DOUBLE'), '미제출자 중 마감이 지난 학생', AlertTriangle, 'DOUBLE'],
-    ['체력훈련 대상자', scopeStudents.filter((student) => student.physicalTrainingRequired).length, '이번 주 3회 또는 NET 8점 이상', ShieldAlert, 'PHYSICAL'],
-    ['징계위원회 대상자', scopeStudents.filter((student) => student.committeeRequired).length, '현재 정산기간 판정', ShieldAlert, 'COMMITTEE'],
-  ] as const;
-
-  return <div>
-    <PageHeader
-      eyebrow="오늘의 생활지도 현황"
-      title={calendar.label}
-      copy={calendar.weekLabel + ' · ' + settlementLabel + ' 정산기간'}
-      action={<Link href="/points/positive" className="btn btn-primary" data-testid="link-quick-positive"><Plus size={15} /> 상점 입력</Link>}
-    />
-
-    <div className="metric-grid" style={{ marginTop: 30 }}>
-      {metrics.map(([label, value, note, Icon, view], index) => {
-        const content = <><Icon size={17} /><div className="metric-value">{value}</div><div className="metric-label">{label}</div><div className="metric-note">{note}</div></>;
-        return view === 'PHYSICAL' || view === 'COMMITTEE'
-          ? <button type="button" className="card metric-card metric-action" key={label} onClick={() => { setTargetFilter(view); document.getElementById('dashboard-students')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} data-testid={'card-metric-' + index}>{content}</button>
-          : <Link href={`/reflections?view=${view}`} className="card metric-card metric-action" key={label} data-testid={'card-metric-' + index}>{content}</Link>;
-      })}
-    </div>
-
-    {admin?.isLead && <div className="side-note" style={{ marginTop: 20 }}>
-      <strong>부서상점 자동반영</strong>
-      <span style={{ marginLeft: 10 }}>
-        {(departmentStatus.data?.length ?? 0) > 0 ? `이번 주 ${departmentStatus.data?.filter((row) => row.generated).length ?? 0}/${departmentStatus.data?.length ?? 0}건 반영` : '부서 규칙과 소속 학생을 설정해 주세요.'}
-      </span>
-      {admin?.isLead && <Link href="/points/positive/departments" className="inline-link">반영 내역·규칙 관리</Link>}
-    </div>}
-
-    <div className="section-row" id="dashboard-students">
-      <div>
-        <h2 className="section-title">학생 상태 목록</h2>
-        <p className="section-copy">상점·벌점 원점수는 보존하고, 처벌 판단에는 벌점 - 상점 NET을 사용합니다.</p>
-      </div>
-      <div className="toolbar-right">
-        <select className="select" value={targetFilter} onChange={(event) => setTargetFilter(event.target.value as 'ALL' | 'PHYSICAL' | 'COMMITTEE')} aria-label="대상자 필터" data-testid="select-dashboard-target">
-          <option value="ALL">전체 학생</option>
-          <option value="PHYSICAL">체력훈련 대상자</option>
-          <option value="COMMITTEE">징계위원회 대상자</option>
-        </select>
-        <div className="search-box"><Search size={15} /><input
-          className="input"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="이름 · 학번 · 반 검색"
-          aria-label="학생 검색"
-          data-testid="input-dashboard-search"
-        /></div>
-        <select
-          className="select"
-          value={sort}
-          onChange={(event) => setSort(event.target.value as 'net' | 'grade' | 'name')}
-          aria-label="학생 정렬"
-          data-testid="select-dashboard-sort"
-        >
-          <option value="net">주간 NET 높은 순</option>
-          <option value="grade">학년/반 순</option>
-          <option value="name">이름 순</option>
-        </select>
-      </div>
-    </div>
-
-    <div className="card card-pad table-wrap">
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>학생</th>
-            <th>학년 / 반</th>
-            <th>주간 상점</th>
-            <th>주간 벌점</th>
-            <th>주간 NET</th>
-            <th>정산 NET</th>
-            <th>상태</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((student) => <tr key={student.id} data-testid={'row-dashboard-student-' + student.id}>
-            <td>
-              <Link className="table-link" href={'/students/' + (student.coreStudentId ?? student.id)} data-testid={'link-dashboard-student-' + student.id}>{student.name}</Link>
-              <div className="record-meta">{student.studentNo ?? 'Core 매핑 대기'}</div>
-            </td>
-            <td>{student.homeroom ?? (student.grade + '학년')}</td>
-            <td className="weight-number success-text">+{student.weeklyPositivePoints}</td>
-            <td className="weight-number danger-text">{student.weeklyPenaltyPoints}</td>
-            <td className={student.weeklyNetPenaltyPoints >= 8 ? 'weight-number danger-text' : 'weight-number'}>
-              {student.weeklyNetPenaltyPoints}
-            </td>
-            <td className={student.settlementNetPenaltyPoints >= 20 ? 'weight-number danger-text' : 'weight-number'}>
-              {student.settlementNetPenaltyPoints}
-            </td>
-            <td><div className="status-list">
-              {student.statuses.length
-                ? student.statuses.map((status) => <span className="pill pill-warning" key={status}>{status}</span>)
-                : <span className="pill pill-positive"><Check size={11} /> 양호</span>}
-            </div></td>
-          </tr>)}
-        </tbody>
-      </table>
-      {rows.length === 0 && <EmptyState title="해당 학생이 없습니다" copy={search ? '검색어나 대상자 필터를 바꿔 보세요.' : '선택한 상태의 대상자가 없습니다.'} />}
-    </div>
-
-  </div>;
+  return <DashboardView
+    students={dashboard.data.students.filter(student => matchesDisciplineScope(student.grade, admin?.disciplineScope))}
+    reflections={(reflections.data ?? []).filter(reflection => matchesDisciplineScope(reflection.grade, admin?.disciplineScope))}
+    calendar={dashboardCalendar()}
+    scope={admin?.disciplineScope}
+    isLead={Boolean(admin?.isLead)}
+    departments={{ data: departmentStatus.data, loading: departmentStatus.isLoading, error: departmentStatus.isError }}
+    settlement={{ data: settlement.data, loading: settlement.isLoading, error: settlement.isError }}
+  />;
 }
 
 function SasaengDashboardPage() {
@@ -2506,3 +2382,4 @@ function App() {
 }
 
 export default App;
+

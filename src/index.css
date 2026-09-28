@@ -611,3 +611,22 @@ html { -webkit-text-size-adjust: 100%; }
   .nav-link, .btn, .metric-action { transition: none; }
   .nav-link:hover, .btn:hover, .metric-action:hover { transform: none; }
 }
+
+
+/* Shared console framing aligned with the dashboard. */
+@media (min-width: 821px) {
+  .sidebar { width: 244px; flex-basis: 244px; padding: 26px 14px 18px; }
+  .sidebar .brand { gap: 9px; padding: 0 9px 28px; }
+  .sidebar .brand-name { font-size: 18px; }
+  .topbar { padding-inline: 36px; }
+  .content { max-width: 1480px; padding: 36px 36px 70px; }
+}
+.sidebar { background: #203e38; }
+.sidebar .nav-link.active { background: #ffffff14; color: #e3eed8; box-shadow: inset 3px 0 #c6d6a9; }
+.sidebar .nav-link { border: 0; }
+.sidebar .nav-child { border-left: 1px solid #ffffff30; }
+.sidebar .nav-link:hover { transform: none; }
+.sidebar-bottom > button { background: transparent; text-align: left; }
+.topbar { height: 68px; border-bottom-color: hsl(var(--foreground) / .1); }
+.topbar-title { font-size: 15px; font-weight: 650; }
+@media (max-width: 560px) { .topbar { height: 64px; } .content { padding-top: 25px; } }
