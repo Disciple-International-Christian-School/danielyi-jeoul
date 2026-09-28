@@ -630,3 +630,5 @@ html { -webkit-text-size-adjust: 100%; }
 .topbar { height: 68px; border-bottom-color: hsl(var(--foreground) / .1); }
 .topbar-title { font-size: 15px; font-weight: 650; }
 @media (max-width: 560px) { .topbar { height: 64px; } .content { padding-top: 25px; } }
+.mobile-brand .brand-mark, .landing .brand-mark { color: hsl(var(--primary)); border-color: hsl(var(--primary) / .5); }
+.sidebar :focus-visible { outline-color: #c6d6a9; }
