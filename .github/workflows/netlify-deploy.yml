@@ -1,0 +1,79 @@
+name: Deploy Daniels Scale to Netlify
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'vite.config.ts'
+      - 'netlify.toml'
+      - '.github/workflows/netlify-deploy.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'vite.config.ts'
+      - 'netlify.toml'
+      - '.github/workflows/netlify-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: danielyi-jeoul-netlify-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install project dependencies
+        run: npm ci
+      - name: Verify project
+        run: npm run typecheck
+      - name: Check production build
+        run: npm run build
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install project dependencies
+        run: npm ci
+      - name: Install pinned Netlify CLI
+        run: npm install --prefix "$RUNNER_TEMP/dics-netlify-cli" --no-audit --no-fund --save-exact netlify-cli@27.10.2
+      - name: Build and deploy to the existing Netlify site
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: df6ae713-42c1-4e56-bb5a-e134553fcb24
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ]; then
+            echo "::error::Set the NETLIFY_AUTH_TOKEN repository secret before deploying."
+            exit 1
+          fi
+          "$RUNNER_TEMP/dics-netlify-cli/node_modules/.bin/netlify" deploy \
+            --prod --context=production --site="$NETLIFY_SITE_ID" \
+            --message="$GITHUB_REPOSITORY@$GITHUB_SHA"
