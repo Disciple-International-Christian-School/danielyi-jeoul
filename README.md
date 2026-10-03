@@ -6,6 +6,8 @@ DICS 학생 상점·벌점 관리 콘솔. 관리자 전용 (선도부 / 사생�
 
 ## 문서
 
+- [Organization 무료 Netlify 배포 연결](docs/netlify-deployment.md)
+
 - [초기 구축 기록 — Legacy](docs/LEGACY_INITIAL_BUILD.md)
 - [현재 이후 변경 이력 — Change Log](docs/CHANGELOG.md)
 - [운영 개선 로드맵](docs/OPERATIONS_ROADMAP.md)
@@ -31,6 +33,6 @@ npm run dev
 
 ## 스택
 
-Vite + React + supabase-js. 비즈니스 룰은 Postgres 뷰·트리거·RPC, 권한은 RLS. Netlify가 `main`을 배포한다. `service_role` 키는 클라이언트에 넣지 않는다.
+Vite + React + supabase-js. 비즈니스 룰은 Postgres 뷰·트리거·RPC, 권한은 RLS. Organization 무료 배포용 GitHub Actions·Netlify CLI 설정은 [배포 연결 문서](docs/netlify-deployment.md)를 따른다. `service_role` 키는 클라이언트에 넣지 않는다.
 
 명단 엑셀은 `_local/`에 두며 git에 올리지 않는다. Replit 덤프는 `_replit/`에 `school.ts`와 Drizzle 스키마만 남겨 두었다.
