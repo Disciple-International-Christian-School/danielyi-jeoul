@@ -343,6 +343,12 @@
       "name": "department_merits_monday_cron",
       "status": "TRACKED",
       "file": "supabase/migrations/20260927153350_department_merits_monday_cron.sql"
+    },
+    {
+      "version": "20261015101921",
+      "name": "sync_daniel_roster_from_core",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261015101921_sync_daniel_roster_from_core.sql"
     }
   ]
 }
