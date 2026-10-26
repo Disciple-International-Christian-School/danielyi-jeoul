@@ -10,7 +10,11 @@ The [preview tool](../scripts/prepare-english-history.py) defaults to dry run. W
 
 **The documentation PR does not rewrite existing main history.** GitHub's available commit-creation connector does not expose author/date preservation fields; using it to recreate older commits would change attribution. The prepared owner-run tool avoids that change. It has been exercised on a synthetic merge graph; run its checks on a complete authenticated clone before any remote update.
 
-## Prepare after owner review of the documentation PR
+## GitHub-hosted preview
+
+The `Prepare English history preview` workflow runs once when its preparation files change on this PR branch, and can be run manually after merging. It creates a unique `review/english-history-<run>-<attempt>` branch from the current main, validates identical trees and preserved metadata, and pushes only that new review branch. It never updates main and stops if main moves during preparation. A preview made before the documentation PR merges does not yet contain the PR; regenerate it afterward.
+
+## Prepare locally after owner review of the documentation PR
 
 ```bash
 git fetch origin

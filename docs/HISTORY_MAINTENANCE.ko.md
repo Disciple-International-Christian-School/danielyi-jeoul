@@ -10,7 +10,11 @@ scripts/prepare-english-history.py는 기본 모의 실행이다. --apply를 주
 
 문서 PR은 기존 main 이력을 바꾸지 않는다. 현재 GitHub 커밋 생성 연결 도구는 과거 작성자·시각 지정 기능이 없어 그대로 재생성하면 기여 정보가 바뀐다. Owner용 도구는 이를 보존하며 가상 병합 그래프로 검증했다. 실제 반영 전 인증된 전체 복제에서도 확인한다.
 
-## 문서 PR 검토 후 준비
+## GitHub 미리보기
+
+Prepare English history preview 워크플로는 이 PR 브랜치의 준비 파일 변경 시 실행하고 병합 후 수동 실행도 가능하다. 현재 main에서 고유한 review/english-history-실행번호-시도번호 브랜치를 만들고 동일 트리·기여 정보 보존을 검증해 그 새 브랜치만 올린다. main은 바꾸지 않고 준비 중 main이 변하면 중단한다. 문서 PR 병합 전 미리보기에는 문서 변경이 없으므로 병합 후 다시 생성한다.
+
+## 문서 PR 검토 후 로컬 준비
 
 ```bash
 git fetch origin
