@@ -3,6 +3,7 @@ import { ArrowDownRight, ArrowRight, ArrowUpRight, BookOpenCheck, CalendarDays, 
 import { Link } from 'wouter';
 import type { DepartmentMeritStatus, DisciplineScope, Reflection, SettlementPeriod, StudentSummary } from '@/lib/api';
 import './dashboard.css';
+import { PointHistory } from './point-history';
 
 type ReadState<T> = { data: T | undefined; loading: boolean; error: boolean };
 type Target = 'ALL' | 'PHYSICAL' | 'COMMITTEE';
@@ -30,6 +31,14 @@ function ActionRow({ href, icon, title, copy, badge }: { href: string; icon: Rea
 }
 
 export function DashboardView({ students, reflections, calendar, scope, isLead, departments, settlement }: Props) {
+  const [historyDate, setHistoryDate] = useState(calendar.date);
+  const [historyVersion, setHistoryVersion] = useState(0);
+  const historyPanel = useRef<HTMLDivElement>(null);
+  const selectHistoryDate = (date: string) => {
+    setHistoryDate(date);
+    setHistoryVersion(value => value + 1);
+    historyPanel.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+  };
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<'net' | 'grade' | 'name'>('net');
   const [target, setTarget] = useState<Target>('ALL');
@@ -94,7 +103,7 @@ export function DashboardView({ students, reflections, calendar, scope, isLead, 
     <div className="desk-work-grid">
       <section className="desk-week" aria-labelledby="desk-week-title">
         <div className="desk-panel-heading"><div><span className="desk-panel-kicker">주간 업무</span><h2 id="desk-week-title">이번 주의 흐름</h2></div><span className="desk-week-range">{shortDate(days[0].date)} – {shortDate(days[6].date)}</span></div>
-        <ol className="desk-week-days" aria-label="이번 주 달력">{days.map(day => <li key={day.date} className={day.date === calendar.date ? 'is-today' : ''} aria-current={day.date === calendar.date ? 'date' : undefined}><span>{day.label}</span><strong>{day.day}</strong><span className="desk-day-marker">{day.date === calendar.date ? '오늘' : '\u00a0'}</span></li>)}</ol>
+        <ol className="desk-week-days" aria-label="이번 주 달력">{days.map(day => <li key={day.date} className={day.date === calendar.date ? 'is-today' : ''} aria-current={day.date === calendar.date ? 'date' : undefined}><button type="button" disabled={day.date > calendar.date} aria-label={day.date + ' 기록 보기'} onClick={() => selectHistoryDate(day.date)}><span>{day.label}</span><strong>{day.day}</strong><span className="desk-day-marker">{day.date === calendar.date ? '오늘' : '\u00a0'}</span></button></li>)}</ol>
         {isLead ? <div className="desk-merit">
           <div className="desk-merit-heading"><span>{!departments.loading && !departments.error && total > 0 && generated === total ? <CircleCheck size={18} /> : <CalendarDays size={18} />}부서상점 자동반영</span><Link href="/points/positive/departments">관리<ArrowRight size={15} /></Link></div>
           <div className="desk-merit-status"><strong>{meritLabel}</strong>{!departments.loading && !departments.error && total > 0 && <span>{generated} / {total}건</span>}</div>
@@ -109,7 +118,7 @@ export function DashboardView({ students, reflections, calendar, scope, isLead, 
     </div>
 
     <section className="desk-students" aria-labelledby="dashboard-students">
-      <div className="desk-students-heading"><div><h2 id="dashboard-students" ref={listHeading} tabIndex={-1}>학생 생활점수<span className="desk-row-count" aria-live="polite">{rows.length}명</span></h2><p>주간 점수와 현재 정산기간의 누적 점수를 확인합니다.</p></div><span className="desk-net-legend">NET = 벌점 − 상점</span></div>
+      <div className="desk-students-heading"><div><h2 id="dashboard-students" ref={listHeading} tabIndex={-1}>학생 생활점수<span className="desk-row-count" aria-live="polite">{rows.length}명</span></h2><p>주간 점수와 현재 정산기간의 누적 점수를 확인합니다.</p></div><span className="desk-net-legend">NET = 벌점 − 상점 · 음수는 상점 우세</span></div>
       <div className="desk-filter-bar"><div className="desk-filter-tabs" role="group" aria-label="대상자 필터">{targetLabels.map(([value, label]) => <button key={value} type="button" aria-pressed={target === value} className={target === value ? 'is-active' : ''} onClick={() => setTarget(value)}>{label}</button>)}</div>
         <div className="desk-search-tools"><div className="search-box"><Search size={17} aria-hidden="true" /><input className="input" value={search} onChange={event => setSearch(event.target.value)} placeholder="이름 · 학번 · 반" aria-label="학생 검색" data-testid="input-dashboard-search" />{search && <button type="button" className="desk-clear-search" aria-label="검색어 지우기" onClick={() => setSearch('')}><X size={15} /></button>}</div><select className="select" value={sort} onChange={event => setSort(event.target.value as typeof sort)} aria-label="학생 정렬" data-testid="select-dashboard-sort"><option value="net">주간 NET 높은 순</option><option value="grade">학년/반 순</option><option value="name">이름 순</option></select></div>
       </div>
@@ -119,5 +128,7 @@ export function DashboardView({ students, reflections, calendar, scope, isLead, 
       {rows.length === 0 && <div className="desk-empty"><Users size={28} aria-hidden="true" /><strong>{search ? '검색 결과가 없습니다' : '해당 대상자가 없습니다'}</strong><p>{search ? '이름·학번·반 또는 선택한 필터를 확인해 주세요.' : '현재 선택한 조건에 해당하는 학생이 없습니다.'}</p>{(search || target !== 'ALL') && <button className="btn btn-outline" type="button" onClick={() => { setSearch(''); setTarget('ALL'); }}>전체 학생 보기</button>}</div>}
       <div className="desk-table-footer"><span>{targetLabels.find(([value]) => value === target)?.[1]} · {rows.length}명</span><span>학생 이름을 누르면 상세 기록으로 이동합니다.</span></div>
     </section>
+    <div ref={historyPanel}><PointHistory key={historyVersion} date={historyDate} today={calendar.date} onDateChange={setHistoryDate} students={students} scope={scope} /></div>
   </div>;
 }
+

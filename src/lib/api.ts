@@ -1159,6 +1159,28 @@ export function useListPointRecords(params: { studentRef: string; limit?: number
   });
 }
 
+/** Read-only archive. Page through every row; never silently truncate at the
+ * PostgREST row limit. Recorded dates, not creation dates, define the period. */
+export function usePointRecordArchive(startsOn: string, endsOn: string) {
+  return useQuery({
+    queryKey: ['point-record-archive', startsOn, endsOn],
+    enabled: Boolean(startsOn && endsOn && startsOn <= endsOn),
+    queryFn: async (): Promise<PointRecord[]> => {
+      const rows: PointRecordRow[] = [];
+      const size = 500;
+      for (let offset = 0; ; offset += size) {
+        const page = unwrap<PointRecordRow[]>(await supabase.from('v_point_records')
+          .select('*').gte('recorded_at', startsOn).lte('recorded_at', endsOn)
+          .order('recorded_at', { ascending: false }).order('id', { ascending: false })
+          .range(offset, offset + size - 1));
+        rows.push(...page);
+        if (page.length < size) break;
+      }
+      return rows.map(mapPointRecord);
+    },
+  });
+}
+
 export function useListPointItems(params?: { type?: PointType; includeInactive?: boolean }) {
   return useQuery({
     queryKey: getListPointItemsQueryKey(params),
@@ -1825,3 +1847,4 @@ export function useImportPointItems() {
     },
   });
 }
+
