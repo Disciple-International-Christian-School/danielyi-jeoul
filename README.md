@@ -1,8 +1,17 @@
 # 다니엘의 저울
 
+**언어 / Language:** [한국어](README.md) | [English](README.en.md)
+
 DICS 학생 상점·벌점 관리 콘솔. 관리자 전용 (선도부 / 사생회). 학생은 로그인하지 않는다.
 
 **앱:** https://dics-daniels-scale.netlify.app
+
+## 시작하기
+
+- [문서 목차 (한국어)](docs/README.md) · [Documentation index (English)](docs/README.en.md)
+- [핵심 이슈 및 확인사항 (한국어)](docs/KEY_ISSUES.md) · [Key issues (English)](docs/KEY_ISSUES.en.md)
+
+대표 README, 문서 목차, 핵심 이슈 요약은 한국어와 영어를 선택해서 볼 수 있습니다. 기존 상세 기술 문서는 원문 언어 그대로 유지됩니다.
 
 ## 문서
 
