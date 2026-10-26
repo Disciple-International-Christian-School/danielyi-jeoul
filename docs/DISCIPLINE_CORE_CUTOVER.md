@@ -1,5 +1,7 @@
 # Discipline Core UUID Cut-over Runbook
 
+**Language / 언어:** [English](DISCIPLINE_CORE_CUTOVER.md) | [한국어](DISCIPLINE_CORE_CUTOVER.ko.md)
+
 > Purpose: safely retire the legacy integer student FK from Daniel's Scale after the discipline domain is fully anchored to `core.students.id`.
 >
 > Status: **COMPLETED / VERIFIED**

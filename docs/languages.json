@@ -1,0 +1,106 @@
+{
+  "default": "en",
+  "pairs": [
+    {
+      "en": "README.md",
+      "ko": "README.ko.md"
+    },
+    {
+      "en": "docs/ADMIN_ACCOUNT_OPERATIONS.md",
+      "ko": "docs/ADMIN_ACCOUNT_OPERATIONS.ko.md"
+    },
+    {
+      "en": "docs/CHANGELOG.md",
+      "ko": "docs/CHANGELOG.ko.md"
+    },
+    {
+      "en": "docs/CORE_MIGRATION_GOVERNANCE.md",
+      "ko": "docs/CORE_MIGRATION_GOVERNANCE.ko.md"
+    },
+    {
+      "en": "docs/DECISIONS.md",
+      "ko": "docs/DECISIONS.ko.md"
+    },
+    {
+      "en": "docs/DEVELOPMENT_JOURNAL.md",
+      "ko": "docs/DEVELOPMENT_JOURNAL.ko.md"
+    },
+    {
+      "en": "docs/DICS_CORE_ARCHITECTURE.md",
+      "ko": "docs/DICS_CORE_ARCHITECTURE.ko.md"
+    },
+    {
+      "en": "docs/DISCIPLINE_CORE_CUTOVER.md",
+      "ko": "docs/DISCIPLINE_CORE_CUTOVER.ko.md"
+    },
+    {
+      "en": "docs/DOCUMENTATION_POLICY.md",
+      "ko": "docs/DOCUMENTATION_POLICY.ko.md"
+    },
+    {
+      "en": "docs/HISTORY_MAINTENANCE.md",
+      "ko": "docs/HISTORY_MAINTENANCE.ko.md"
+    },
+    {
+      "en": "docs/KEY_ISSUES.md",
+      "ko": "docs/KEY_ISSUES.ko.md"
+    },
+    {
+      "en": "docs/LEGACY_INITIAL_BUILD.md",
+      "ko": "docs/LEGACY_INITIAL_BUILD.ko.md"
+    },
+    {
+      "en": "docs/OPERATIONS_ROADMAP.md",
+      "ko": "docs/OPERATIONS_ROADMAP.ko.md"
+    },
+    {
+      "en": "docs/PROJECT_CASE_STUDY.md",
+      "ko": "docs/PROJECT_CASE_STUDY.ko.md"
+    },
+    {
+      "en": "docs/README.md",
+      "ko": "docs/README.ko.md"
+    },
+    {
+      "en": "docs/SP_CORE_MIGRATION_RUNBOOK.md",
+      "ko": "docs/SP_CORE_MIGRATION_RUNBOOK.ko.md"
+    },
+    {
+      "en": "docs/SP_IDENTITY_MIGRATION_PROTOCOL.md",
+      "ko": "docs/SP_IDENTITY_MIGRATION_PROTOCOL.ko.md"
+    },
+    {
+      "en": "docs/STUDY_PLANNER_MIGRATION_PLAN.md",
+      "ko": "docs/STUDY_PLANNER_MIGRATION_PLAN.ko.md"
+    },
+    {
+      "en": "docs/UI_DESIGN_SYSTEM.md",
+      "ko": "docs/UI_DESIGN_SYSTEM.ko.md"
+    },
+    {
+      "en": "docs/architecture.md",
+      "ko": "docs/architecture.ko.md"
+    },
+    {
+      "en": "docs/attachments/SUPABASE_CAPACITY.md",
+      "ko": "docs/attachments/SUPABASE_CAPACITY.ko.md"
+    },
+    {
+      "en": "docs/netlify-deployment.md",
+      "ko": "docs/netlify-deployment.ko.md"
+    },
+    {
+      "en": "docs/spec.md",
+      "ko": "docs/spec.ko.md"
+    }
+  ],
+  "aliases": [
+    "README.en.md",
+    "docs/README.en.md",
+    "docs/KEY_ISSUES.en.md"
+  ],
+  "archives": [
+    "docs/archive/supabase-capacity-source.ko.html",
+    "docs/archive/supabase-capacity-source.ko.pdf"
+  ]
+}

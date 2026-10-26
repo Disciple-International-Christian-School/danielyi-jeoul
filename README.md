@@ -1,47 +1,43 @@
-# 다니엘의 저울
+# Daniel's Scale
 
-**언어 / Language:** [한국어](README.md) | [English](README.en.md)
+**Language / 언어:** [English](README.md) | [한국어](README.ko.md)
 
-DICS 학생 상점·벌점 관리 콘솔. 관리자 전용 (선도부 / 사생회). 학생은 로그인하지 않는다.
+An internal student-guidance operations console for **DICS — Disciple International Christian School**. Administrators manage merit/demerit records, reflection submissions, residential-life sanctions, class notices, and weekly/settlement follow-up. Students do not sign in to this application.
 
-**앱:** https://dics-daniels-scale.netlify.app
+[Project case study](docs/PROJECT_CASE_STUDY.md) · [Documentation](docs/README.md) · [Key issues](docs/KEY_ISSUES.md) · [Development journal](docs/DEVELOPMENT_JOURNAL.md)
 
-## 시작하기
+**Application:** https://dics-daniels-scale.netlify.app
 
-- [문서 목차 (한국어)](docs/README.md) · [Documentation index (English)](docs/README.en.md)
-- [핵심 이슈 및 확인사항 (한국어)](docs/KEY_ISSUES.md) · [Key issues (English)](docs/KEY_ISSUES.en.md)
+## From a school workflow to a shared identity model
 
-대표 README, 문서 목차, 핵심 이슈 요약은 한국어와 영어를 선택해서 볼 수 있습니다. 기존 상세 기술 문서는 원문 언어 그대로 유지됩니다.
+The project began with paper discipline sheets. Integrating learning and school-service apps exposed a deeper problem: each application identified the same student differently. DICS Core separates a durable student UUID from login accounts and academic placement.
 
-## 문서
+The repository records the move from a prototype to database-enforced rules, authenticated audit actors, staged UUID migration, parity checks, and a migration ledger. Historical evidence and its limits are explained in the [case study](docs/PROJECT_CASE_STUDY.md); planned work and dated operational snapshots are labeled separately from completed implementation.
 
-- [Organization 무료 Netlify 배포 연결](docs/netlify-deployment.md)
+## Reading paths
 
-- [초기 구축 기록 — Legacy](docs/LEGACY_INITIAL_BUILD.md)
-- [현재 이후 변경 이력 — Change Log](docs/CHANGELOG.md)
-- [운영 개선 로드맵](docs/OPERATIONS_ROADMAP.md)
-- [개발 서사 / Development Journal](docs/DEVELOPMENT_JOURNAL.md)
-- [Architecture Decision Log](docs/DECISIONS.md)
-- [DICS Core 통합 스키마](docs/DICS_CORE_ARCHITECTURE.md)
-- [Core Migration Governance](docs/CORE_MIGRATION_GOVERNANCE.md)
-- [SP → DICS Core Migration Runbook](docs/SP_CORE_MIGRATION_RUNBOOK.md)
-- [Discipline Core UUID Cut-over](docs/DISCIPLINE_CORE_CUTOVER.md)
-- [개인 관리자 계정 운영 Runbook](docs/ADMIN_ACCOUNT_OPERATIONS.md)
-- [아키텍처](docs/architecture.md)
-- [원본 스펙 (35절)](docs/spec.md)
+| Audience | Start here |
+| --- | --- |
+| School operators | [Operations roadmap](docs/OPERATIONS_ROADMAP.md), [individual admin accounts](docs/ADMIN_ACCOUNT_OPERATIONS.md) |
+| Technical reviewers | [Core architecture](docs/DICS_CORE_ARCHITECTURE.md), [decisions](docs/DECISIONS.md), [UUID cut-over](docs/DISCIPLINE_CORE_CUTOVER.md) |
+| EC/project reviewers | [Case study](docs/PROJECT_CASE_STUDY.md), [journal](docs/DEVELOPMENT_JOURNAL.md), [change log](docs/CHANGELOG.md) |
+| Maintainers | [Deployment](docs/netlify-deployment.md), [migration governance](docs/CORE_MIGRATION_GOVERNANCE.md), [language policy](docs/DOCUMENTATION_POLICY.md) |
 
-## 로컬
+Every maintained Markdown document has an English default and a Korean counterpart with a language link at the top. [The documentation index](docs/README.md) includes historical attachments and translated reading versions.
+
+## Local development
 
 ```bash
-cp .env.example .env   # VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
-npm install
+cp .env.example .env
+# Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.
+npm ci
 npm run dev
 ```
 
-로그인 아이디는 `seondo` (선도부) 또는 `sasaeng` (사생회). `{아이디}@scale.dics.kr`로 매핑된다.
+React 19 + Vite + supabase-js form the client. PostgreSQL views/RPCs/triggers implement rules and RLS enforces permissions. Legacy login IDs seondo/sasaeng map to {login_id}@scale.dics.kr; actual individual-account adoption must be checked with the school. Follow the [account runbook](docs/ADMIN_ACCOUNT_OPERATIONS.md).
 
-## 스택
+## Responsible project evidence
 
-Vite + React + supabase-js. 비즈니스 룰은 Postgres 뷰·트리거·RPC, 권한은 RLS. Organization 무료 배포용 GitHub Actions·Netlify CLI 설정은 [배포 연결 문서](docs/netlify-deployment.md)를 따른다. `service_role` 키는 클라이언트에 넣지 않는다.
+The development record includes Lovable, Replit, Cursor, Claude Code, and GPT-assisted work. An EC submission should identify the applicant's own decisions and implementation with specific PRs/commits; it should not claim sole authorship of the repository or unmeasured impact.
 
-명단 엑셀은 `_local/`에 두며 git에 올리지 않는다. Replit 덤프는 `_replit/`에 `school.ts`와 Drizzle 스키마만 남겨 두었다.
+Use synthetic examples and aggregate results. Never put service_role keys in browser code or student rosters, PINs, credentials, or identity mappings in Git. A historical credential handout was replaced with a blank template; owners must review old Git objects and credential validity before sharing access. The repository remains private unless its owner changes visibility.

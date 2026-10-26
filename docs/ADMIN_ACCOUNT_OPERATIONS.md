@@ -1,5 +1,7 @@
 # Personal Admin Account Operations
 
+**Language / 언어:** [English](ADMIN_ACCOUNT_OPERATIONS.md) | [한국어](ADMIN_ACCOUNT_OPERATIONS.ko.md)
+
 > Purpose: transition Daniel's Scale from shared role accounts to individual authenticated staff accounts while preserving continuity and auditability.
 
 ## 1. Why individual accounts

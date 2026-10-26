@@ -1,0 +1,9 @@
+{
+  "537b3dbbb728f5aa76efd07b7b8a1bf08e9a541a": "Sync the Core student roster into Daniel's Scale automatically (#13)\n\nSynchronize active Core students and current enrollment changes into the Daniel compatibility roster and record the production migration ledger.",
+  "ec0c2abaf2a45aed0609c53586b5cd182266dca4": "Improve dashboard design and weekly operations workflow\n\n* Redesign operations dashboard with weekly context and actionable student status\n\n* Record dashboard visual verification and remove temporary preview fixtures",
+  "a1668f0cfe434858fefb6efe56d5cb84844a80d4": "Improve operational screen typography and contrast",
+  "c0c1c5ea3237d46a058c7df7ce8cdc1f2447bf74": "Nest the student roster under administrator accounts",
+  "fa8e9cd9ceb71912361661a4c830817d3fb22bb9": "Open target lists directly from dashboard cards",
+  "2ae6f20e6dfad0f61a1b4446a178f8c74b7871ef": "Schedule weekly department merits at Monday midnight\n\n* Schedule weekly department merits at Monday midnight KST\n\n* Record successful Cron scheduler probe",
+  "e99e7b52219365ea42f2121dd1e480043642ab0d": "Reorganize navigation and dashboard around operational workflows\n\n* Align operations navigation and dashboard with weekly workflow\n\n* Handle unassigned discipline scope in dashboard filters"
+}

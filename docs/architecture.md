@@ -1,7 +1,9 @@
-# 다니엘의 저울 (daniels-scale) — Architecture
+# Daniel's Scale (daniels-scale) — Architecture
 
-Student merit/demerit (상점·벌점) management console for DICS. Admin-only — two roles
-(선도부 SEONDO, 사생회 SASAENG), students never log in.
+**Language / 언어:** [English](architecture.md) | [한국어](architecture.ko.md)
+
+Student merit/demerit (Merits·Demerits) management console for DICS. Admin-only — two roles
+(Student guidance SEONDO, Residential life SASAENG), students never log in.
 
 **Live:** https://dics-daniels-scale.netlify.app
 **Repo:** https://github.com/shualoalumin/danielyi-jeoul
@@ -10,6 +12,8 @@ Student merit/demerit (상점·벌점) management console for DICS. Admin-only �
 Initial build history: [LEGACY_INITIAL_BUILD.md](./LEGACY_INITIAL_BUILD.md). Ongoing changes: [CHANGELOG.md](./CHANGELOG.md). Business rules: [spec.md](./spec.md).
 
 ---
+
+> Historical architecture snapshot. Later Core UUID, NET/settlement, account, and deployment decisions supersede transitional rules below. See [Change Log](CHANGELOG.md).
 
 ## Where the project stands (2026-09-21)
 
@@ -78,14 +82,14 @@ All timestamps in **Asia/Seoul**. Weeks are **Mon 00:00–Sun 23:59:59**.
 |---|---|
 | Reflection auto-created on NEGATIVE record, deadline = same day (§10) | trigger on `point_records` insert |
 | SUBMITTED / MISSING / DOUBLE (§10) | computed in `v_reflections` — never stored |
-| 체력훈련 대상: week ≥3 벌점 records OR ≥8 벌점 (§11A) | `v_student_summary` |
-| 징계위원회 대상: month ≥20 벌점 (§11B) | `v_student_summary` |
-| 처분 선택 필요: week ≥5 벌점, no active punishment (§14) | `v_student_summary` |
-| 귀가금지 조건 충족: 3 consecutive weeks each ≥5 벌점 (§16) | `v_weekly_penalties` + window check |
-| Punishment: week ≥5 → 1 type, ≥10 → 2; only 운동금지/간식금지/면회금지 (§14–15, 18) | `create_punishment` RPC |
-| Violation → 귀가금지 (§17) | `set_punishment_violation` stamps `violated_at` |
-| 선생님 재량 벌점: 1–5 only, never fixed (§8) | triggers |
-| 상점/벌점 never netted (§34) | separate `positive_points` / `negative_points` |
+| Physical-training eligible: week ≥3 Demerits records OR ≥8 Demerits (§11A) | `v_student_summary` |
+| Committee referral eligible: month ≥20 Demerits (§11B) | `v_student_summary` |
+| Sanction selection required: week ≥5 Demerits, no active punishment (§14) | `v_student_summary` |
+| Home-leave restriction condition met: 3 consecutive weeks each ≥5 Demerits (§16) | `v_weekly_penalties` + window check |
+| Punishment: week ≥5 → 1 type, ≥10 → 2; only Sports restriction/Snack restriction/Visitor restriction (§14–15, 18) | `create_punishment` RPC |
+| Violation → Home-leave restriction (§17) | `set_punishment_violation` stamps `violated_at` |
+| Teacher-discretion demerit: 1–5 only, never fixed (§8) | triggers |
+| Merits/Demerits never netted (§34) | separate `positive_points` / `negative_points` |
 
 Views: `v_student_summary`, `v_reflections`, `v_point_records`, `v_punishments`,
 `v_weekly_penalties`, `v_dashboard_counts`. All `security_invoker = true`.
@@ -129,7 +133,7 @@ _local/                 # gitignored rosters / xlsx
 ## Known gaps (don't copy the Replit dump blindly)
 
 - Express used UTC week/month windows — this port uses Asia/Seoul.
-- 귀가금지 조건 충족 and 처분 선택 필요 were missing in Express; they exist here.
+- Home-leave restriction condition met and Sanction selection required were missing in Express; they exist here.
 - Audit log (spec §31) is not in v1.
 - Real student roster import from Excel is not wired yet — CSV import exists for
   `point_items` only.

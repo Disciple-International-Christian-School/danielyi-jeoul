@@ -1,474 +1,82 @@
 # DICS Core — Decision Log
 
-> **Architecture & operations decisions**
->
-> 이 문서는 “무엇을 만들었는가”보다 **어떤 선택지를 두고 왜 이 결정을 했는가**를 보존한다.
-> Development Journal이 서사라면, 이 문서는 나중에 빠르게 의사결정 근거를 찾기 위한 ledger다.
->
-> 상태: `ACCEPTED`, `TRANSITION`, `OPEN`, `SUPERSEDED`
+**Language / 언어:** [English](DECISIONS.md) | [한국어](DECISIONS.ko.md)
 
----
+This ledger records alternatives and reasons, complementing the narrative [development journal](DEVELOPMENT_JOURNAL.md). Status vocabulary: ACCEPTED, TRANSITION, OPEN, SUPERSEDED. Statuses describe the cited historical decisions; unresolved operational questions require current verification.
 
-| ID | 상태 | 결정 | 핵심 이유 |
-|---|---|---|---|
-| D-001 | ACCEPTED | 학생 자체 UUID와 로그인 Auth UUID를 분리 | 로그인 없는 학생도 존재하며 Auth provider가 학생 identity를 정의하면 안 됨 |
-| D-002 | ACCEPTED | 한 학생 master는 `core.students` 하나 | SP/discipline/lab/assessment의 중복 학생 master 방지 |
-| D-003 | ACCEPTED | 학년/반은 student row가 아니라 term enrollment | 진급·분반 변경 이력 보존 |
-| D-004 | ACCEPTED | 생활지도 판정은 raw 점수 보존 + 파생 NET | 상점/벌점 원기록을 지우지 않으면서 정책 판정 가능 |
-| D-005 | ACCEPTED | calendar month 대신 관리자 종료형 settlement | 실제 귀가 주기가 2–3주로 변동 |
-| D-006 | ACCEPTED | 반성문 deadline은 `timestamptz due_at` | 17:00 / 21:00 / 익일 등교 같은 시간 규칙 필요 |
-| D-007 | ACCEPTED | 운영 날짜는 명시적 Asia/Seoul | UTC 날짜가 아침 업무에서 전날로 보이는 오류 방지 |
-| D-008 | ACCEPTED | 자동 상점은 scheduler보다 idempotent RPC 우선 | 실행 시각보다 중복 없는 결과가 핵심, scheduler 교체 가능 |
-| D-009 | ACCEPTED | 실데이터 migration에서 추정 매칭 금지 | 동명이인·오타가 canonical identity 오염으로 이어질 수 있음 |
-| D-010 | ACCEPTED | 기존 과거 작성자를 추정 backfill하지 않음 | 감사로그는 모르는 값을 null로 남기는 편이 정확 |
-| D-011 | ACCEPTED | SP 외부 Auth UUID와 Core local Auth UUID를 분리 | 서로 다른 Supabase project의 Auth namespace는 FK 공유 불가 |
-| D-012 | TRANSITION | 기존 SP pilot ID 28건을 Core student_no로 보강 | 이미 학생 로그인에 사용 중이며 1:1 검증 완료된 값만 우선 보존 |
-| D-013 | OPEN | 전교생 human-facing student number 발급정책 | 기존 `GGNN` 형식은 학년을 포함해 진급 시 stable ID 원칙과 충돌 |
-| D-014 | OPEN | 기존 SP `GGNN`을 permanent student_no로 유지할지 legacy login alias로 전환할지 | 기존 사용자 경험 보존과 장기 identity 안정성을 함께 고려해야 함 |
-| D-015 | TRANSITION | Daniel 내부에 Core provisioning console 유지 | Core Admin이 별도 앱으로 분리되기 전 안전한 provisioning 경로 필요 |
-| D-016 | TRANSITION | shared Core DB는 중앙 migration ledger를 둔다 | 여러 domain/AI lane이 live DB를 동시에 바꾸면 Git↔DB drift가 발생 |
-| D-017 | ACCEPTED | 외부 Auth mapping 값은 Git/Issue/채팅 handoff 대신 secure migration path로 이동 | Auth UUID·student_no 매핑은 운영 identity data이며 공개 개발 기록과 분리해야 함 |
-| D-018 | ACCEPTED | 공유 관리자 계정은 즉시 삭제하지 않고 개인계정으로 staged transition | 운영 연속성을 보존하면서 audit actor를 개인화하기 위함 |
-| D-019 | ACCEPTED | 개인계정 Auth 생성과 첫 비밀번호 변경 완료 처리는 Edge Function에서 수행 | service credential을 브라우저에 노출하지 않고 실제 Auth 변경 성공을 server-side에서 검증해야 함 |
-| D-020 | ACCEPTED | discipline 원본 FK는 canonical Core UUID 하나만 사용 | dual-key·parity 검증 후 물리 integer FK 제거 완료, legacy ID는 derived compatibility로만 유지 |
-| D-021 | ACCEPTED | destructive identity cut-over 전 aggregate parity evidence를 보존 | live 운영 데이터 손실 없이 전환 근거를 재구성하고 rollback 판단 근거를 남기기 위함 |
-| D-022 | ACCEPTED | Git migration filename version은 live Supabase history와 일치 | 이미 적용된 migration의 재적용/ordering drift를 방지하고 중앙 ledger 재현성을 보장 |
+| ID | Status | Decision | Reason |
+| --- | --- | --- | --- |
+| D-001 | ACCEPTED | Separate canonical student and login UUIDs | Students may have no account; Auth providers must not define person identity |
+| D-002 | ACCEPTED | One student master: core.students | Prevent duplicate masters across learning, discipline, lab, and assessment |
+| D-003 | ACCEPTED | Grade/class in term enrollment | Preserve promotion and section history |
+| D-004 | ACCEPTED | Preserve raw scores and derive NET | Apply policy without erasing original merits/demerits |
+| D-005 | ACCEPTED | Administrator-closed settlement replaces calendar month | Home-leave cycles vary between two and three weeks |
+| D-006 | ACCEPTED | due_at is timestamptz | Express 17:00, 21:00, and next-school-morning deadlines |
+| D-007 | ACCEPTED | Explicit Asia/Seoul dates | Avoid previous-day defaults in morning work |
+| D-008 | ACCEPTED | Idempotent merit RPC before scheduler | Duplicate-free results survive scheduler changes |
+| D-009 | ACCEPTED | No guessed real-data identity matching | Duplicate names/typos can corrupt canonical identity |
+| D-010 | ACCEPTED | Do not guess historical authors | Null is more accurate than invented provenance |
+| D-011 | ACCEPTED | External SP Auth and local Core Auth are separate | Different projects cannot share Auth FKs |
+| D-012 | TRANSITION | Preserve 28 verified pilot numbers | Existing login identifiers were verified one-to-one |
+| D-013 | OPEN | School-wide student-number policy | GGNN embeds grade and conflicts with stable identity after promotion |
+| D-014 | OPEN | Permanent GGNN or legacy login alias | Balance existing login compatibility and durable identification |
+| D-015 | TRANSITION | Core provisioning console in Daniel | Safe interim path before dedicated Core Admin |
+| D-016 | TRANSITION | Central shared-database migration ledger | Parallel live changes otherwise drift from Git |
+| D-017 | ACCEPTED | Identity mappings use a secure migration path | Operational mappings do not belong in Git/issues/chats |
+| D-018 | ACCEPTED | Stage individual-account adoption | Preserve continuity while personalizing audit actors |
+| D-019 | ACCEPTED | Provisioning/password completion in Edge Functions | Keep service credentials server-side and verify real Auth changes |
+| D-020 | ACCEPTED | Discipline stores only canonical UUID FKs | Dual-key/parity gates enabled removal of physical integer FKs |
+| D-021 | ACCEPTED | Store aggregate evidence before destructive cut-over | Preserve a basis for verification and recovery decisions |
+| D-022 | ACCEPTED | Git migration versions match production | Prevent reapplication and ordering drift |
 
----
+## D-001 — Student identity differs from login identity
 
-## D-001 — Canonical Student Identity ≠ Login Identity
+Choose `core.students.id` as canonical UUID and optional `core.students.auth_user_id` as the local Auth link. Reject students.id = auth.users.id: students without accounts still exist, authentication can change, and domains need one stable reference.
 
-### 선택
+## D-009 — Do not turn 28/29 into an invented 29/29
 
-```text
-core.students.id
-= canonical student UUID
+Reconciliation found 29 source rows, 28 exact, one unmatched, zero ambiguous. Apply only 28 verified matches, hold the other for original-source review, and exclude PINs. This rule applies to future roster imports too.
 
-core.students.auth_user_id
-= optional local DICS Core Auth UUID
-```
+## D-011 — External Auth namespace
 
-### 배제한 선택
+SP Auth and Core Auth are independent namespaces. Preserve SP UUID → core.external_auth_identities → canonical student. Only a login provisioned in Core Auth may populate core.students.auth_user_id.
 
-```text
-students.id = auth.users.id
-```
+## D-013 / D-014 — Numbering policy remains open
 
-### 근거
+Pilot IDs such as 0801/0901/1101 encoded two-digit grade plus sequence. If 0802 changes to a G9 number next year, it is not stable. If it stays 0802, users may mistake its prefix for current grade.
 
-- 초등학생 등 로그인 계정이 없는 학생 존재
-- 인증 교체/통합이 학생 PK를 바꾸면 안 됨
-- 여러 domain이 동일 학생을 참조해야 함
+| Option | Benefit | Cost |
+| --- | --- | --- |
+| Keep GGNN permanently | Familiar; easy existing-login compatibility | Embedded grade becomes stale |
+| Keep GGNN as alias and add stable school ID | Stable human identity with old-login compatibility | Two identifiers and transition explanation |
+| Issue a new grade-independent number to all | Clean long-term structure | Change 29 pilot logins, handouts, and habits |
 
----
+No final policy was chosen. Preserve the 28 verified numbers while the school decides before generating numbers for everyone. Canonical UUIDs already exist, so there is no technical need to rush.
 
-## D-009 — “28/29면 29로 만들어버리지 않는다”
+## D-016 — Shared Core migration ownership
 
-SP pilot identity reconciliation에서:
+Core, discipline, study_planner, and computer_lab now share one database. Live-before-Git drift occurred during parallel work. Daniel's migrations are an interim central ledger; a future DICS-Core repository should own shared schema and migration ordering. Completion means rebuilding structure from Git, not merely observing a healthy live DB.
 
-```text
-29 source
-28 exact
-1 unmatched
-0 ambiguous
-```
+## D-017 — Identity bridges are operational data
 
-가 확인됐다.
+Never put actual UUID/number mappings in SQL seeds, issues, or PR comments. Read a trusted source, verify mappings, use an authenticated/service migration path, and invoke guarded Core RPCs. Validate number existence; reject external identity reassignment and conflicting same-source identities; make repeated exact mappings idempotent. PIN/password values never participate.
 
-1건을 가장 비슷한 이름에 자동 배정하지 않았다.
+## D-018 — Shared account to individual account
 
-결정:
+A typed entered_by_name and authenticated auth.uid() do not carry equal evidential weight. Provision personal accounts → verify real workflows → confirm scope → review audit actors → disable shared accounts. Do not remove the fallback first.
 
-- 28 exact만 운영 Core에 반영
-- 1건은 별도 원본 확인 전 pending
-- reconciliation에 PIN 미사용
+## D-019 — Password completion is server-verified
 
-이 규칙은 이후 모든 roster import/mapping에 적용한다.
+The old mark_admin_password_changed() client RPC could clear a flag without changing a password. Replace it with a JWT-authenticated Edge Function that updates Auth and only then clears must_change_password. Provisioning also uses the server-only Auth Admin API. Service credentials never enter browser JavaScript.
 
----
+## D-020 — Completed discipline FK strategy
 
-## D-011 — External Auth Namespace
+Use four stages: dual integer/UUID keys, UUID write entry points, Core reads/routes, then integer dependency removal. Reject immediate one-migration replacement because reflection/weekly/settlement/punishment rules and existing routes were operational. Each phase requires mismatch zero; dual-key triggers reject different-student pairs.
 
-현재:
+## D-021 — Evidence before dropping columns
 
-```text
-SP Supabase Project
-└─ auth.users.id
+Preflight: points 1/1 linked, point mismatch 0; punishments 0/0 linked, mismatch 0; weekly 1/1 and penalties 1/1, mismatch 0; settlement 0/0, mismatch 0; summary 175/175, mismatch 0. Store aggregates in discipline.core_cutover_evidence, with no per-student values. Then remove point_records.student_id and punishments.student_id; retain only core_student_id UUID NOT NULL. Legacy IDs are derived through the public.students bridge for old contracts. These are small historical datasets, not load-test evidence.
 
-DICS Core Supabase Project
-└─ auth.users.id
-```
+## D-022 — Match the live migration ledger
 
-는 별도 namespace다.
-
-따라서:
-
-```text
-SP external UUID
-  ↓
-core.external_auth_identities
-  ↓
-core.students.id
-```
-
-로 transition mapping을 보존한다.
-
-학생 계정이 실제 DICS Core Auth에 provision된 뒤에만:
-
-```text
-core.students.auth_user_id
-→ local auth.users.id
-```
-
-를 사용한다.
-
----
-
-## D-013 / D-014 — Student Number Policy — OPEN
-
-기존 SP pilot ID 예:
-
-```text
-0801
-0901
-1101
-```
-
-은 당시:
-
-```text
-현재 학년 2자리 + 순번
-```
-
-으로 생성됐다.
-
-이 형식은 현재 학년을 직관적으로 알 수 있다는 장점이 있지만,
-진급 시 문제가 생긴다.
-
-예:
-
-```text
-2026: G8 → 0802
-2027: G9 → ?
-```
-
-번호를 `090x`로 바꾸면 cross-system stable key가 아니게 된다.
-
-### 검토 중인 선택지 A — 기존 GGNN을 permanent student_no로 유지
-
-장점:
-- 현재 사용자 익숙함
-- 기존 SP login 유지 쉬움
-
-문제:
-- 번호 속 grade가 시간이 지나며 실제 grade와 달라짐
-- 번호를 “현재 학년”으로 오해할 가능성
-
-### 선택지 B — GGNN은 legacy/login alias로 보존 + 별도 stable school ID
-
-장점:
-- canonical human ID도 장기간 안정
-- 기존 SP 로그인 호환 가능
-
-문제:
-- 전환기에 식별자가 두 개 존재
-- 운영 설명 필요
-
-### 선택지 C — grade-independent 새 번호로 전체 재발급
-
-장점:
-- 가장 깨끗한 장기구조
-
-문제:
-- 기존 29명 login/배부자료/습관 변경 필요
-
-### 현재 결정
-
-**아직 확정하지 않는다.**
-
-이미 검증된 28개 기존 번호는 운영 Core에 보존하되,
-나머지 전교생 번호를 기계적으로 생성하기 전에 school-wide numbering policy를 확정한다.
-
-Canonical UUID는 이미 별도로 존재하므로 이 결정을 서두를 기술적 이유가 없다.
-
-
----
-
-## D-016 — Shared Core Migration Ownership
-
-DICS Core가 실제로 다음 schema를 동시에 담기 시작했다.
-
-```text
-core.*
-discipline.*
-study_planner.*
-computer_lab.*
-```
-
-병렬 작업 중 live migration이 Git보다 먼저 적용되는 drift가 실제로 발생했다.
-
-따라서 현재는 Daniel repo의 `supabase/migrations/`를 임시 ledger로 사용하되,
-장기적으로는 별도 `DICS-Core` repository가 중앙 migration ordering과 `core.*`를 소유하도록 한다.
-
-완료 기준은 단순히 production DB가 동작하는 것이 아니라:
-
-> Git migration history만으로 새 환경의 구조를 재현할 수 있는가?
-
-이다.
-
----
-
-## D-017 — External Identity는 Secure Migration Data
-
-SP의 기존 Auth UUID와 student_no를 Core에 연결해야 하지만,
-이 mapping row 자체는 schema가 아니라 **운영 identity data**다.
-
-따라서 다음 방식은 사용하지 않는다.
-
-```text
-❌ Git SQL seed에 실제 mapping 작성
-❌ GitHub Issue에 UUID/student_no 목록 첨부
-❌ PR comment로 실데이터 전달
-```
-
-허용되는 방향:
-
-```text
-trusted source read
-        ↓
-verified mapping
-        ↓
-authenticated/service migration path
-        ↓
-Core guarded RPC
-        ↓
-core.external_auth_identities
-```
-
-Core RPC는:
-
-- student_no가 실제 Core 학생인지 확인
-- external identity가 다른 학생에게 연결되어 있으면 거부
-- 한 학생이 같은 source의 다른 identity를 이미 가지면 거부
-- 동일 mapping 재실행은 verification timestamp만 갱신
-
-하도록 설계한다.
-
-PIN/password는 이 과정에 참여하지 않는다.
-
-
----
-
-## D-018 — Shared Role Account → Individual Account
-
-기존 운영은:
-
-```text
-seondo
-sasaeng
-```
-
-같은 role-centered shared account로 시작했다.
-
-초기 MVP에서는 단순했지만 audit trail이 실제로 필요해지면서 한계가 생겼다.
-
-```text
-entered_by_name
-= 사람이 입력한 문자열
-
-auth.uid()
-= 실제 로그인 actor
-```
-
-는 동일한 신뢰수준이 아니다.
-
-따라서 개인계정으로 이동한다.
-
-다만 기존 공유계정을 먼저 삭제하지 않는다.
-
-```text
-개인계정 provision
-→ 실제 운영 검증
-→ 책임범위 확인
-→ audit actor 확인
-→ 공유계정 비활성화
-```
-
-순서로 staged transition 한다.
-
----
-
-## D-019 — Password Completion은 Client Flag가 아니다
-
-처음 구현에서는 신규 계정이 비밀번호를 바꾼 뒤:
-
-```text
-mark_admin_password_changed()
-```
-
-RPC로 profile flag를 내리는 구조가 가능했다.
-
-하지만 이렇게 하면 기술적으로는 실제 password change 없이 RPC만 호출해 flag를 우회할 수 있다.
-
-따라서 이 설계를 폐기했다.
-
-최종 구조:
-
-```text
-JWT-authenticated Edge Function
-  → Supabase Auth password 실제 변경
-  → 성공 확인
-  → must_change_password = false
-```
-
-service credential은 Edge Function에만 존재하고 브라우저에는 노출하지 않는다.
-
-개인 계정 생성도 같은 이유로:
-
-```text
-provision-admin-account
-```
-
-Edge Function에서만 Auth Admin API를 호출한다.
-
-
----
-
-## D-020 — Discipline Student FK Cut-over Strategy — COMPLETED
-
-선택:
-
-```text
-Phase 1
-legacy integer + Core UUID dual-key
-
-Phase 2
-new writes accept Core UUID
-
-Phase 3
-reads/routes move to Core UUID
-
-Phase 4
-legacy integer dependency 제거
-```
-
-배제:
-
-```text
-한 migration에서 모든 integer FK를 즉시 UUID로 교체
-```
-
-이유:
-
-- reflection / weekly / settlement / punishment business rule이 이미 운영 중
-- 기존 route와 query contract 보존 필요
-- record history 손실 없이 단계별 검증 가능
-- 각 phase마다 mismatch=0을 완료선으로 설정 가능
-
-dual-key trigger는 두 identity가 서로 다른 학생을 가리키는 상태를 허용하지 않는다.
-
-
----
-
-## D-021 — Cut-over Evidence Before Destructive Change
-
-discipline identity migration은 단순히:
-
-```text
-ALTER TABLE ... DROP COLUMN student_id
-```
-
-로 끝내지 않았다.
-
-최종 destructive migration 직전 production에서 다음을 확인했다.
-
-```text
-point_records          1 / 1 Core linked
-point mismatch         0
-
-punishments            0 / 0 Core linked
-punishment mismatch    0
-
-weekly rows            1 legacy / 1 Core
-weekly mismatch        0
-
-weekly penalty rows    1 legacy / 1 Core
-weekly penalty mismatch 0
-
-settlement rows        0 legacy / 0 Core
-settlement mismatch    0
-
-student summary        175 legacy / 175 Core
-summary mismatch       0
-```
-
-이 aggregate state를:
-
-```text
-discipline.core_cutover_evidence
-```
-
-에 저장한 뒤에만 physical integer FK를 제거했다.
-
-학생 이름, 학번, Auth UUID, mapping row는 evidence에 포함하지 않는다.
-
-최종 결과:
-
-```text
-point_records.student_id  → removed
-punishments.student_id    → removed
-
-point_records.core_student_id UUID NOT NULL
-punishments.core_student_id   UUID NOT NULL
-```
-
-legacy integer ID가 필요한 기존 화면은:
-
-```text
-core_student_id
-→ public.students bridge
-→ derived compatibility student_id
-```
-
-로 계산한다.
-
-따라서 저장 identity는 하나지만 기존 API contract는 단계적으로 유지할 수 있다.
-
----
-
-## D-022 — Migration Version은 Live Ledger와 맞춘다
-
-Supabase connector로 migration을 live 적용할 때,
-Git에서 미리 정한 timestamp와 live history가 실제로 기록한 version이 달라질 수 있었다.
-
-예:
-
-```text
-Git draft
-20260927022500_drop_legacy_discipline_student_ids.sql
-
-Live Supabase history
-20260926171350_drop_legacy_discipline_student_ids
-```
-
-내용이 같더라도 version이 다르면 향후 CLI에서:
-
-```text
-Git에는 미적용 migration
-Live에는 다른 version의 같은 migration
-```
-
-처럼 인식될 수 있다.
-
-따라서 live 적용 후:
-
-1. migration name 확인
-2. production version 확인
-3. Git filename을 live version으로 rename
-4. CI의 version uniqueness 재검증
-
-을 수행한다.
-
-Core cut-over 구간 15개 migration과 admin RLS optimization migration은 이 방식으로 reconciliation했다.
-
-이 원칙은 향후 별도 `DICS-Core` 중앙 migration repository에서도 그대로 적용한다.
+A draft version such as 20260927022500 can differ from the actual 20260926171350 application version. Identical content under a different version may be treated as unapplied by CLI tooling. After applying, read actual name/version, align the Git filename, and recheck uniqueness. Fifteen cut-over migrations plus admin RLS optimization were reconciled this way. Apply the same rule in a future central Core repository.

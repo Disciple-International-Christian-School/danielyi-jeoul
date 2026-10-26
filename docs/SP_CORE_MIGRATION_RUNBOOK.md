@@ -1,5 +1,7 @@
 # Study Planner → DICS Core Migration Runbook
 
+**Language / 언어:** [English](SP_CORE_MIGRATION_RUNBOOK.md) | [한국어](SP_CORE_MIGRATION_RUNBOOK.ko.md)
+
 > Status: preparation
 >
 > Goal: move Study Planner domain data from the legacy SP Supabase project into the DICS Core project without breaking the existing SP service or duplicating student identity.
