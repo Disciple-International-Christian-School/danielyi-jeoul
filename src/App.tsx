@@ -1,3 +1,5 @@
+import { StudentHistory } from '@/components/point-history';
+import { WeeklyImportPage } from '@/components/weekly-import';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import {
@@ -64,6 +66,7 @@ import {
   useStudentSummaryCoreParity,
   useCoreStudentReadiness,
   useCoreSetupStatus,
+  useDisciplineHistory,
   useCreateDepartmentWithMeritRule,
   useCreatePointItem,
   useCreatePointRecord,
@@ -79,7 +82,7 @@ import {
   useEnsureWeeklyDepartmentMerits,
   useGetDashboard,
   useGetStudent,
-  useExtendReflectionTo21,
+  useExtendReflectionToNextDay,
   useImportPointItems,
   useInitializeCurrentAcademicTerm,
   useGrade9Assignments,
@@ -397,7 +400,7 @@ function StudentsPage() {
 
     <div className="card card-pad table-wrap">
       <table className="data-table">
-        <thead><tr><th>학번</th><th>이름</th><th>학년 / 반</th><th>주간 NET</th><th>정산 NET</th><th>감지 상태</th></tr></thead>
+        <thead><tr><th>학번</th><th>이름</th><th>학년 / 반</th><th>주간 순벌점</th><th>정산 순벌점</th><th>감지 상태</th></tr></thead>
         <tbody>
           {rows.map((student) => <tr key={student.id} data-testid={'row-student-' + student.id}>
             <td className="muted">{student.studentNo ?? '매핑 대기'}</td>
@@ -433,6 +436,8 @@ function StudentDetailPage() {
   if (detail.isError || !detail.data) return <ErrorState error={detail.error} retry={() => detail.refetch()} />;
   const student = detail.data;
   const refreshDetail = () => {
+    queryClient.invalidateQueries({ queryKey: ['discipline-history'] });
+    queryClient.invalidateQueries({ queryKey: ['point-record-archive'] });
     queryClient.invalidateQueries({ queryKey: getGetStudentQueryKey(studentRef) });
     queryClient.invalidateQueries({ queryKey: getListPointRecordsQueryKey({ studentRef, limit: 100 }) });
   };
@@ -443,7 +448,7 @@ function StudentDetailPage() {
     updateRecord.mutate({ id: record.id, data: { points: Number(nextPoints), item: record.item, recordedAt: record.recordedAt, enteredByName: record.enteredByName, reflectionSubmitted: record.reflection?.submitted ?? null } }, { onSuccess: () => { refreshDetail(); notify('점수 기록을 수정했습니다.'); }, onError: (error) => notify(errText(error), 'error') });
   };
   const toggleViolated = (punishment: Punishment) => setViolation.mutate({ id: punishment.id, violated: !punishment.violated }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetStudentQueryKey(studentRef) }), onError: (error) => notify(errText(error), 'error') });
-  return <div><Link href="/students" className="btn btn-outline" data-testid="link-back-students"><ChevronLeft size={15} /> 학생 목록</Link><div style={{ marginTop: 25 }} className="detail-hero"><div><div className="eyebrow">학생 상세 기록</div><h1 className="heading">{student.name}</h1><p className="subheading">{student.homeroom ?? (student.grade + '학년')}{student.studentNo ? ' · ' + student.studentNo : ''} · 최근 생활점수와 상태 신호</p><div className="status-list">{student.statuses.length ? student.statuses.map((status) => <span className="pill pill-warning" key={status}>{status}</span>) : <span className="pill pill-positive"><Check size={11} /> 현재 양호</span>}</div></div><div className="detail-avatar">{student.name.slice(0, 1)}</div></div><div className="metric-grid" style={{ marginTop: 28 }}><div className="card metric-card"><div className="metric-label">주간 상점</div><div className="metric-value success-text">+{student.weeklyPositivePoints}</div></div><div className="card metric-card"><div className="metric-label">주간 벌점</div><div className="metric-value danger-text">{student.weeklyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">주간 NET</div><div className="metric-value">{student.weeklyNetPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">정산기간 NET</div><div className="metric-value">{student.settlementNetPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">체력훈련 판정 주차</div><div className="metric-value">{student.physicalTrainingWeeks}</div></div><div className="card metric-card"><div className="metric-label">기숙사 처분</div><div className="metric-value" style={{ fontSize: 14 }}>{student.punishment ?? '없음'}</div></div></div><div className="detail-grid" style={{ marginTop: 18 }}><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">점수 이력</h2><p className="section-copy">최근 기록부터 확인합니다.</p></div></div>{records.isLoading ? <div className="skeleton" style={{ height: 90, marginTop: 18 }} /> : records.isError ? <ErrorState error={records.error} retry={() => records.refetch()} /> : <div className="record-list">{(records.data ?? []).map((record) => <div className="record-row" key={record.id} data-testid={`row-record-${record.id}`}><div className="record-date">{dateLabel(record.recordedAt)}</div><div className="record-main"><div className="record-item">{record.item}</div><div className="record-meta">{record.enteredByName}{record.reflection ? ` · 반성문 ${record.reflection.status === 'SUBMITTED' ? '제출' : record.reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}` : ''}</div></div><div className={`record-points ${record.type === 'NEGATIVE' ? 'negative' : 'positive'}`}>{record.type === 'NEGATIVE' ? '-' : '+'}{record.points}<button className="btn btn-icon btn-outline" style={{ marginLeft: 8 }} onClick={() => editRecord(record)} aria-label="점수 기록 수정" data-testid={`button-edit-record-${record.id}`}><Pencil size={13} /></button><button className="btn btn-icon btn-danger" style={{ marginLeft: 6 }} onClick={() => removeRecord(record)} aria-label="점수 기록 삭제" data-testid={`button-delete-record-${record.id}`}><Trash2 size={13} /></button></div></div>)}{(records.data ?? []).length === 0 && <EmptyState title="점수 이력이 없습니다" copy="아직 등록된 생활점수가 없습니다." />}</div>}</section><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">기숙사 처분</h2><p className="section-copy">사생회가 기록한 처분입니다.</p></div></div>{student.punishments.length === 0 ? <EmptyState title="처분 이력 없음" copy="등록된 기숙사 처분이 없습니다." /> : <div className="activity-list">{student.punishments.map((punishment) => <div className="activity-row" key={punishment.id} data-testid={`row-punishment-${punishment.id}`}><div className="activity-mark"><BedDouble size={15} /></div><div><div className="activity-label">{punishment.types.join(' · ')}</div><div className="record-meta">{dateLabel(punishment.startDate)} — {dateLabel(punishment.endDate)}</div></div><button className={`pill ${punishment.violated ? 'pill-negative' : 'pill-neutral'}`} onClick={() => toggleViolated(punishment)} data-testid={`button-toggle-violation-${punishment.id}`}>{punishment.violated ? '위반 기록됨' : '위반 없음'}</button></div>)}</div>}</section></div></div>;
+  return <div><Link href="/students" className="btn btn-outline" data-testid="link-back-students"><ChevronLeft size={15} /> 학생 목록</Link><div style={{ marginTop: 25 }} className="detail-hero"><div><div className="eyebrow">학생 상세 기록</div><h1 className="heading">{student.name}</h1><p className="subheading">{student.homeroom ?? (student.grade + '학년')}{student.studentNo ? ' · ' + student.studentNo : ''} · 최근 생활점수와 상태 신호</p><div className="status-list">{student.statuses.length ? student.statuses.map((status) => <span className="pill pill-warning" key={status}>{status}</span>) : <span className="pill pill-positive"><Check size={11} /> 현재 양호</span>}</div></div><div className="detail-avatar">{student.name.slice(0, 1)}</div></div>{student.isActive !== false && <div className="metric-grid" style={{ marginTop: 28 }}><div className="card metric-card"><div className="metric-label">주간 상점</div><div className="metric-value success-text">+{student.weeklyPositivePoints}</div></div><div className="card metric-card"><div className="metric-label">주간 벌점</div><div className="metric-value danger-text">{student.weeklyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">주간 순벌점</div><div className="metric-value">{student.weeklyNetPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">정산기간 순벌점</div><div className="metric-value">{student.settlementNetPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">체력훈련 판정 주차</div><div className="metric-value">{student.physicalTrainingWeeks}</div></div><div className="card metric-card"><div className="metric-label">기숙사 처분</div><div className="metric-value" style={{ fontSize: 14 }}>{student.punishment ?? '없음'}</div></div></div>}<div style={{ marginTop: 18 }}>{student.coreStudentId && <StudentHistory studentId={student.coreStudentId} />}</div><div className="detail-grid" style={{ marginTop: 18 }}><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">일별 점수 이력</h2><p className="section-copy">최근 100건입니다. 전체 주차와 누계는 위의 학기 추이에서 확인하세요.</p></div></div>{records.isLoading ? <div className="skeleton" style={{ height: 90, marginTop: 18 }} /> : records.isError ? <ErrorState error={records.error} retry={() => records.refetch()} /> : <div className="record-list">{(records.data ?? []).map((record) => <div className="record-row" key={record.id} data-testid={`row-record-${record.id}`}><div className="record-date">{dateLabel(record.recordedAt)}</div><div className="record-main"><div className="record-item">{record.item}</div><div className="record-meta">{record.enteredByName}{record.reflection ? ` · 반성문 ${record.reflection.status === 'SUBMITTED' ? '제출' : record.reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}` : ''}</div></div><div className={`record-points ${record.type === 'NEGATIVE' ? 'negative' : 'positive'}`}>{record.type === 'NEGATIVE' ? '-' : '+'}{record.points}<button className="btn btn-icon btn-outline" style={{ marginLeft: 8 }} onClick={() => editRecord(record)} aria-label="점수 기록 수정" data-testid={`button-edit-record-${record.id}`}><Pencil size={13} /></button><button className="btn btn-icon btn-danger" style={{ marginLeft: 6 }} onClick={() => removeRecord(record)} aria-label="점수 기록 삭제" data-testid={`button-delete-record-${record.id}`}><Trash2 size={13} /></button></div></div>)}{(records.data ?? []).length === 0 && <EmptyState title="점수 이력이 없습니다" copy="아직 등록된 생활점수가 없습니다." />}</div>}</section><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">기숙사 처분</h2><p className="section-copy">사생회가 기록한 처분입니다.</p></div></div>{student.punishments.length === 0 ? <EmptyState title="처분 이력 없음" copy="등록된 기숙사 처분이 없습니다." /> : <div className="activity-list">{student.punishments.map((punishment) => <div className="activity-row" key={punishment.id} data-testid={`row-punishment-${punishment.id}`}><div className="activity-mark"><BedDouble size={15} /></div><div><div className="activity-label">{punishment.types.join(' · ')}</div><div className="record-meta">{dateLabel(punishment.startDate)} — {dateLabel(punishment.endDate)}</div></div><button className={`pill ${punishment.violated ? 'pill-negative' : 'pill-neutral'}`} onClick={() => toggleViolated(punishment)} data-testid={`button-toggle-violation-${punishment.id}`}>{punishment.violated ? '위반 기록됨' : '위반 없음'}</button></div>)}</div>}</section></div></div>;
 }
 
 function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
@@ -453,6 +458,10 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
   const students = useListStudents();
   const items = useListPointItems({ type, includeInactive: false });
   const create = useCreatePointRecord();
+  const undo = useDeletePointRecord();
+  const historySettings = useDisciplineHistory(today(), today());
+  const requestRef = useRef<{ fingerprint: string; id: string } | null>(null);
+  const savingRef = useRef(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const [studentId, setStudentId] = useState('');
@@ -463,7 +472,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
   const [reflectionSubmitted, setReflectionSubmitted] = useState(false);
   const [search, setSearch] = useState('');
   const [continuousMode, setContinuousMode] = useState(type === 'NEGATIVE');
-  const [recentEntries, setRecentEntries] = useState<Array<{ student: string; item: string; points: number }>>([]);
+  const [recentEntries, setRecentEntries] = useState<Array<{ id: number; student: string; item: string; points: number }>>([]);
 
   const negative = type === 'NEGATIVE';
   const needle = search.trim().toLowerCase();
@@ -486,7 +495,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!studentId || !points || !admin) return;
+    if (!studentId || !points || !admin || savingRef.current) return;
     if (!selectedStudent?.coreStudentId) {
       notify('이 학생의 Core Identity 연결을 확인해주세요.', 'error');
       return;
@@ -500,7 +509,11 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
     const pointValue = Number(points);
     const studentName = selectedStudent.name;
 
+    const fingerprint = JSON.stringify([selectedStudent.coreStudentId,type,itemName,pointValue,recordedAt,reflectionSubmitted]);
+    if (requestRef.current?.fingerprint !== fingerprint) requestRef.current = { fingerprint, id: crypto.randomUUID() };
+    savingRef.current = true;
     create.mutate({
+      requestId: requestRef.current.id,
       data: {
         coreStudentId: selectedStudent.coreStudentId,
         type,
@@ -511,13 +524,16 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
         reflectionSubmitted: negative ? reflectionSubmitted : null,
       },
     }, {
-      onSuccess: () => {
+      onSuccess: (id) => {
+        requestRef.current = null;
+        queryClient.invalidateQueries({ queryKey: ['discipline-history'] });
+        queryClient.invalidateQueries({ queryKey: ['point-record-archive'] });
         queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
         queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() });
 
         setRecentEntries((current) => [
-          { student: studentName, item: itemName, points: pointValue },
+          { id, student: studentName, item: itemName, points: pointValue },
           ...current,
         ].slice(0, 6));
 
@@ -531,6 +547,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 
         notify(studentName + ' · ' + (negative ? '벌점' : '상점') + ' ' + pointValue + '점 기록 완료');
       },
+      onSettled: () => { savingRef.current = false; },
       onError: (error) => notify(errText(error), 'error'),
     });
   };
@@ -620,7 +637,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 
           {!itemId && <div className="field full">
             <label htmlFor="entry-custom-item">사유</label>
-            <input id="entry-custom-item" className="input" required maxLength={120} value={customItem} onChange={(event) => setCustomItem(event.target.value)} placeholder={negative ? '벌점 사유를 입력하세요' : '상점 사유를 입력하세요'} data-testid="input-point-custom-item" />
+            <input id="entry-custom-item" className="input" required maxLength={80} value={customItem} onChange={(event) => setCustomItem(event.target.value)} placeholder={negative ? '벌점 사유를 입력하세요' : '상점 사유를 입력하세요'} data-testid="input-point-custom-item" />
           </div>}
 
           <div className="field">
@@ -630,7 +647,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 
           <div className="field">
             <label htmlFor="entry-date">기록일</label>
-            <input id="entry-date" className="input" type="date" required value={recordedAt} onChange={(event) => setRecordedAt(event.target.value)} data-testid="input-point-date" />
+            <input id="entry-date" className="input" type="date" required max={today()} min={(selectedStudent?.grade ?? 0) >= 7 ? historySettings.data?.daily_starts_on ?? undefined : undefined} value={recordedAt} onChange={(event) => setRecordedAt(event.target.value)} data-testid="input-point-date" />
           </div>
 
           <div className="side-note field full">
@@ -671,12 +688,13 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
           <div className="eyebrow">이번 입력 세션</div>
           <h2 className="section-title" style={{ marginTop: 10 }}>최근 저장</h2>
           <div className="activity-list" style={{ marginTop: 16 }}>
-            {recentEntries.map((entry, index) => <div className="activity-row" key={index}>
+            {recentEntries.map((entry) => <div className="activity-row" key={entry.id}>
               <div className="activity-mark"><Check size={15} /></div>
               <div>
                 <div className="activity-label">{entry.student}</div>
                 <div className="record-meta">{entry.item + ' · ' + (negative ? '-' : '+') + entry.points + '점'}</div>
               </div>
+              <button type="button" className="btn btn-outline" disabled={undo.isPending} onClick={() => undo.mutate({ id: entry.id }, { onSuccess: () => { setRecentEntries(rows => rows.filter(r => r.id !== entry.id)); queryClient.invalidateQueries(); notify(entry.student + ' 기록을 취소했습니다.'); }, onError: e => notify(errText(e), 'error') })}>취소</button>
             </div>)}
           </div>
         </div>}
@@ -696,7 +714,7 @@ function ReflectionsPage() {
   const [scopeFilter, setScopeFilter] = useState<DisciplineScope>(admin?.disciplineScope ?? 'ALL');
   const reflections = useListReflections();
   const update = useUpdateReflection();
-  const extend = useExtendReflectionTo21();
+  const extend = useExtendReflectionToNextDay();
 
   if (reflections.isLoading) return <LoadingState />;
   if (reflections.isError) return <ErrorState error={reflections.error} retry={() => reflections.refetch()} />;
@@ -722,7 +740,7 @@ function ReflectionsPage() {
     <PageHeader
       eyebrow="반성문 관리"
       title="반성문 대상자"
-      copy="초등은 익일 등교, 중고등은 기본 17시·필요 시 21시 연장 기준으로 담당 범위별 제출 상태를 확인합니다."
+      copy="초등은 익일 등교, 중고등은 기본 17시·필요 시 다음날 17시 연장(주말 발생은 월요일) 기준으로 담당 범위별 제출 상태를 확인합니다."
     />
 
     <div className="card card-pad" style={{ marginTop: 30 }}>
@@ -772,16 +790,16 @@ function ReflectionsPage() {
                 });
               }} data-testid={'button-toggle-reflection-' + reflection.id}>{reflection.submitted ? '미제출로' : '제출 완료'}</button>
               {!reflection.submitted && reflection.grade >= 7 && <button className="btn btn-outline" onClick={() => {
-                const reason = window.prompt('21시까지 연장하는 사유를 입력하세요.', '오후 벌점 발생');
+                const reason = window.prompt('발생일 다음날 17시까지 연장합니다. 주말 발생은 월요일 17시입니다. 연장 사유를 입력하세요.', '오후 벌점 발생');
                 if (reason == null) return;
                 extend.mutate({ id: reflection.id, reason }, {
-                  onSuccess: () => {
-                    queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() });
-                    notify('반성문 마감을 21시로 연장했습니다.');
+                  onSuccess: (deadline) => {
+                    queryClient.invalidateQueries();
+                    notify('반성문 마감: ' + dateTimeLabel(deadline));
                   },
                   onError: (error) => notify(errText(error), 'error'),
                 });
-              }} data-testid={'button-extend-reflection-' + reflection.id}>21시 연장</button>}
+              }} data-testid={'button-extend-reflection-' + reflection.id}>다음날 17시로 연장</button>}
             </div></td>
           </tr>)}</tbody>
         </table>
@@ -795,6 +813,7 @@ function ReportsPage() {
   const { admin } = useAuth();
   const [mode, setMode] = useState<'DAILY' | 'WEEKLY'>('DAILY');
   const [noticeDate, setNoticeDate] = useState(today());
+  const [noticeText, setNoticeText] = useState('');
   const [classFilter, setClassFilter] = useState('ALL');
 
   const daily = useDailyDisciplineNotice(noticeDate);
@@ -896,6 +915,7 @@ function ReportsPage() {
       </div>
     </div>
 
+    <div className="screen-only field" style={{ margin: '20px 0' }}><label htmlFor="report-note">함께 출력할 안내문</label><textarea id="report-note" className="input" rows={4} maxLength={2000} value={noticeText} onChange={e => setNoticeText(e.target.value)} placeholder="제출 장소·준비물·추가 안내를 입력하세요." /></div>
     <section className="print-sheet" data-testid="print-sheet">
       <header className="print-header">
         <div>
@@ -909,6 +929,7 @@ function ReportsPage() {
         </div>
       </header>
 
+      {noticeText.trim() && <p className="print-notice-text" style={{ whiteSpace: 'pre-wrap' }}>{noticeText}</p>}
       {mode === 'DAILY' ? <>
         <div className="print-summary">
           <span>벌점 기록 <strong>{filteredDaily.length}</strong>건</span>
@@ -948,7 +969,7 @@ function ReportsPage() {
             return <section className="print-group" key={className}>
               <h2>{className}</h2>
               <table className="print-table">
-                <thead><tr><th>학생</th><th>벌점 횟수</th><th>주간 상점</th><th>주간 벌점</th><th>주간 NET</th><th>정산 NET</th><th>판정</th></tr></thead>
+                <thead><tr><th>학생</th><th>벌점 횟수</th><th>주간 상점</th><th>주간 벌점</th><th>주간 순벌점</th><th>정산 순벌점</th><th>판정</th></tr></thead>
                 <tbody>{rows.map((row) => <tr key={row.studentId}>
                   <td><strong>{row.studentName}</strong></td>
                   <td>{row.penaltyIncidentCount}</td>
@@ -1053,7 +1074,7 @@ function SettlementPage() {
       <form className="card card-pad" onSubmit={submitStart}>
         <div className="eyebrow">현재 상태</div>
         <h2 className="section-title" style={{ marginTop: 10 }}>열린 정산기간 없음</h2>
-        <p className="section-copy">첫 정산 시작일을 지정하면 그 날짜부터 상점·벌점 NET이 누적됩니다.</p>
+        <p className="section-copy">첫 정산 시작일을 지정하면 그 날짜부터 상점·벌점 순벌점이 누적됩니다.</p>
 
         <div className="form-grid" style={{ marginTop: 24 }}>
           <div className="field">
@@ -1092,8 +1113,8 @@ function SettlementPage() {
         <div className="eyebrow">판정 기준</div>
         <h2 className="section-title" style={{ marginTop: 10 }}>관리자가 종료할 때까지 누적</h2>
         <div className="activity-list" style={{ marginTop: 20 }}>
-          <div className="activity-row"><div className="activity-mark"><ShieldAlert size={15} /></div><div><div className="activity-label">주간 체력훈련</div><div className="record-meta">벌점 발생 3회 이상 또는 주간 NET 8점 이상</div></div></div>
-          <div className="activity-row"><div className="activity-mark"><AlertTriangle size={15} /></div><div><div className="activity-label">징계위원회</div><div className="record-meta">정산기간 내 체력훈련 판정 3주 이상 또는 NET 20점 이상</div></div></div>
+          <div className="activity-row"><div className="activity-mark"><ShieldAlert size={15} /></div><div><div className="activity-label">주간 체력훈련</div><div className="record-meta">벌점 발생 3회 이상 또는 주간 순벌점 8점 이상</div></div></div>
+          <div className="activity-row"><div className="activity-mark"><AlertTriangle size={15} /></div><div><div className="activity-label">징계위원회</div><div className="record-meta">정산기간 내 체력훈련 판정 3주 이상 또는 순벌점 20점 이상</div></div></div>
         </div>
       </section>
     </div> : <div className="detail-grid" style={{ marginTop: 30 }}>
@@ -2365,6 +2386,7 @@ function ProtectedRoutes() {
     <Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} />
     <Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} />
     <Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} />
+    <Route path="/history/import" component={() => <LeadGate><WeeklyImportPage /></LeadGate>} />
     <Route path="/settlement" component={() => <LeadGate><SettlementPage /></LeadGate>} />
     <Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} />
     <Route path="/admins" component={() => <LeadGate><AdminAccountsPage /></LeadGate>} />

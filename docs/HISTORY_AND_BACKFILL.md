@@ -1,96 +1,84 @@
-# DaS history and daily-entry cutover — 2026-10-26
+# DaS weekly history and daily-entry cutover
 
-## Confirmed operating contract
+## Operating contract
 
-This document supersedes the earlier backfill proposal. The source workbook contains independent, final weekly settlements; tabs are not running totals.
+The source workbook contains independent final weekly settlements, not running totals. The weekly net is merit minus penalty. The source's two component columns are retained as supplied; they are not a reconstruction of individual incidents.
 
-- Through 2026-10-25: preserve weekly settlement values as authoritative student-week results.
-- From 2026-10-26: accumulate actual daily events and eligible automatic department merits using the same CORE student UUID.
-- 2026-08-19–23 is camp and 2026-09-21–27 is the Chuseok break. These are explicitly non-operating periods, not missing uploads and not observations of perfect behavior.
-- There are eight completed weekly tabs before cutover and one ongoing 10/26–11/1 tab. Never import the ongoing tab as a completed weekly settlement.
-- A missing student row is not a zero score and is not proof of withdrawal. Resolve against CORE and preserve uncertainty.
-- Active rosters and historical identity are separate: inactive/withdrawn students disappear from current input lists; their existing historical records remain attributable. Never attach an unmatched former student to a similarly named active student.
-- The user explicitly excluded one transferred student's source rows from active import; retain source provenance and an exclusion reason without recreating an active CORE account.
+- Through 2026-10-25, secondary-school weekly settlements replace older DaS events in official aggregation.
+- From 2026-10-26, actual daily events and eligible automatic department merits accumulate against the same CORE UUID.
+- Old events remain in `point_records`, linked to the superseding import. Operational views exclude them. The immutable originals can be inspected by an authorized database operator.
+- Elementary records are outside this secondary-school import and remain included.
+- Camp 8/19–23 (week beginning 8/17) and Chuseok 9/21–27 are `NO_SCHOOL`, not zero-score observations.
+- Missing student rows remain missing. An inactive CORE identity retains its history; an unknown identity stays in the source archive without creating a new active student.
+- The ongoing 10/26–11/1 sheet is excluded. Its entries are not assumed to duplicate the daily database.
+- The prior settlement closes 10/25; the new operational settlement starts 10/26. Term history survives settlement closure.
 
-## Evidence from source and production (read-only)
+## Production reconciliation
 
-The original Google Sheet has three five-column blocks: class, name, merit, penalty, net. Source net formulas are merit minus penalty. App operational views currently use penalty minus merit.
+The structural migrations and initial import were applied on 2026-10-26 UTC. Initial source rows: **898**. Linked current weekly balances: **873**. Unlinked source rows: **22** across five historical class/name identities. Three duplicate groups collapsed. All original rows, blank cells, formulas/effective values, and annotations are retained in the private database.
 
-| Completed week | Source rows | Distinct class/name pairs | Source merit sum | Source penalty sum |
-| --- | ---: | ---: | ---: | ---: |
-| 8/24–8/30 | 111 | 111 | 0 | 39 |
-| 8/31–9/6 | 114 | 113 | 0 | 142 |
-| 9/7–9/13 | 113 | 113 | 0 | 318 |
-| 9/14–9/20 | 113 | 113 | 100 | 247 |
-| 9/28–10/4 | 113 | 113 | 0 | 266 |
-| 10/5–10/11 | 112 | 111 | 0 | 158 |
-| 10/12–10/18 | 111 | 110 | 0 | 387 |
-| 10/19–10/25 | 110 | 110 | 0 | 115 |
+| Week | Original rows | Distinct source identities | Linked balances | Source merit | Source penalty | Linked merit | Linked penalty |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 8/24–8/30 | 111 | 111 | 106 | 0 | 39 | 0 | 30 |
+| 8/31–9/6 | 114 | 113 | 108 | 0 | 142 | 0 | 129 |
+| 9/7–9/13 | 113 | 113 | 109 | 0 | 318 | 0 | 315 |
+| 9/14–9/20 | 113 | 113 | 109 | 100 | 247 | 100 | 243 |
+| 9/28–10/4 | 113 | 113 | 110 | 0 | 266 | 0 | 266 |
+| 10/5–10/11 | 112 | 111 | 110 | 0 | 158 | 0 | 158 |
+| 10/12–10/18 | 111 | 110 | 110 | 0 | 387 | 0 | 387 |
+| 10/19–10/25 | 111 | 111 | 111 | 0 | 123 | 0 | 123 |
 
-These are raw-source control totals, NOT approved CORE totals. Duplicate rows, excluded former students, and an unconfirmed 100-point entry must be resolved before publication. Do not interpret source penalty columns as reconstructed gross daily penalties when only the final weekly balance is established.
+The earlier analysis omitted one row with a malformed class cell. The exact name has one consistent class across the other tabs; the import preserves the malformed original and documents the class resolution. This restores an eight-point penalty. The original 100-point merit remains included with an explicit review note, not silently corrected.
 
-Three duplicate student-week groups exist (zero/nonzero and zero/zero). Name suffixes also change, and a historical class/name resembles a current student in another grade. Mapping must use explicit, class-aware aliases and preserve originals. Do not automatically strip suffixes globally or match by row position.
+**170 non-deleted secondary events** were superseded. The elementary penalty was preserved. On 10/26, all **40 existing events** remained: two manual penalties totaling 9 and 38 automatic merits totaling 86. Importing weekly balances created no reflection records. The current reflection view contains the two current secondary records plus the preserved elementary record.
 
-The 10/12–18 tab also has weekly narrative notes listing training targets and overdue reflection names. Preserve those as source annotations, not dated incidents, verified punishment completions, or reconstructed incident counts.
+Source student identities and raw payloads are private operational data and must not be committed to this repository.
 
-Before cutover the live DB contains 171 non-deleted event rows: 158 automatic merits totaling 374 points, 12 manual penalties totaling 25 points, and one manual merit worth 2 points. They are NOT an additional opening balance on top of the final source settlements. Preserve them for audit and reconcile coverage; do not blindly delete them or label them all test data.
+## Storage, revision, and access
 
-On 10/26 the DB already has two manual penalties totaling 9 points and 38 automatic merit rows totaling 86 points. Today's sheet has two different penalty rows totaling 10 points. Neither side proves duplication or test status. Do not erase today's entries or import its aggregate as dated events.
+- `discipline.history_settings`: term, cutoff, grade scope, activation audit.
+- `history_import_batches` and `history_source_rows`: original payload, hash, source coordinates, components, net, resolution, importer/time. Large annotations are retained without inventing events.
+- `history_aliases`: explicit class-aware alias mapping. Never globally strip name suffixes or join by row position.
+- `weekly_balances`: one current row per term/student/week, prior versions retained. Replacing a week must include every previously imported source identity. Partial uploads fail atomically.
+- Identical or zero-placeholder duplicates collapse to the same nonzero settlement. Distinct nonzero settlements for one student/week fail. Never sum duplicate final values.
+- Re-uploading an identical current payload is idempotent. A stale previously superseded payload is rejected. Changed payloads create an import revision, not additive balances.
+- `public.get_discipline_history(student_id,start,end)` returns exact weekly settlements, daily-derived weekly totals, identity, source precision, review notes, and calendar. Weekly source rows have `incident_count = null`.
+- Staff reads obey the admin's grade scope. Non-admin callers must supply their own CORE student ID linked to `auth.uid()`. Anonymous calls are denied. Import/status/activation require a lead administrator.
+- Six new tables have RLS. Public RPCs are invoker wrappers; privileged internals live in the private schema with explicit role/ownership checks and an empty search path.
 
-The open operational settlement starts 9/30, midweek. A weekly historical total cannot be split across 9/30 without daily source data. Academic-term history and operational settlement eligibility must therefore remain separate during cutover.
+Weekly periods are indivisible. A day query in the historical range returns the overlapping **whole weekly settlement**, visibly labeled as such; it must not be described as a daily score. Term totals cover available records only. Missing rows and non-operating weeks are not filled with zero.
 
-## Required storage and query model (not yet implemented)
+## UI and daily operations
 
-1. Immutable import batch and source rows: source workbook/tab IDs, source range, original class/name, original entered values, formulas/effective net, snapshot checksum, importer, and import timestamp. Blank cells remain distinguishable from entered zeroes.
-2. Resolution layer: CORE UUID or explicit unresolved/excluded status, alias justification, duplicate decisions, anomaly-review state, and revision history. Each reviewed student-week has one effective settlement. A changed source snapshot becomes a revision rather than a second additive batch.
-3. Historical weekly settlements: term, CORE UUID, week bounds, exact source net, source components as supplied, weekly precision, review status, and provenance. Occurrence date and incident count remain unknown. Importing this layer never invokes the daily penalty/reflection trigger.
-4. Daily events from cutover: actual occurrence date separate from entry timestamp, reason/category, point type/value, actor UUID, source, and request idempotency key. Retried saves must not produce duplicate events; intentional identical incidents remain possible with distinct request IDs.
-5. A shared student-week/term read model: select historical settlement before cutover, daily-event aggregation from cutover onward. Do not UNION and sum both sources for the same week. Incomplete/reviewed/excluded/no-school/not-enrolled states must survive aggregation; a partial total must not be labeled a complete semester total.
-6. Access: authenticated users only within established admin scope; future student endpoints restrict to that student's CORE/Auth mapping at the database layer. Reuse this read model in SP and student dashboards rather than rewriting formulas in each frontend.
+- Dashboard: date/week/term history plus a lead-only link to the weekly import/reconciliation page.
+- Student detail: semester weekly trend, source precision, component values, missing/no-school gaps, and an inactive-identity fallback. The editable daily list remains explicitly labeled as the most recent 100 events; totals come from the complete RPC, never that capped list.
+- Import: `.xlsx` multi-tab parser, completed-week filtering, source totals, duplicate/malformed-class/large-value warnings, unresolved identity preview, explicit replacement review, import history, and current unresolved source rows.
+- Entry: required custom reason (80-character DB limit), preset changes clear stale score, continuous student entry retains the selected reason, request UUID prevents retried saves from duplicating, recent-save undo, cutoff/future-date guards.
+- Operational penalty-minus-merit numbers are labeled **순벌점**. Historical source-compatible totals are labeled **최종값/학기 누계 = 상점 − 벌점**. Threshold formulas are unchanged.
+- Reflection extension: occurrence date + one day at 17:00 KST; Saturday/Sunday occurrences extend to Monday 17:00. Friday therefore extends to Saturday under this literal policy. The default same-day deadline is unchanged. Already-submitted rows cannot be extended. Legacy RPC callers receive the new extension behavior too.
+- Reports: optional announcement text with immediate print preview. Text is retained only while the page remains open; it is not a shared saved announcement.
+- Department creation distinguishes first load from explicit new mode. Automatic merits retain source-key uniqueness, handle concurrent retries, and skip historical imported secondary weeks.
 
-Term trend = sum of reviewed historical weekly net + sum of daily net from cutover. Keep this independent of discipline periods, reflection status, and training incident-count thresholds. Past weekly settlements do not generate overdue reflections or retroactive punishments.
+## Rules audit
 
-Operational metrics may retain signed penalty-minus-merit semantics for compatibility. User-facing trend should explicitly say which direction is positive; preferred source-compatible display is merit minus penalty. Never flip stored scoring rules or threshold comparisons merely to change display signs. Show merit/penalty components and plain-language surplus where known; label historical gross components unavailable if only final balance is reliable.
+The source rules tab and active app rules were compared. No new school policy or score was invented.
 
-## UI review and meeting requirements
+| Difference | Source | Current app | Handling |
+| --- | --- | --- | --- |
+| Punctuation/spacing | 등교지각, 욕설·비속어 | 등교 지각, 욕설 | Recorded for canonical-name review |
+| Grouped vs split | 세상노래 가창/연주, each 7 | 세상노래, 7 | Existing score unchanged; splitting remains a policy/catalog decision |
+| Wording | 교실 미소등, 2 | 미소등, 2 | Existing score unchanged |
+| Blank source scores | 등교지각, 잔반 and other manual items | 등교 지각/잔반 currently 2 | A blank is not interpreted as zero or a request to erase an existing rule |
+| Fixed source-only items | 교실 미정리 2; 냉난방 문단속 2; 슬리퍼 등교 2; 복도통행 2; 성경책 미지참 5; 선풍기 가동 2; 체육복 미착용 2 | No matching preset | Available through custom reason/score; catalog synchronization is pending policy review |
+| Additional source-only blank items | 교외 실내화 착용; 교내 실외화 착용; 식사 후 테이블 미정리; 교내 취식; 복도 양치 | No matching preset | Custom input supported; fixed score not fabricated |
+| App-only items | Not listed in source tab | 암송 미완료; 일기 미제출; 수업태도 불량; 선생님 재량 벌점 | Retained; teacher-discretion 1–5 validator unchanged |
 
-The current app is an administrative console with separate menus; it does not yet complete the field-entry → weekly review → student-trend workflow.
+## Verification and remaining boundaries
 
-| Meeting item | Verified current state | Required response |
-| --- | --- | --- |
-| Add department / instrumental leaders | New-department reset is immediately undone by initial auto-selection effect | Fixed in this draft by distinguishing initial selection from explicit create mode; no department/rule values invented |
-| Manual merit and penalty entry | Score/date inputs exist but custom reason is saved only as a generic label | Fixed in this draft with required free-text reason; preset changes clear stale point values |
-| Clear existing penalties before launch | Contains pre-cutover overlap and real entries after cutover | Source-based reconciliation and reversible exclusion, never blanket deletion |
-| Merit reflected in weekly score | SQL already subtracts merits from penalties | Expose components and consistent sign labels; no second merit-deduction event |
-| Grade-9 name suffix | Roster change already verified in prior work | Link history to UUID and preserve source spelling |
-| Extend deadline to next day 17:00 / weekends Monday 17:00 | DB and UI still use same-day 21:00 extension; default trigger remains same-day 17:00 for secondary | Update extension policy and labels together; distinguish an extension request from a default-deadline change; test Friday/weekends/KST and already-submitted rows |
-| Historical weekly upload | Absent | Preview → mapping/exceptions → atomic versioned commit → student-week reconciliation |
-| Click previous dashboard date | Implemented in draft PR #15; not deployed | Verify signed-in/mobile behavior; weekly source periods should open a weekly summary, not fabricated daily records |
-| Student semester trend | Draft totals only cover existing event rows; detail page caps at 100 records and requires active roster summary | Add unified week history with full pagination and separate historical identity lookup |
-| Printable announcement text | No input in current Reports page | Add optional notice with print preview and unambiguous save/persistence behavior |
-| Rules source spreadsheet | Reference requirement visible in screenshot | Audit rule mapping against the rule tab before changing item values |
+Passed: TypeScript; production build; date boundary tests; source-parser duplicate/sign/date/cell-validation tests. Transaction-rollback database tests covered exact source and linked totals, no new reflections, elementary preservation, current events, repeated file upload, partial-file rejection, daily request idempotency, cutoff enforcement, automatic-merit retries, staff RPC access, student ownership/cross-student rejection, anonymous rejection, and KST extension dates. Production was re-queried after the atomic import.
 
-Recommended information architecture:
+Supabase advisors found no newly introduced security finding. A new history foreign-key index finding was fixed in the follow-up migration. Existing cross-app advisories remain outside this change; details are available in the Supabase project advisor. See [Supabase advisor reference](https://supabase.com/docs/guides/database/database-linter).
 
-- **Input:** mobile-first student search → preset/custom reason → points/date → save feedback and recent editable entries. Keep useful repeat conditions, show offline/save errors, and prevent accidental repeat submissions.
-- **Today / weekly review:** selected date or week, entered records, pending reflections, component totals, and source/completion state. Date selection must visibly scope the content it controls; keep historical data distinct from current action cards.
-- **Student history:** CORE identity, week-by-week net and cumulative trend, source precision, admission/withdrawal context, and optional daily detail only where it exists. Use term cumulative for trajectory, not a permanent current-punishment balance.
-- **Management:** imports/reconciliation, rule versions, department membership, settlement periods, notice output, admin accounts, and audit history. Keep these out of the frontline entry sequence.
+Live sign-in is required for device/browser acceptance of staff-only pages. The cloud browser reached the production login page but had no administrator session; authenticated visual acceptance must not be claimed as complete.
 
-Future insights must account for enrollment duration, non-operating weeks, the weekly-to-daily measurement change, and missing observations. A lower recorded total alone is not proof of improved behavior. Do not infer violation frequency from historical weekly balances.
-
-## Draft implementation and validation
-
-Existing PR #15 provides weekday record links, date/week navigation, and a paginated event archive. This update fixes department-create mode and adds actual custom reasons. It does not implement the historical storage/read model above, import production data, reset a settlement, change the reflection policy, or deploy.
-
-Required checks: typecheck, production build, history date-boundary tests; signed-in field-entry, department-create, contrast/mobile, and scope verification remains before rollout. All production DB inspection for this review was read-only.
-
-## Completion order
-
-1. Archive source and resolve explicit exceptions; produce approved student-week coverage.
-2. Add historical storage plus a single CORE-based query path with exclusive cutover and idempotent revision handling.
-3. Reconcile old event rows and operational settlement boundary without deleting originals or backdating unknown events.
-4. Finish field-entry and deadline behavior, personal admin accountability, and live device verification.
-5. Deliver student history and later consume it from SP/student dashboards.
-
-This is the agreed target and implementation backlog, not a claim that migration is complete.
+Student-facing SP/dashboard integration, unresolved former-student identity decisions, review of the original 100-point merit, optional catalog synchronization, personal staff-account assignments, and previously pending student Auth/PIN onboarding remain explicit follow-ups. The shared CORE read API is ready; those other apps were not modified by this change.

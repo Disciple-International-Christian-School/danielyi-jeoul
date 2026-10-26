@@ -175,3 +175,9 @@
 }
 @media (prefers-reduced-motion: reduce) { .desk-metric { transition: none; } .desk-metric:hover { transform: none; } }
 
+.history-trend { margin: 22px 0; overflow-x: auto; }
+.history-trend svg { display: block; width: 100%; min-width: 500px; max-height: 260px; }
+.history-trend figcaption { font-size: 13px; margin-bottom: 12px; color: hsl(var(--muted-foreground)); }
+.point-history { margin-top: 20px; }
+.print-notice-text { border: 1px solid currentColor; padding: 12px; line-height: 1.65; }
+@media(max-width: 600px) { .point-history .section-row { align-items: flex-start; flex-direction: column; gap: 12px; } .history-controls { flex-wrap: wrap; } }
