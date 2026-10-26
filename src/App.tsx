@@ -457,6 +457,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 
   const [studentId, setStudentId] = useState('');
   const [itemId, setItemId] = useState('');
+  const [customItem, setCustomItem] = useState('');
   const [points, setPoints] = useState('');
   const [recordedAt, setRecordedAt] = useState(today());
   const [reflectionSubmitted, setReflectionSubmitted] = useState(false);
@@ -491,7 +492,11 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
       return;
     }
 
-    const itemName = selectedItem?.name ?? '수기 입력';
+    const itemName = selectedItem?.name ?? customItem.trim();
+    if (!itemName || (itemId && !selectedItem)) {
+      notify('점수 항목을 선택하거나 사유를 입력해주세요.', 'error');
+      return;
+    }
     const pointValue = Number(points);
     const studentName = selectedStudent.name;
 
@@ -520,6 +525,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 
         if (!continuousMode) {
           setItemId('');
+          setCustomItem('');
           setPoints('');
         }
 
@@ -543,7 +549,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
     <PageHeader
       eyebrow={negative ? '생활지도 기록' : '긍정 기록'}
       title={negative ? '벌점 입력' : '상점 입력'}
-      copy={negative ? '아침 종이 시트도 빠르게 옮길 수 있도록 연속 입력에 최적화했습니다.' : '학생의 좋은 행동을 상점으로 남깁니다. 부서활동 상점은 아래 자동반영 관리에서 확인합니다.'}
+      copy={negative ? '학생과 사유를 선택해 기록합니다. 같은 사유는 연속으로 입력할 수 있습니다.' : '학생의 좋은 행동을 상점으로 남깁니다. 부서활동 상점은 자동반영 관리에서 확인합니다.'}
       action={<Link href={negative ? '/points/negative/items' : '/points/positive/departments'} className="btn btn-outline">{negative ? '벌점항목관리' : '부서상점 자동반영'}</Link>}
     />
 
@@ -601,16 +607,21 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
               onChange={(event) => {
                 setItemId(event.target.value);
                 const selected = (items.data ?? []).find((item) => String(item.id) === event.target.value);
-                if (selected?.fixedPoints != null) setPoints(String(selected.fixedPoints));
+                setPoints(selected?.fixedPoints != null ? String(selected.fixedPoints) : '');
               }}
               data-testid="select-point-item"
             >
-              <option value="">항목 선택 또는 수기 입력</option>
+              <option value="">사유 직접 입력</option>
               {(items.data ?? []).filter((item) => item.type === type).map((item) => <option key={item.id} value={item.id}>
                 {item.name + (item.fixedPoints != null ? ' · ' + item.fixedPoints + '점' : '')}
               </option>)}
             </select>
           </div>
+
+          {!itemId && <div className="field full">
+            <label htmlFor="entry-custom-item">사유</label>
+            <input id="entry-custom-item" className="input" required maxLength={120} value={customItem} onChange={(event) => setCustomItem(event.target.value)} placeholder={negative ? '벌점 사유를 입력하세요' : '상점 사유를 입력하세요'} data-testid="input-point-custom-item" />
+          </div>}
 
           <div className="field">
             <label htmlFor="entry-points">점수</label>
@@ -638,7 +649,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
         </div>
 
         <div className="modal-actions">
-          <button className="btn btn-primary" disabled={create.isPending || !studentId || !points || !selectedStudent?.coreStudentId} data-testid="button-submit-point">
+          <button className="btn btn-primary" disabled={create.isPending || !studentId || !points || (!selectedItem && !customItem.trim()) || !selectedStudent?.coreStudentId} data-testid="button-submit-point">
             {create.isPending ? '저장 중' : (negative ? '벌점' : '상점') + ' 기록 + 다음 학생'}
           </button>
         </div>
@@ -647,7 +658,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
       <div>
         <div className="card card-pad">
           <div className="eyebrow">빠른 입력</div>
-          <h2 className="section-title" style={{ marginTop: 10 }}>{negative ? '아침 종이 시트 처리' : '반복 상점 처리'}</h2>
+          <h2 className="section-title" style={{ marginTop: 10 }}>같은 사유로 연속 입력</h2>
           <p className="subheading" style={{ marginTop: 12 }}>
             같은 사유가 반복되면 항목과 점수는 그대로 두고 학생 이름만 검색해서 연속 저장하세요.
           </p>
@@ -1885,7 +1896,8 @@ function DepartmentMeritAdminPage() {
   const setMembership = useSetDepartmentStudentMembership();
   const setDepartmentActive = useSetDepartmentActive();
 
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
+  // null: initial selection pending; empty string: user is creating a department.
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentId, setStudentId] = useState('');
   const [membershipDate, setMembershipDate] = useState(currentWeekMonday());
@@ -1901,7 +1913,7 @@ function DepartmentMeritAdminPage() {
   const selectedDepartment = departmentRows.find((row) => row.departmentId === selectedDepartmentId) ?? null;
 
   useEffect(() => {
-    if (!selectedDepartmentId && departmentRows.length > 0) {
+    if (selectedDepartmentId === null && departmentRows.length > 0) {
       setSelectedDepartmentId(departmentRows[0].departmentId);
     }
   }, [departmentRows, selectedDepartmentId]);
@@ -2382,4 +2394,5 @@ function App() {
 }
 
 export default App;
+
 
