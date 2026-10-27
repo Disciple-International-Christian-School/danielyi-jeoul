@@ -361,6 +361,12 @@
       "name": "discipline_history_student_index",
       "status": "TRACKED",
       "file": "supabase/migrations/20261026150559_discipline_history_student_index.sql"
+    },
+    {
+      "version": "20261027120410",
+      "name": "allow_manual_historical_dates",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261027120410_allow_manual_historical_dates.sql"
     }
   ]
 }

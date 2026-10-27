@@ -66,7 +66,6 @@ import {
   useStudentSummaryCoreParity,
   useCoreStudentReadiness,
   useCoreSetupStatus,
-  useDisciplineHistory,
   useCreateDepartmentWithMeritRule,
   useCreatePointItem,
   useCreatePointRecord,
@@ -459,7 +458,6 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
   const items = useListPointItems({ type, includeInactive: false });
   const create = useCreatePointRecord();
   const undo = useDeletePointRecord();
-  const historySettings = useDisciplineHistory(today(), today());
   const requestRef = useRef<{ fingerprint: string; id: string } | null>(null);
   const savingRef = useRef(false);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -646,8 +644,9 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
           </div>
 
           <div className="field">
-            <label htmlFor="entry-date">기록일</label>
-            <input id="entry-date" className="input" type="date" required max={today()} min={(selectedStudent?.grade ?? 0) >= 7 ? historySettings.data?.daily_starts_on ?? undefined : undefined} value={recordedAt} onChange={(event) => setRecordedAt(event.target.value)} data-testid="input-point-date" />
+            <label htmlFor="entry-date">발생일</label>
+            <input id="entry-date" className="input" type="date" required max={today()} value={recordedAt} onChange={(event) => setRecordedAt(event.target.value)} data-testid="input-point-date" />
+            <span className="record-meta">과거 날짜도 선택할 수 있습니다. 선택한 발생일 기준으로 집계됩니다.</span>
           </div>
 
           <div className="side-note field full">

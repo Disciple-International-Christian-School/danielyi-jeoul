@@ -67,7 +67,7 @@ export function PointHistory({ date, today, onDateChange, scope, studentId }: {
     {error ? <div role="alert"><p className="danger-text">기록 조회에 실패했습니다. 누계가 0이라는 뜻은 아닙니다.</p><button className="btn btn-outline" onClick={() => { history.refetch(); archive.refetch(); term.refetch(); }}>다시 시도</button></div>
       : pending ? <p role="status">기록을 불러오는 중입니다.</p> : <>
         <p className="history-totals" aria-live="polite">상점 <span className="success-text">{positive}점</span> · 벌점 <span className="danger-text">{negative}점</span> · {mode === 'TERM' ? '학기 누계' : '최종값'} <strong>{positive - negative}점</strong></p>
-        {secondary && history.data?.daily_starts_on && <p className="section-copy">{history.data.daily_starts_on} 전은 주간 확정, 이후는 일별 합산입니다. 정산기간이 바뀌어도 학기 누계는 유지됩니다. 누계는 조회된 기록 기준입니다.</p>}
+        {secondary && history.data?.daily_starts_on && <p className="section-copy">기록 기준은 각 주차에 표시됩니다. 일별 입력은 선택한 발생일에 합산되며, 누계는 조회된 기록 기준입니다.</p>}
         {mode === 'DAY' && weekly && <p role="status">이 날짜는 주간 확정값만 있습니다. 아래 점수는 해당 주 전체이며 일별 사유·발생 횟수는 확인할 수 없습니다.</p>}
         {calendar.filter(c => c.kind === 'NO_SCHOOL').map(c => <p className="section-copy" key={c.week_start}>{c.week_start} 주 · {c.label} · 비운영</p>)}
         {studentId && mode === 'TERM' && trend.length > 0 && <figure className="history-trend">
