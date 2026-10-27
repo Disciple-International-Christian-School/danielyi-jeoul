@@ -48,9 +48,17 @@ export function DashboardView({ students, reflections, calendar, scope, isLead, 
     return students.filter(student =>
       (target === 'ALL' || (target === 'PHYSICAL' ? student.physicalTrainingRequired : student.committeeRequired))
       && (!needle || [student.name, student.studentNo, student.homeroom].some(value => value?.toLowerCase().includes(needle)))
-    ).sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name, 'ko') : sort === 'grade'
-      ? a.grade - b.grade || (a.homeroom ?? '').localeCompare(b.homeroom ?? '', 'ko')
-      : b.weeklyNetPenaltyPoints - a.weeklyNetPenaltyPoints);
+    ).sort((a, b) => {
+      // Gross components keep merit-only and fully offset records above empty rows.
+      const hasPoints = (student: StudentSummary) =>
+        student.positivePoints > 0 || student.negativePoints > 0 || student.weeklyRecordCount > 0;
+      const recordedFirst = Number(hasPoints(b)) - Number(hasPoints(a));
+      if (recordedFirst) return recordedFirst;
+      return (sort === 'name' ? a.name.localeCompare(b.name, 'ko') : sort === 'grade'
+        ? a.grade - b.grade || (a.homeroom ?? '').localeCompare(b.homeroom ?? '', 'ko')
+        : b.weeklyNetPenaltyPoints - a.weeklyNetPenaltyPoints)
+        || a.name.localeCompare(b.name, 'ko');
+    });
   }, [students, search, sort, target]);
   const personCount = (predicate: (reflection: Reflection) => boolean) => new Set(reflections.filter(predicate).map(row => row.coreStudentId)).size;
   const missing = personCount(row => row.status !== 'SUBMITTED');
