@@ -367,6 +367,12 @@
       "name": "allow_manual_historical_dates",
       "status": "TRACKED",
       "file": "supabase/migrations/20261027120410_allow_manual_historical_dates.sql"
+    },
+    {
+      "version": "20261027123434",
+      "name": "consecutive_training_committee_rule",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261027123434_consecutive_training_committee_rule.sql"
     }
   ]
 }
