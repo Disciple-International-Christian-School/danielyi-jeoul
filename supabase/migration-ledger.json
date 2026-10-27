@@ -349,6 +349,18 @@
       "name": "sync_daniel_roster_from_core",
       "status": "TRACKED",
       "file": "supabase/migrations/20261015101921_sync_daniel_roster_from_core.sql"
+    },
+    {
+      "version": "20261026150507",
+      "name": "discipline_weekly_history_cutover",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261026150507_discipline_weekly_history_cutover.sql"
+    },
+    {
+      "version": "20261026150559",
+      "name": "discipline_history_student_index",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261026150559_discipline_history_student_index.sql"
     }
   ]
 }
