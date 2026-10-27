@@ -1954,6 +1954,9 @@ function DepartmentMeritAdminPage() {
     queryClient.invalidateQueries({ queryKey: getDepartmentMembersQueryKey() });
     queryClient.invalidateQueries({ queryKey: getDepartmentMeritStatusQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: ['discipline-history'] });
+    queryClient.invalidateQueries({ queryKey: ['point-record-archive'] });
   };
 
   const currentMembers = (members.data ?? []).filter((row) => row.departmentId === selectedDepartmentId);
@@ -2021,7 +2024,7 @@ function DepartmentMeritAdminPage() {
 
   const removeMember = (coreStudentId: string) => {
     if (!selectedDepartmentId) return;
-    if (!window.confirm('이 학생의 현재 부서 소속을 종료할까요? 과거 상점 기록은 유지됩니다.')) return;
+    if (!window.confirm('오늘부터 이 학생을 현재 부서 명단에서 제외할까요? 이미 반영된 상점 기록은 유지됩니다.')) return;
 
     setMembership.mutate({
       departmentId: selectedDepartmentId,
@@ -2162,7 +2165,7 @@ function DepartmentMeritAdminPage() {
         <div>
           <div className="eyebrow">Membership</div>
           <h2 className="section-title" style={{ marginTop: 8 }}>{selectedDepartment ? selectedDepartment.name + ' 소속 학생' : '부서를 먼저 선택하세요'}</h2>
-          <p className="section-copy">소속 이력은 삭제하지 않고 시작일/종료일로 보존합니다.</p>
+          <p className="section-copy">종료일부터 현재 명단에서 제외됩니다. 시작일·종료일과 기존 상점 기록은 보존됩니다.</p>
         </div>
         {selectedDepartment && <span className="pill pill-positive">{currentMembers.length}명</span>}
       </div>
@@ -2210,7 +2213,7 @@ function DepartmentMeritAdminPage() {
                 <td>{row.homeroom ?? (row.grade ? 'G' + row.grade : '—')}</td>
                 <td className="muted">{row.studentNo ?? '미발급'}</td>
                 <td>{dateLabel(row.startsOn)}</td>
-                <td><button type="button" className="btn btn-outline" onClick={() => removeMember(row.coreStudentId)}>소속 종료</button></td>
+                <td><button type="button" className="btn btn-outline" disabled={setMembership.isPending} onClick={() => removeMember(row.coreStudentId)}>소속 종료</button></td>
               </tr>)}</tbody>
             </table>
           </div>}

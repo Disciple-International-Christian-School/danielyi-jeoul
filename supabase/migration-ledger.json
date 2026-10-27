@@ -373,6 +373,12 @@
       "name": "consecutive_training_committee_rule",
       "status": "TRACKED",
       "file": "supabase/migrations/20261027123434_consecutive_training_committee_rule.sql"
+    },
+    {
+      "version": "20261027124319",
+      "name": "department_membership_end_exclusive",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261027124319_department_membership_end_exclusive.sql"
     }
   ]
 }
