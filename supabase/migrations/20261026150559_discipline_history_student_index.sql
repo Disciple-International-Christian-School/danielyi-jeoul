@@ -1,0 +1,1 @@
+create index weekly_balances_student_history_idx on discipline.weekly_balances(core_student_id,term_id,week_start);

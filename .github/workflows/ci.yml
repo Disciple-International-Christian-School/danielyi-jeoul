@@ -59,8 +59,12 @@ jobs:
       - name: Check migration tool syntax
         run: node --check scripts/migrate-sp-external-identities.mjs
 
+      - name: History regression checks
+        run: node scripts/test-history.mjs && node scripts/test-weekly-import.mjs
+
       - name: Typecheck
         run: npm run typecheck
 
       - name: Build
         run: npm run build
+
