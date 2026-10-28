@@ -739,7 +739,7 @@ function ReflectionsPage() {
     <PageHeader
       eyebrow="반성문 관리"
       title="반성문 대상자"
-      copy="초등은 익일 등교, 중고등은 기본 17시·필요 시 다음날 17시 연장(주말 발생은 월요일) 기준으로 담당 범위별 제출 상태를 확인합니다."
+      copy="주간 상벌NET이 음수일 때만 반성문 대상입니다. 초등은 익일 등교, 중고등은 기본 17시·필요 시 다음날 17시 연장(주말 발생은 월요일) 기준으로 제출 상태를 확인합니다."
     />
 
     <div className="card card-pad" style={{ marginTop: 30 }}>
