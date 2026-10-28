@@ -106,6 +106,8 @@
 .desk-student-identity strong { display: block; font-size: 14px; font-weight: 650; white-space: nowrap; }
 .desk-student-identity small { display: block; font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 2px; }
 .desk-student-table .status-list { margin: 0; gap: 4px; }
+.desk-training-status { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; max-width: 340px; }
+.desk-training-reasons { color: hsl(var(--muted-foreground)); font-size: 11px; font-weight: 500; line-height: 1.55; word-break: keep-all; }
 .desk-student-table .pill { font-size: 11px; padding: 5px 8px; border-radius: 6px; }
 .desk-status-clear { display: flex; align-items: center; gap: 5px; font-size: 12px; color: hsl(var(--muted-foreground)); white-space: nowrap; }
 .desk-empty { display: grid; justify-items: center; padding: 45px 20px; gap: 8px; color: hsl(var(--muted-foreground)); text-align: center; }

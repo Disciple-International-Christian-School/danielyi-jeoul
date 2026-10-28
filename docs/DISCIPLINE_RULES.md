@@ -26,3 +26,11 @@ Verification: SQL rollback regression checks cover three consecutive weeks acros
 - Current-date print notice contains today's unsubmitted eligible reflections plus all earlier unsubmitted reflections currently in DOUBLE status. Submitted and weekly-NET-ineligible penalty records are excluded from the **target notice**, though point audit history is preserved. Non-current date print notices do not automatically carry overdue rows into history.
 - The dashboard's Today target count reflects the same actionable new-plus-carried set. `DOUBLE` badges use the established red negative pill; physical training uses dark navy. Training criteria themselves are unchanged.
 - Sign conventions on dashboard and printed weekly report: weekly merits `+0`, weekly penalties `−0`, weekly NET remains signed merit minus penalty.
+
+## 2026-10-28 — 체력훈련 사유 추가
+
+- 세 조건 중 하나면 대상: 주간 벌점 3회 이상 / 주간 NET -8 이하 / 2배 반성문 17시 미제출 후 익일.
+- 최초 제출 마감이 17시 이전이면 해당일 17시, 17시 이후라면 다음날 17시를 2배 제출 확인 마감으로 사용.
+- 완료 표시되면 2배 미제출 사유는 비활성화하며 다른 조건은 독립 유지.
+- 3주 연속 대상 판정에서 2배 미제출 1건은 최초 대상 주차 1회만 인정.
+- 모든 해당 사유는 대시보드와 공지 출력에 표시.

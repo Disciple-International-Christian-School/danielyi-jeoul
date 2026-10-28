@@ -70,6 +70,8 @@ export interface StudentSummary {
   weeklyNetPenaltyPoints: number;
   weeklyRecordCount: number;
   physicalTrainingRequired: boolean;
+  /** All currently satisfied training rules, never a single prioritized label. */
+  physicalTrainingReasons: string[];
 
   // Current admin-controlled settlement period.
   settlementPeriodId: number | null;
@@ -355,6 +357,7 @@ export interface WeeklyDisciplineReport {
   weeklyNetPenaltyPoints: number;
   penaltyIncidentCount: number;
   physicalTrainingRequired: boolean;
+  physicalTrainingReasons: string[];
   settlementPeriodId: number | null;
   settlementPeriodLabel: string | null;
   settlementStartsOn: string | null;
@@ -447,6 +450,7 @@ interface StudentSummaryRow {
   weekly_net_penalty_points: number;
   weekly_record_count: number;
   physical_training_required: boolean;
+  physical_training_reasons: string[] | null;
 
   settlement_period_id: number | null;
   settlement_period_label: string | null;
@@ -678,6 +682,7 @@ interface WeeklyDisciplineReportRow {
   weekly_net_penalty_points: number;
   penalty_incident_count: number;
   physical_training_required: boolean;
+  physical_training_reasons: string[] | null;
   settlement_period_id: number | null;
   settlement_period_label: string | null;
   settlement_starts_on: string | null;
@@ -728,6 +733,7 @@ function mapStudent(row: StudentSummaryRow): StudentSummary {
     weeklyNetPenaltyPoints: row.weekly_net_penalty_points,
     weeklyRecordCount: row.weekly_record_count,
     physicalTrainingRequired: row.physical_training_required,
+    physicalTrainingReasons: row.physical_training_reasons ?? [],
 
     settlementPeriodId: row.settlement_period_id,
     settlementPeriodLabel: row.settlement_period_label,
@@ -960,6 +966,7 @@ function mapWeeklyDisciplineReport(row: WeeklyDisciplineReportRow): WeeklyDiscip
     weeklyNetPenaltyPoints: row.weekly_net_penalty_points,
     penaltyIncidentCount: row.penalty_incident_count,
     physicalTrainingRequired: row.physical_training_required,
+    physicalTrainingReasons: row.physical_training_reasons ?? [],
     settlementPeriodId: row.settlement_period_id,
     settlementPeriodLabel: row.settlement_period_label,
     settlementStartsOn: row.settlement_starts_on,
@@ -1109,12 +1116,13 @@ async function fetchStudentSummaries(): Promise<StudentSummary[]> {
 }
 
 export function useListStudents() {
-  return useQuery({ queryKey: getListStudentsQueryKey(), queryFn: fetchStudentSummaries });
+  return useQuery({ queryKey: getListStudentsQueryKey(), queryFn: fetchStudentSummaries, refetchInterval: 60_000 });
 }
 
 export function useGetDashboard() {
   return useQuery({
     queryKey: getGetDashboardQueryKey(),
+    refetchInterval: 60_000, // KST date boundary may activate overdue-paper training without another write.
     queryFn: async (): Promise<Dashboard> => {
       const [countsRes, students] = await Promise.all([
         supabase.from('v_dashboard_counts').select('*').single(),
@@ -1170,7 +1178,7 @@ export function useGetStudent(studentRef: string) {
         return {
           id: 0, coreStudentId: person.id, studentNo: person.student_no, name: person.name, grade: person.grade, homeroom: person.homeroom,
           createdAt: '', updatedAt: '', isActive: false, positivePoints: 0, negativePoints: 0,
-          weeklyPositivePoints: 0, weeklyPenaltyPoints: 0, weeklyNetPenaltyPoints: 0, weeklyRecordCount: 0, physicalTrainingRequired: false,
+          weeklyPositivePoints: 0, weeklyPenaltyPoints: 0, weeklyNetPenaltyPoints: 0, weeklyRecordCount: 0, physicalTrainingRequired: false, physicalTrainingReasons: [],
           settlementPeriodId: null, settlementPeriodLabel: null, settlementStartsOn: null, settlementPositivePoints: 0, settlementPenaltyPoints: 0,
           settlementNetPenaltyPoints: 0, physicalTrainingWeeks: 0, committeeRequired: false, monthlyPenaltyPoints: 0, punishment: null,
           statuses: ['현재 명부 제외 · 과거 이력'], punishments: unwrap<PunishmentRow[]>(punishmentsRes).map(mapPunishment),
@@ -1618,6 +1626,7 @@ export function useDailyDisciplineNotice(recordedAt: string, includeOverdue = fa
 export function useWeeklyDisciplineReport() {
   return useQuery({
     queryKey: getWeeklyDisciplineReportQueryKey(),
+    refetchInterval: 60_000,
     queryFn: async (): Promise<WeeklyDisciplineReport[]> => {
       const rows = unwrap<WeeklyDisciplineReportRow[]>(
         await supabase
