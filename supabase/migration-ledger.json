@@ -391,6 +391,12 @@
       "name": "move_grade9_to_high_scope",
       "status": "TRACKED",
       "file": "supabase/migrations/20261028012114_move_grade9_to_high_scope.sql"
+    },
+    {
+      "version": "20261028120036",
+      "name": "double_reflection_training_next_day",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261028120036_double_reflection_training_next_day.sql"
     }
   ]
 }
