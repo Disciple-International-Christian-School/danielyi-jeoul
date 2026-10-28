@@ -591,6 +591,8 @@ html { -webkit-text-size-adjust: 100%; }
 .dark .card { box-shadow: 0 12px 28px hsl(0 0% 0% / .1); }
 .dark .print-sheet, .dark .print-sheet * { color: #172129; }
 .dark .print-sheet { background: #fff; }
+.dark .print-sheet .print-reflection-status-double { color: #a12c31; }
+.dark .print-sheet .print-reflection-status-missing { color: #795420; }
 @media (max-width: 820px) and (min-width: 561px) {
   .nav-child { margin-left: 0; padding: 10px; }
 }
