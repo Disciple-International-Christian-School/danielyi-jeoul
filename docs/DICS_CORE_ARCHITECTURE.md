@@ -2,6 +2,8 @@
 
 **Language / 언어:** [English](DICS_CORE_ARCHITECTURE.md) | [한국어](DICS_CORE_ARCHITECTURE.ko.md)
 
+> For October 28 eligibility changes and G9 responsibility routing, use [current discipline rules](DISCIPLINE_RULES.md). Earlier designs and snapshots below remain dated historical evidence.
+
 > Target architecture, September 25, 2026. This dated design explains Daniel's transition; later [cut-over evidence](DISCIPLINE_CORE_CUTOVER.md) supersedes transitional status statements.
 
 ## 1. One student master

@@ -74,6 +74,9 @@ jobs:
       - name: Check history tool syntax
         run: python3 -m py_compile scripts/prepare-english-history.py
 
+      - name: History regression checks
+        run: node scripts/test-history.mjs && node scripts/test-weekly-import.mjs
+
       - name: Typecheck
         run: npm run typecheck
 

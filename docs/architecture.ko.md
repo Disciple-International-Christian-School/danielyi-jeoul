@@ -2,6 +2,8 @@
 
 **Language / 언어:** [English](architecture.md) | [한국어](architecture.ko.md)
 
+> 2026-10-28 이후의 판정·G9 담당범위는 [현재 생활지도 규칙](DISCIPLINE_RULES.ko.md)을 우선한다. 아래의 이전 설계·기록은 해당 시점의 근거로 보존한다.
+
 > 2026-09-21의 역사적 구조다. 학년 1–6, 직접 입력 작성자, 월간 벌점, 학생 CRUD 등은 이후 변경됐다. 현재 구조는 Core 설계·변경 이력·전환 실행서를 참조한다.
 
 DICS 관리자 전용 상·벌점 콘솔. SEONDO(선도부)와 SASAENG(사생회)만 로그인하며 학생은 로그인하지 않는다. 앱은 https://dics-daniels-scale.netlify.app, 당시 저장소는 shualoalumin/danielyi-jeoul, Supabase는 DICS 조직 daniels-scale(jgrzsfomcwfiukkaqtos, 서울)이었다.

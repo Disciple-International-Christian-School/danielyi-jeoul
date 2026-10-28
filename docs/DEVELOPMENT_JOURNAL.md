@@ -2,6 +2,8 @@
 
 **Language / 언어:** [English](DEVELOPMENT_JOURNAL.md) | [한국어](DEVELOPMENT_JOURNAL.ko.md)
 
+> For October 28 eligibility changes and G9 responsibility routing, use [current discipline rules](DISCIPLINE_RULES.md). Earlier designs and snapshots below remain dated historical evidence.
+
 A living engineering record, begun September 25, 2026. It preserves context, discoveries, decisions, implementation, verification, and next steps for school reporting and retrospective use. Student names, PINs, and original rosters do not belong here. Historical checkpoints and repeated section numbers are retained; later entries supersede earlier transitional states.
 
 ## 0. When the problem changed
@@ -891,3 +893,19 @@ The migration was rollback-tested, then `20260927153350_department_merits_monday
 Following typography/contrast work, Josh requested a more coherent design. Date/week context and five target-card order were retained. Queries and responsibility filtering stayed in the container while DashboardView separated presentation. A green weekly panel groups calendar/merit work; adjacent links reach reflections, notices, and settlement. The student card joins filters/search/table/summary, with right-aligned numbers and a shaded NET column. A dedicated settlement query avoids inferring period state from the first student.
 
 Local typecheck/build passed. Because agent-browser could not bind its daemon socket, a temporary Netlify preview rendered the real component with synthetic data. Desktop, 320px, 390px, dark mode, filters, empty/unconfigured/error states, and role links were checked. Temporary fixtures/pages were excluded before merge. Authenticated real-data verification remained follow-up work. The design record and fixture screenshot are in UI_DESIGN_SYSTEM.md.
+
+## October 28, 2026 — Covered penalties should not create reflection obligations
+
+A student with +10 merits and -5 penalties has NET +5. Showing missing/double obligations for that covered penalty contradicted policy; later negative NET must not retrospectively make the earlier record overdue. The source point/reflection rows remain intact, while reads require both current negative full-week NET and negative entry-time running NET. Week membership uses recorded_at; entry order uses created_at,id. Targets disappear together when NET reaches zero and later eligible penalties return if NET becomes negative.
+
+A contract-preserving view migration aligned the read paths without changing deadlines or training/committee policy at that checkpoint. The recorded live check excluded 12 of 81 rows, including two incorrect double statuses. A +10,-5,-6,+1,-1 scenario was verified with BEGIN/ROLLBACK, retaining no test data. The regression is in supabase/tests/reflection_weekly_net.sql.
+
+## October 28, 2026 — Today's work differs from occurrence date
+
+An occurrence-date-only notice omitted older overdue reflections from today's work. After defining negative-NET eligibility, the read path combined today's actionable missing records with carried DOUBLE records. Submitted students disappear while ledger/deadline history remains. Carry-forward applies only to today's notice and does not rewrite past-date output.
+
+Dark-navy training and red DOUBLE status remain distinct. Weekly penalties show an explicit sign. G9 routing moves to high school without altering grade. A4 margins, body/table sizes and multi-page tables were improved together.
+
+## October 28, 2026 — Submission checks connect to training
+
+Completing double submission by the 17:00 check avoids training for that missing obligation; continued non-submission activates it the next day. The three reasons are independent and may coexist, so dashboard/reports retain all of them rather than a single representative reason. Existing submission timestamps and score source rows were not changed. Rollback checks covered next-day activation, single-week credit and release upon completion.

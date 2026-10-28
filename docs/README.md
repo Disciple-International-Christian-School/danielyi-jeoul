@@ -30,6 +30,12 @@ Canonical paths open in English. Use the selector for the corresponding Korean e
 | [Commit-history maintenance](HISTORY_MAINTENANCE.md) | Read dates, evidence, and ownership together. |
 | [Historical capacity discussion](attachments/SUPABASE_CAPACITY.md) | Read dates, evidence, and ownership together. |
 
+| [Department merits and membership](DEPARTMENT_MERITS.md) | Distinguish current decisions from historical checkpoints. |
+| [Current discipline rules](DISCIPLINE_RULES.md) | Distinguish current decisions from historical checkpoints. |
+| [Weekly history and daily cut-over](HISTORY_AND_BACKFILL.md) | Distinguish current decisions from historical checkpoints. |
+| [Cut-over implementation checklist](IMPLEMENTATION_TODO.md) | Distinguish current decisions from historical checkpoints. |
+| [Historical manual-entry reset](OPERATIONS_2026-10-27.md) | Distinguish current decisions from historical checkpoints. |
+
 ## Attachments
 
 - [Blank account handout — English/Korean controls](attachments/account-handout.html)

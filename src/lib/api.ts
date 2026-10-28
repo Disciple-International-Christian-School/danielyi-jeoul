@@ -5,6 +5,36 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { supabase } from './supabase';
+import type { WeeklySourceRow } from './weekly-import';
+
+export interface HistoryBalance {
+  core_student_id: string; student_name: string; student_no: string; homeroom: string; grade: number; is_active: boolean;
+  week_start: string; week_end: string; positive_points: number; negative_points: number; net: number;
+  incident_count: number | null; source: 'WEEKLY' | 'DAILY'; review_note: string | null;
+}
+export interface DisciplineHistory {
+  rows: HistoryBalance[];
+  students: { id: string; name: string; student_no: string; homeroom: string; grade: number; is_active: boolean }[];
+  calendar: { week_start: string; kind: 'WEEKLY' | 'NO_SCHOOL'; label: string }[];
+  daily_starts_on: string | null;
+}
+export function useDisciplineHistory(start: string, end: string, studentId?: string) {
+  return useQuery({
+    queryKey: ['discipline-history', start, end, studentId ?? null], enabled: Boolean(start && end && start <= end),
+    queryFn: async (): Promise<DisciplineHistory> => {
+      const { data, error } = await supabase.rpc('get_discipline_history', { p_student_id: studentId ?? null, p_start: start, p_end: end });
+      if (error) throw new Error(error.message);
+      return data as DisciplineHistory;
+    },
+  });
+}
+export function useImportDisciplineWeekly() {
+  return useMutation({ mutationFn: async (input: { termId: string; source: string; rows: WeeklySourceRow[]; notes: unknown }) => {
+    const { data, error } = await supabase.rpc('import_discipline_weekly', { p_term_id: input.termId, p_source_label: input.source, p_rows: input.rows, p_notes: input.notes });
+    if (error) throw new Error(error.message);
+    return data as { batch_id: string; source_rows: number; balances: number; unlinked: number; reused: boolean };
+  }});
+}
 
 // ---------------------------------------------------------------------------
 // Domain types (hand-written; no codegen)
@@ -40,6 +70,8 @@ export interface StudentSummary {
   weeklyNetPenaltyPoints: number;
   weeklyRecordCount: number;
   physicalTrainingRequired: boolean;
+  /** All currently satisfied training rules, never a single prioritized label. */
+  physicalTrainingReasons: string[];
 
   // Current admin-controlled settlement period.
   settlementPeriodId: number | null;
@@ -60,6 +92,7 @@ export interface StudentSummary {
 
 export interface StudentDetail extends StudentSummary {
   punishments: Punishment[];
+  isActive?: boolean;
 }
 
 export interface PointRecordReflection {
@@ -324,6 +357,7 @@ export interface WeeklyDisciplineReport {
   weeklyNetPenaltyPoints: number;
   penaltyIncidentCount: number;
   physicalTrainingRequired: boolean;
+  physicalTrainingReasons: string[];
   settlementPeriodId: number | null;
   settlementPeriodLabel: string | null;
   settlementStartsOn: string | null;
@@ -416,6 +450,7 @@ interface StudentSummaryRow {
   weekly_net_penalty_points: number;
   weekly_record_count: number;
   physical_training_required: boolean;
+  physical_training_reasons: string[] | null;
 
   settlement_period_id: number | null;
   settlement_period_label: string | null;
@@ -647,6 +682,7 @@ interface WeeklyDisciplineReportRow {
   weekly_net_penalty_points: number;
   penalty_incident_count: number;
   physical_training_required: boolean;
+  physical_training_reasons: string[] | null;
   settlement_period_id: number | null;
   settlement_period_label: string | null;
   settlement_starts_on: string | null;
@@ -697,6 +733,7 @@ function mapStudent(row: StudentSummaryRow): StudentSummary {
     weeklyNetPenaltyPoints: row.weekly_net_penalty_points,
     weeklyRecordCount: row.weekly_record_count,
     physicalTrainingRequired: row.physical_training_required,
+    physicalTrainingReasons: row.physical_training_reasons ?? [],
 
     settlementPeriodId: row.settlement_period_id,
     settlementPeriodLabel: row.settlement_period_label,
@@ -929,6 +966,7 @@ function mapWeeklyDisciplineReport(row: WeeklyDisciplineReportRow): WeeklyDiscip
     weeklyNetPenaltyPoints: row.weekly_net_penalty_points,
     penaltyIncidentCount: row.penalty_incident_count,
     physicalTrainingRequired: row.physical_training_required,
+    physicalTrainingReasons: row.physical_training_reasons ?? [],
     settlementPeriodId: row.settlement_period_id,
     settlementPeriodLabel: row.settlement_period_label,
     settlementStartsOn: row.settlement_starts_on,
@@ -1078,12 +1116,13 @@ async function fetchStudentSummaries(): Promise<StudentSummary[]> {
 }
 
 export function useListStudents() {
-  return useQuery({ queryKey: getListStudentsQueryKey(), queryFn: fetchStudentSummaries });
+  return useQuery({ queryKey: getListStudentsQueryKey(), queryFn: fetchStudentSummaries, refetchInterval: 60_000 });
 }
 
 export function useGetDashboard() {
   return useQuery({
     queryKey: getGetDashboardQueryKey(),
+    refetchInterval: 60_000, // KST date boundary may activate overdue-paper training without another write.
     queryFn: async (): Promise<Dashboard> => {
       const [countsRes, students] = await Promise.all([
         supabase.from('v_dashboard_counts').select('*').single(),
@@ -1126,10 +1165,25 @@ export function useGetStudent(studentRef: string) {
         : punishmentQuery.eq('core_student_id', studentRef);
 
       const [summaryRes, punishmentsRes] = await Promise.all([
-        summaryQuery.single(),
+        summaryQuery.maybeSingle(),
         punishmentQuery.order('created_at', { ascending: false }),
       ]);
 
+      if (!summaryRes.error && !summaryRes.data && !legacy) {
+        const date = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' }).format(new Date());
+        const { data, error } = await supabase.rpc('get_discipline_history', { p_student_id: studentRef, p_start: date, p_end: date });
+        if (error) throw new Error(error.message);
+        const person = (data as DisciplineHistory)?.students[0];
+        if (!person) throw new Error('조회 가능한 학생 이력이 없습니다.');
+        return {
+          id: 0, coreStudentId: person.id, studentNo: person.student_no, name: person.name, grade: person.grade, homeroom: person.homeroom,
+          createdAt: '', updatedAt: '', isActive: false, positivePoints: 0, negativePoints: 0,
+          weeklyPositivePoints: 0, weeklyPenaltyPoints: 0, weeklyNetPenaltyPoints: 0, weeklyRecordCount: 0, physicalTrainingRequired: false, physicalTrainingReasons: [],
+          settlementPeriodId: null, settlementPeriodLabel: null, settlementStartsOn: null, settlementPositivePoints: 0, settlementPenaltyPoints: 0,
+          settlementNetPenaltyPoints: 0, physicalTrainingWeeks: 0, committeeRequired: false, monthlyPenaltyPoints: 0, punishment: null,
+          statuses: ['현재 명부 제외 · 과거 이력'], punishments: unwrap<PunishmentRow[]>(punishmentsRes).map(mapPunishment),
+        };
+      }
       const summary = unwrap<StudentSummaryRow>(summaryRes as { data: StudentSummaryRow | null; error: { message: string } | null });
       const punishments = unwrap<PunishmentRow[]>(punishmentsRes);
       return { ...mapStudent(summary), punishments: punishments.map(mapPunishment) };
@@ -1156,6 +1210,29 @@ export function useListPointRecords(params: { studentRef: string; limit?: number
       return rows.map(mapPointRecord);
     },
     enabled: params.studentRef.length > 0,
+  });
+}
+
+/** Read-only archive. Page through every row; never silently truncate at the
+ * PostgREST row limit. Recorded dates, not creation dates, define the period. */
+export function usePointRecordArchive(startsOn: string, endsOn: string, studentId?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['point-record-archive', startsOn, endsOn, studentId ?? null],
+    enabled: enabled && Boolean(startsOn && endsOn && startsOn <= endsOn),
+    queryFn: async (): Promise<PointRecord[]> => {
+      const rows: PointRecordRow[] = [];
+      const size = 500;
+      for (let offset = 0; ; offset += size) {
+        let query = supabase.from('v_point_records').select('*').gte('recorded_at', startsOn).lte('recorded_at', endsOn);
+        if (studentId) query = query.eq('core_student_id', studentId);
+        const page = unwrap<PointRecordRow[]>(await query
+          .order('recorded_at', { ascending: false }).order('id', { ascending: false })
+          .range(offset, offset + size - 1));
+        rows.push(...page);
+        if (page.length < size) break;
+      }
+      return rows.map(mapPointRecord);
+    },
   });
 }
 
@@ -1503,20 +1580,44 @@ export function useEnsureWeeklyDepartmentMerits() {
   });
 }
 
-export function useDailyDisciplineNotice(recordedAt: string) {
+/** A daily notice lists only actionable reflection papers.
+ *  The current-day notice also carries every overdue, still-unsubmitted DOUBLE
+ *  from earlier days. A past-day notice does not rewrite historical notices.
+ *  The view owns weekly-NET eligibility; never infer targets from raw penalties.
+ */
+export function useDailyDisciplineNotice(recordedAt: string, includeOverdue = false) {
   return useQuery({
-    queryKey: getDailyDisciplineNoticeQueryKey(recordedAt),
+    queryKey: [...getDailyDisciplineNoticeQueryKey(recordedAt), includeOverdue],
+    refetchInterval: 60_000,
     queryFn: async (): Promise<DailyDisciplineNotice[]> => {
-      const rows = unwrap<DailyDisciplineNoticeRow[]>(
-        await supabase
-          .from('v_daily_discipline_notice')
-          .select('*')
-          .eq('recorded_at', recordedAt)
-          .order('grade', { ascending: true })
-          .order('homeroom', { ascending: true, nullsFirst: false })
-          .order('student_name', { ascending: true }),
-      );
-      return rows.map(mapDailyDisciplineNotice);
+      const current = supabase.from('v_daily_discipline_notice')
+        .select('*')
+        .eq('recorded_at', recordedAt)
+        .in('reflection_status', ['MISSING', 'DOUBLE']);
+      const overdue = includeOverdue
+        ? supabase.from('v_daily_discipline_notice').select('*')
+            .lt('recorded_at', recordedAt)
+            .eq('reflection_status', 'DOUBLE')
+        : null;
+      const [todayResult, overdueResult] = await Promise.all([
+        current,
+        overdue ?? Promise.resolve({ data: [] as DailyDisciplineNoticeRow[], error: null }),
+      ]);
+      const todayRows = unwrap<DailyDisciplineNoticeRow[]>(todayResult);
+      const carriedRows = unwrap<DailyDisciplineNoticeRow[]>(overdueResult);
+      const uniqueRows = new Map<number, DailyDisciplineNoticeRow>();
+      for (const row of [...todayRows, ...carriedRows]) {
+        if (row.reflection_status !== 'SUBMITTED' && row.reflection_id != null) {
+          uniqueRows.set(row.point_record_id, row);
+        }
+      }
+      return [...uniqueRows.values()].sort((a, b) =>
+        a.grade - b.grade
+        || (a.homeroom ?? '').localeCompare(b.homeroom ?? '', 'ko')
+        || a.student_name.localeCompare(b.student_name, 'ko')
+        || (a.reflection_status === 'DOUBLE' ? -1 : 1) - (b.reflection_status === 'DOUBLE' ? -1 : 1)
+        || a.point_record_id - b.point_record_id
+      ).map(mapDailyDisciplineNotice);
     },
     enabled: Boolean(recordedAt),
   });
@@ -1525,6 +1626,7 @@ export function useDailyDisciplineNotice(recordedAt: string) {
 export function useWeeklyDisciplineReport() {
   return useQuery({
     queryKey: getWeeklyDisciplineReportQueryKey(),
+    refetchInterval: 60_000,
     queryFn: async (): Promise<WeeklyDisciplineReport[]> => {
       const rows = unwrap<WeeklyDisciplineReportRow[]>(
         await supabase
@@ -1668,15 +1770,15 @@ export function useCloseSettlementPeriod() {
 
 export function useCreatePointRecord() {
   return useMutation({
-    mutationFn: async ({ data }: { data: PointRecordInput }) => {
-      const { data: id, error } = await supabase.rpc('create_point_record_core', {
+    mutationFn: async ({ data, requestId }: { data: PointRecordInput; requestId: string }) => {
+      const { data: id, error } = await supabase.rpc('create_point_record_once', {
         p_core_student_id: data.coreStudentId,
         p_type: data.type,
         p_item: data.item,
         p_points: data.points,
-        p_entered_by_name: data.enteredByName,
+        p_request_id: requestId,
         p_recorded_at: data.recordedAt,
-        p_reflection_submitted: data.reflectionSubmitted ?? null,
+        p_reflection_submitted: data.reflectionSubmitted ?? false,
       });
       if (error) throw new Error(error.message);
       return id as number;
@@ -1713,10 +1815,10 @@ export function useDeletePointRecord() {
 // Writes — reflections
 // ---------------------------------------------------------------------------
 
-export function useExtendReflectionTo21() {
+export function useExtendReflectionToNextDay() {
   return useMutation({
     mutationFn: async ({ id, reason }: { id: number; reason: string }) => {
-      const { data, error } = await supabase.rpc('extend_reflection_to_21', {
+      const { data, error } = await supabase.rpc('extend_reflection_to_next_day', {
         p_reflection_id: id,
         p_reason: reason,
       });
@@ -1824,4 +1926,18 @@ export function useImportPointItems() {
       if (error) throw new Error(error.message);
     },
   });
+}
+
+
+export function useDisciplineImportStatus() {
+  return useQuery({ queryKey: ['discipline-import-status'], queryFn: async () => {
+    const { data, error } = await supabase.rpc('get_discipline_import_status');
+    if (error) throw new Error(error.message);
+    return data as {
+      settings: { term_id: string; daily_starts_on: string; activated_at: string | null } | null;
+      aliases: { source_name: string; grade: number; section: string; core_student_id: string }[];
+      batches: { id: string; source_label: string; created_at: string; source_rows: number; unlinked: number; current_balances: number }[];
+      unlinked: { source_name: string; grade: number; section: string; week_start: string; positive_points: number; negative_points: number }[];
+    };
+  }});
 }

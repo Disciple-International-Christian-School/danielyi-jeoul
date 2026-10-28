@@ -30,6 +30,12 @@
 | [커밋 이력 관리](HISTORY_MAINTENANCE.ko.md) | 날짜·근거·책임 범위를 함께 읽는다. |
 | [과거 용량 논의](attachments/SUPABASE_CAPACITY.ko.md) | 날짜·근거·책임 범위를 함께 읽는다. |
 
+| [부서상점·소속](DEPARTMENT_MERITS.ko.md) | 최신 결정과 과거 상태를 구분한다. |
+| [현재 생활지도 규칙](DISCIPLINE_RULES.ko.md) | 최신 결정과 과거 상태를 구분한다. |
+| [주간 이력·일별 전환](HISTORY_AND_BACKFILL.ko.md) | 최신 결정과 과거 상태를 구분한다. |
+| [전환 구현 점검](IMPLEMENTATION_TODO.ko.md) | 최신 결정과 과거 상태를 구분한다. |
+| [과거 수기 시험 초기화](OPERATIONS_2026-10-27.ko.md) | 최신 결정과 과거 상태를 구분한다. |
+
 ## 첨부 자료
 
 - [계정 배부 빈 양식 — 영·한 선택](attachments/account-handout.html)

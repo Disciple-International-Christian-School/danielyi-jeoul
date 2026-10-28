@@ -51,3 +51,7 @@ git push --force-with-lease=refs/heads/main:"$expected_main" origin review/engli
 The diff guard catches file changes but not a new remote commit with an identical tree: also compare the reviewed source-head SHA from the tool with expected_main before pushing. If they differ, stop and regenerate the preview. Do not use a blind --force. Collaborators must refresh or rebase their local branches after replacement; references/signatures tied to old hashes need review.
 
 Commit-message translation does not remove sensitive historical files. Credential rotation and any approved data-history cleanup are separate owner actions. Backup refs deliberately preserve old objects and must remain access-controlled.
+
+## October 28 merge reconciliation
+
+Added translations for two Korean-containing messages among the nine later main commits through e682248d717b042fb8074ed32a4c9e3819a2daf3. The map now covers nine messages; the earlier 280-commit/seven-message counts remain the initial historical scan. Replacing existing history is separate from merging this documentation PR and is not performed by the merge.

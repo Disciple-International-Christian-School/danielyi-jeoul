@@ -1,3 +1,5 @@
+import { StudentHistory } from '@/components/point-history';
+import { WeeklyImportPage } from '@/components/weekly-import';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import {
@@ -79,7 +81,7 @@ import {
   useEnsureWeeklyDepartmentMerits,
   useGetDashboard,
   useGetStudent,
-  useExtendReflectionTo21,
+  useExtendReflectionToNextDay,
   useImportPointItems,
   useInitializeCurrentAcademicTerm,
   useGrade9Assignments,
@@ -159,8 +161,8 @@ function dashboardCalendar() {
 function matchesDisciplineScope(grade: number, scope: DisciplineScope | null | undefined) {
   return !scope || scope === 'ALL'
     || (scope === 'ELEMENTARY' && grade <= 6)
-    || (scope === 'MIDDLE' && grade >= 7 && grade <= 9)
-    || (scope === 'HIGH' && grade >= 10);
+    || (scope === 'MIDDLE' && grade >= 7 && grade <= 8)
+    || (scope === 'HIGH' && grade >= 9);
 }
 function errText(error: unknown) { return error instanceof Error ? error.message : '요청을 처리하지 못했습니다.'; }
 
@@ -397,14 +399,14 @@ function StudentsPage() {
 
     <div className="card card-pad table-wrap">
       <table className="data-table">
-        <thead><tr><th>학번</th><th>이름</th><th>학년 / 반</th><th>주간 NET</th><th>정산 NET</th><th>감지 상태</th></tr></thead>
+        <thead><tr><th>학번</th><th>이름</th><th>학년 / 반</th><th>주간 상벌NET</th><th>누적NET</th><th>감지 상태</th></tr></thead>
         <tbody>
           {rows.map((student) => <tr key={student.id} data-testid={'row-student-' + student.id}>
             <td className="muted">{student.studentNo ?? '매핑 대기'}</td>
             <td><Link href={'/students/' + (student.coreStudentId ?? student.id)} className="table-link" data-testid={'link-student-' + student.id}>{student.name}</Link></td>
             <td>{student.homeroom ?? (student.grade + '학년')}</td>
-            <td>{student.weeklyNetPenaltyPoints}</td>
-            <td>{student.settlementNetPenaltyPoints}</td>
+            <td>{student.weeklyPositivePoints - student.weeklyPenaltyPoints}</td>
+            <td>{student.settlementPositivePoints - student.settlementPenaltyPoints}</td>
             <td>{student.statuses.length ? student.statuses.join(', ') : '양호'}</td>
           </tr>)}
         </tbody>
@@ -433,6 +435,8 @@ function StudentDetailPage() {
   if (detail.isError || !detail.data) return <ErrorState error={detail.error} retry={() => detail.refetch()} />;
   const student = detail.data;
   const refreshDetail = () => {
+    queryClient.invalidateQueries({ queryKey: ['discipline-history'] });
+    queryClient.invalidateQueries({ queryKey: ['point-record-archive'] });
     queryClient.invalidateQueries({ queryKey: getGetStudentQueryKey(studentRef) });
     queryClient.invalidateQueries({ queryKey: getListPointRecordsQueryKey({ studentRef, limit: 100 }) });
   };
@@ -443,7 +447,7 @@ function StudentDetailPage() {
     updateRecord.mutate({ id: record.id, data: { points: Number(nextPoints), item: record.item, recordedAt: record.recordedAt, enteredByName: record.enteredByName, reflectionSubmitted: record.reflection?.submitted ?? null } }, { onSuccess: () => { refreshDetail(); notify('점수 기록을 수정했습니다.'); }, onError: (error) => notify(errText(error), 'error') });
   };
   const toggleViolated = (punishment: Punishment) => setViolation.mutate({ id: punishment.id, violated: !punishment.violated }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetStudentQueryKey(studentRef) }), onError: (error) => notify(errText(error), 'error') });
-  return <div><Link href="/students" className="btn btn-outline" data-testid="link-back-students"><ChevronLeft size={15} /> 학생 목록</Link><div style={{ marginTop: 25 }} className="detail-hero"><div><div className="eyebrow">학생 상세 기록</div><h1 className="heading">{student.name}</h1><p className="subheading">{student.homeroom ?? (student.grade + '학년')}{student.studentNo ? ' · ' + student.studentNo : ''} · 최근 생활점수와 상태 신호</p><div className="status-list">{student.statuses.length ? student.statuses.map((status) => <span className="pill pill-warning" key={status}>{status}</span>) : <span className="pill pill-positive"><Check size={11} /> 현재 양호</span>}</div></div><div className="detail-avatar">{student.name.slice(0, 1)}</div></div><div className="metric-grid" style={{ marginTop: 28 }}><div className="card metric-card"><div className="metric-label">주간 상점</div><div className="metric-value success-text">+{student.weeklyPositivePoints}</div></div><div className="card metric-card"><div className="metric-label">주간 벌점</div><div className="metric-value danger-text">{student.weeklyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">주간 NET</div><div className="metric-value">{student.weeklyNetPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">정산기간 NET</div><div className="metric-value">{student.settlementNetPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">체력훈련 판정 주차</div><div className="metric-value">{student.physicalTrainingWeeks}</div></div><div className="card metric-card"><div className="metric-label">기숙사 처분</div><div className="metric-value" style={{ fontSize: 14 }}>{student.punishment ?? '없음'}</div></div></div><div className="detail-grid" style={{ marginTop: 18 }}><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">점수 이력</h2><p className="section-copy">최근 기록부터 확인합니다.</p></div></div>{records.isLoading ? <div className="skeleton" style={{ height: 90, marginTop: 18 }} /> : records.isError ? <ErrorState error={records.error} retry={() => records.refetch()} /> : <div className="record-list">{(records.data ?? []).map((record) => <div className="record-row" key={record.id} data-testid={`row-record-${record.id}`}><div className="record-date">{dateLabel(record.recordedAt)}</div><div className="record-main"><div className="record-item">{record.item}</div><div className="record-meta">{record.enteredByName}{record.reflection ? ` · 반성문 ${record.reflection.status === 'SUBMITTED' ? '제출' : record.reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}` : ''}</div></div><div className={`record-points ${record.type === 'NEGATIVE' ? 'negative' : 'positive'}`}>{record.type === 'NEGATIVE' ? '-' : '+'}{record.points}<button className="btn btn-icon btn-outline" style={{ marginLeft: 8 }} onClick={() => editRecord(record)} aria-label="점수 기록 수정" data-testid={`button-edit-record-${record.id}`}><Pencil size={13} /></button><button className="btn btn-icon btn-danger" style={{ marginLeft: 6 }} onClick={() => removeRecord(record)} aria-label="점수 기록 삭제" data-testid={`button-delete-record-${record.id}`}><Trash2 size={13} /></button></div></div>)}{(records.data ?? []).length === 0 && <EmptyState title="점수 이력이 없습니다" copy="아직 등록된 생활점수가 없습니다." />}</div>}</section><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">기숙사 처분</h2><p className="section-copy">사생회가 기록한 처분입니다.</p></div></div>{student.punishments.length === 0 ? <EmptyState title="처분 이력 없음" copy="등록된 기숙사 처분이 없습니다." /> : <div className="activity-list">{student.punishments.map((punishment) => <div className="activity-row" key={punishment.id} data-testid={`row-punishment-${punishment.id}`}><div className="activity-mark"><BedDouble size={15} /></div><div><div className="activity-label">{punishment.types.join(' · ')}</div><div className="record-meta">{dateLabel(punishment.startDate)} — {dateLabel(punishment.endDate)}</div></div><button className={`pill ${punishment.violated ? 'pill-negative' : 'pill-neutral'}`} onClick={() => toggleViolated(punishment)} data-testid={`button-toggle-violation-${punishment.id}`}>{punishment.violated ? '위반 기록됨' : '위반 없음'}</button></div>)}</div>}</section></div></div>;
+  return <div><Link href="/students" className="btn btn-outline" data-testid="link-back-students"><ChevronLeft size={15} /> 학생 목록</Link><div style={{ marginTop: 25 }} className="detail-hero"><div><div className="eyebrow">학생 상세 기록</div><h1 className="heading">{student.name}</h1><p className="subheading">{student.homeroom ?? (student.grade + '학년')}{student.studentNo ? ' · ' + student.studentNo : ''} · 최근 생활점수와 상태 신호</p><div className="status-list">{student.statuses.length ? student.statuses.map((status) => <span className="pill pill-warning" key={status}>{status}</span>) : <span className="pill pill-positive"><Check size={11} /> 현재 양호</span>}</div>{student.physicalTrainingRequired && <p className="record-meta" style={{ marginTop: 9 }}>체력훈련 사유: {student.physicalTrainingReasons.join(' · ')}</p>}</div><div className="detail-avatar">{student.name.slice(0, 1)}</div></div>{student.isActive !== false && <div className="metric-grid" style={{ marginTop: 28 }}><div className="card metric-card"><div className="metric-label">주간 상점</div><div className="metric-value success-text">+{student.weeklyPositivePoints}</div></div><div className="card metric-card"><div className="metric-label">주간 벌점</div><div className="metric-value danger-text">−{student.weeklyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">주간 상벌NET</div><div className="metric-value">{student.weeklyPositivePoints - student.weeklyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">누적NET</div><div className="metric-value">{student.settlementPositivePoints - student.settlementPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">최장 연속 체력훈련 주차</div><div className="metric-value">{student.physicalTrainingWeeks}</div></div><div className="card metric-card"><div className="metric-label">기숙사 처분</div><div className="metric-value" style={{ fontSize: 14 }}>{student.punishment ?? '없음'}</div></div></div>}<div style={{ marginTop: 18 }}>{student.coreStudentId && <StudentHistory studentId={student.coreStudentId} />}</div><div className="detail-grid" style={{ marginTop: 18 }}><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">일별 점수 이력</h2><p className="section-copy">최근 100건입니다. 전체 주차와 누계는 위의 학기 추이에서 확인하세요.</p></div></div>{records.isLoading ? <div className="skeleton" style={{ height: 90, marginTop: 18 }} /> : records.isError ? <ErrorState error={records.error} retry={() => records.refetch()} /> : <div className="record-list">{(records.data ?? []).map((record) => <div className="record-row" key={record.id} data-testid={`row-record-${record.id}`}><div className="record-date">{dateLabel(record.recordedAt)}</div><div className="record-main"><div className="record-item">{record.item}</div><div className="record-meta">{record.enteredByName}{record.reflection ? ` · 반성문 ${record.reflection.status === 'SUBMITTED' ? '제출' : record.reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}` : ''}</div></div><div className={`record-points ${record.type === 'NEGATIVE' ? 'negative' : 'positive'}`}>{record.type === 'NEGATIVE' ? '-' : '+'}{record.points}<button className="btn btn-icon btn-outline" style={{ marginLeft: 8 }} onClick={() => editRecord(record)} aria-label="점수 기록 수정" data-testid={`button-edit-record-${record.id}`}><Pencil size={13} /></button><button className="btn btn-icon btn-danger" style={{ marginLeft: 6 }} onClick={() => removeRecord(record)} aria-label="점수 기록 삭제" data-testid={`button-delete-record-${record.id}`}><Trash2 size={13} /></button></div></div>)}{(records.data ?? []).length === 0 && <EmptyState title="점수 이력이 없습니다" copy="아직 등록된 생활점수가 없습니다." />}</div>}</section><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">기숙사 처분</h2><p className="section-copy">사생회가 기록한 처분입니다.</p></div></div>{student.punishments.length === 0 ? <EmptyState title="처분 이력 없음" copy="등록된 기숙사 처분이 없습니다." /> : <div className="activity-list">{student.punishments.map((punishment) => <div className="activity-row" key={punishment.id} data-testid={`row-punishment-${punishment.id}`}><div className="activity-mark"><BedDouble size={15} /></div><div><div className="activity-label">{punishment.types.join(' · ')}</div><div className="record-meta">{dateLabel(punishment.startDate)} — {dateLabel(punishment.endDate)}</div></div><button className={`pill ${punishment.violated ? 'pill-negative' : 'pill-neutral'}`} onClick={() => toggleViolated(punishment)} data-testid={`button-toggle-violation-${punishment.id}`}>{punishment.violated ? '위반 기록됨' : '위반 없음'}</button></div>)}</div>}</section></div></div>;
 }
 
 function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
@@ -453,16 +457,20 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
   const students = useListStudents();
   const items = useListPointItems({ type, includeInactive: false });
   const create = useCreatePointRecord();
+  const undo = useDeletePointRecord();
+  const requestRef = useRef<{ fingerprint: string; id: string } | null>(null);
+  const savingRef = useRef(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const [studentId, setStudentId] = useState('');
   const [itemId, setItemId] = useState('');
+  const [customItem, setCustomItem] = useState('');
   const [points, setPoints] = useState('');
   const [recordedAt, setRecordedAt] = useState(today());
   const [reflectionSubmitted, setReflectionSubmitted] = useState(false);
   const [search, setSearch] = useState('');
   const [continuousMode, setContinuousMode] = useState(type === 'NEGATIVE');
-  const [recentEntries, setRecentEntries] = useState<Array<{ student: string; item: string; points: number }>>([]);
+  const [recentEntries, setRecentEntries] = useState<Array<{ id: number; student: string; item: string; points: number }>>([]);
 
   const negative = type === 'NEGATIVE';
   const needle = search.trim().toLowerCase();
@@ -485,17 +493,25 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!studentId || !points || !admin) return;
+    if (!studentId || !points || !admin || savingRef.current) return;
     if (!selectedStudent?.coreStudentId) {
       notify('이 학생의 Core Identity 연결을 확인해주세요.', 'error');
       return;
     }
 
-    const itemName = selectedItem?.name ?? '수기 입력';
+    const itemName = selectedItem?.name ?? customItem.trim();
+    if (!itemName || (itemId && !selectedItem)) {
+      notify('점수 항목을 선택하거나 사유를 입력해주세요.', 'error');
+      return;
+    }
     const pointValue = Number(points);
     const studentName = selectedStudent.name;
 
+    const fingerprint = JSON.stringify([selectedStudent.coreStudentId,type,itemName,pointValue,recordedAt,reflectionSubmitted]);
+    if (requestRef.current?.fingerprint !== fingerprint) requestRef.current = { fingerprint, id: crypto.randomUUID() };
+    savingRef.current = true;
     create.mutate({
+      requestId: requestRef.current.id,
       data: {
         coreStudentId: selectedStudent.coreStudentId,
         type,
@@ -506,13 +522,16 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
         reflectionSubmitted: negative ? reflectionSubmitted : null,
       },
     }, {
-      onSuccess: () => {
+      onSuccess: (id) => {
+        requestRef.current = null;
+        queryClient.invalidateQueries({ queryKey: ['discipline-history'] });
+        queryClient.invalidateQueries({ queryKey: ['point-record-archive'] });
         queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
         queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() });
 
         setRecentEntries((current) => [
-          { student: studentName, item: itemName, points: pointValue },
+          { id, student: studentName, item: itemName, points: pointValue },
           ...current,
         ].slice(0, 6));
 
@@ -520,11 +539,13 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 
         if (!continuousMode) {
           setItemId('');
+          setCustomItem('');
           setPoints('');
         }
 
         notify(studentName + ' · ' + (negative ? '벌점' : '상점') + ' ' + pointValue + '점 기록 완료');
       },
+      onSettled: () => { savingRef.current = false; },
       onError: (error) => notify(errText(error), 'error'),
     });
   };
@@ -543,7 +564,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
     <PageHeader
       eyebrow={negative ? '생활지도 기록' : '긍정 기록'}
       title={negative ? '벌점 입력' : '상점 입력'}
-      copy={negative ? '아침 종이 시트도 빠르게 옮길 수 있도록 연속 입력에 최적화했습니다.' : '학생의 좋은 행동을 상점으로 남깁니다. 부서활동 상점은 아래 자동반영 관리에서 확인합니다.'}
+      copy={negative ? '학생과 사유를 선택해 기록합니다. 같은 사유는 연속으로 입력할 수 있습니다.' : '학생의 좋은 행동을 상점으로 남깁니다. 부서활동 상점은 자동반영 관리에서 확인합니다.'}
       action={<Link href={negative ? '/points/negative/items' : '/points/positive/departments'} className="btn btn-outline">{negative ? '벌점항목관리' : '부서상점 자동반영'}</Link>}
     />
 
@@ -601,16 +622,21 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
               onChange={(event) => {
                 setItemId(event.target.value);
                 const selected = (items.data ?? []).find((item) => String(item.id) === event.target.value);
-                if (selected?.fixedPoints != null) setPoints(String(selected.fixedPoints));
+                setPoints(selected?.fixedPoints != null ? String(selected.fixedPoints) : '');
               }}
               data-testid="select-point-item"
             >
-              <option value="">항목 선택 또는 수기 입력</option>
+              <option value="">사유 직접 입력</option>
               {(items.data ?? []).filter((item) => item.type === type).map((item) => <option key={item.id} value={item.id}>
                 {item.name + (item.fixedPoints != null ? ' · ' + item.fixedPoints + '점' : '')}
               </option>)}
             </select>
           </div>
+
+          {!itemId && <div className="field full">
+            <label htmlFor="entry-custom-item">사유</label>
+            <input id="entry-custom-item" className="input" required maxLength={80} value={customItem} onChange={(event) => setCustomItem(event.target.value)} placeholder={negative ? '벌점 사유를 입력하세요' : '상점 사유를 입력하세요'} data-testid="input-point-custom-item" />
+          </div>}
 
           <div className="field">
             <label htmlFor="entry-points">점수</label>
@@ -618,8 +644,9 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
           </div>
 
           <div className="field">
-            <label htmlFor="entry-date">기록일</label>
-            <input id="entry-date" className="input" type="date" required value={recordedAt} onChange={(event) => setRecordedAt(event.target.value)} data-testid="input-point-date" />
+            <label htmlFor="entry-date">발생일</label>
+            <input id="entry-date" className="input" type="date" required max={today()} value={recordedAt} onChange={(event) => setRecordedAt(event.target.value)} data-testid="input-point-date" />
+            <span className="record-meta">과거 날짜도 선택할 수 있습니다. 선택한 발생일 기준으로 집계됩니다.</span>
           </div>
 
           <div className="side-note field full">
@@ -638,7 +665,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
         </div>
 
         <div className="modal-actions">
-          <button className="btn btn-primary" disabled={create.isPending || !studentId || !points || !selectedStudent?.coreStudentId} data-testid="button-submit-point">
+          <button className="btn btn-primary" disabled={create.isPending || !studentId || !points || (!selectedItem && !customItem.trim()) || !selectedStudent?.coreStudentId} data-testid="button-submit-point">
             {create.isPending ? '저장 중' : (negative ? '벌점' : '상점') + ' 기록 + 다음 학생'}
           </button>
         </div>
@@ -647,7 +674,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
       <div>
         <div className="card card-pad">
           <div className="eyebrow">빠른 입력</div>
-          <h2 className="section-title" style={{ marginTop: 10 }}>{negative ? '아침 종이 시트 처리' : '반복 상점 처리'}</h2>
+          <h2 className="section-title" style={{ marginTop: 10 }}>같은 사유로 연속 입력</h2>
           <p className="subheading" style={{ marginTop: 12 }}>
             같은 사유가 반복되면 항목과 점수는 그대로 두고 학생 이름만 검색해서 연속 저장하세요.
           </p>
@@ -660,12 +687,13 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
           <div className="eyebrow">이번 입력 세션</div>
           <h2 className="section-title" style={{ marginTop: 10 }}>최근 저장</h2>
           <div className="activity-list" style={{ marginTop: 16 }}>
-            {recentEntries.map((entry, index) => <div className="activity-row" key={index}>
+            {recentEntries.map((entry) => <div className="activity-row" key={entry.id}>
               <div className="activity-mark"><Check size={15} /></div>
               <div>
                 <div className="activity-label">{entry.student}</div>
                 <div className="record-meta">{entry.item + ' · ' + (negative ? '-' : '+') + entry.points + '점'}</div>
               </div>
+              <button type="button" className="btn btn-outline" disabled={undo.isPending} onClick={() => undo.mutate({ id: entry.id }, { onSuccess: () => { setRecentEntries(rows => rows.filter(r => r.id !== entry.id)); queryClient.invalidateQueries(); notify(entry.student + ' 기록을 취소했습니다.'); }, onError: e => notify(errText(e), 'error') })}>취소</button>
             </div>)}
           </div>
         </div>}
@@ -685,7 +713,7 @@ function ReflectionsPage() {
   const [scopeFilter, setScopeFilter] = useState<DisciplineScope>(admin?.disciplineScope ?? 'ALL');
   const reflections = useListReflections();
   const update = useUpdateReflection();
-  const extend = useExtendReflectionTo21();
+  const extend = useExtendReflectionToNextDay();
 
   if (reflections.isLoading) return <LoadingState />;
   if (reflections.isError) return <ErrorState error={reflections.error} retry={() => reflections.refetch()} />;
@@ -694,15 +722,17 @@ function ReflectionsPage() {
   const scopeLabels: Array<[DisciplineScope, string]> = [
     ['ALL', '전체 학년'],
     ['ELEMENTARY', '초등 G1–6'],
-    ['MIDDLE', '중등 G7–9'],
-    ['HIGH', '고등 G10–12'],
+    ['MIDDLE', '중등 G7–8'],
+    ['HIGH', '고등 G9–12'],
   ];
   const allowedScopeLabels = admin?.disciplineScope === 'ALL'
     ? scopeLabels
     : scopeLabels.filter(([value]) => value === admin?.disciplineScope);
 
   const rows = (reflections.data ?? []).filter((reflection) =>
-    (filter === 'ALL' || (filter === 'TODAY' ? reflection.recordedAt.slice(0, 10) === today() : filter === 'MISSING' ? reflection.status !== 'SUBMITTED' : reflection.status === filter))
+    (filter === 'ALL' || (filter === 'TODAY'
+      ? !reflection.submitted && (reflection.recordedAt.slice(0, 10) === today() || reflection.status === 'DOUBLE')
+      : filter === 'MISSING' ? reflection.status !== 'SUBMITTED' : reflection.status === filter))
     && matchesDisciplineScope(reflection.grade, admin?.disciplineScope)
     && (scopeFilter === 'ALL' || reflection.assignedScope === scopeFilter)
   );
@@ -711,7 +741,7 @@ function ReflectionsPage() {
     <PageHeader
       eyebrow="반성문 관리"
       title="반성문 대상자"
-      copy="초등은 익일 등교, 중고등은 기본 17시·필요 시 21시 연장 기준으로 담당 범위별 제출 상태를 확인합니다."
+      copy="주간 상벌NET이 음수일 때만 반성문 대상입니다. 초등은 익일 등교, 중고등은 기본 17시·필요 시 다음날 17시 연장(주말 발생은 월요일) 기준으로 제출 상태를 확인합니다."
     />
 
     <div className="card card-pad" style={{ marginTop: 30 }}>
@@ -755,22 +785,25 @@ function ReflectionsPage() {
                 update.mutate({ id: reflection.id, data: { submitted: !reflection.submitted } }, {
                   onSuccess: () => {
                     queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() });
+                    queryClient.invalidateQueries({ queryKey: ['reports', 'daily-notice'] });
+                    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+                    queryClient.invalidateQueries({ queryKey: ['students'] });
                     notify('반성문 상태를 변경했습니다.');
                   },
                   onError: (error) => notify(errText(error), 'error'),
                 });
               }} data-testid={'button-toggle-reflection-' + reflection.id}>{reflection.submitted ? '미제출로' : '제출 완료'}</button>
               {!reflection.submitted && reflection.grade >= 7 && <button className="btn btn-outline" onClick={() => {
-                const reason = window.prompt('21시까지 연장하는 사유를 입력하세요.', '오후 벌점 발생');
+                const reason = window.prompt('발생일 다음날 17시까지 연장합니다. 주말 발생은 월요일 17시입니다. 연장 사유를 입력하세요.', '오후 벌점 발생');
                 if (reason == null) return;
                 extend.mutate({ id: reflection.id, reason }, {
-                  onSuccess: () => {
-                    queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() });
-                    notify('반성문 마감을 21시로 연장했습니다.');
+                  onSuccess: (deadline) => {
+                    queryClient.invalidateQueries();
+                    notify('반성문 마감: ' + dateTimeLabel(deadline));
                   },
                   onError: (error) => notify(errText(error), 'error'),
                 });
-              }} data-testid={'button-extend-reflection-' + reflection.id}>21시 연장</button>}
+              }} data-testid={'button-extend-reflection-' + reflection.id}>다음날 17시로 연장</button>}
             </div></td>
           </tr>)}</tbody>
         </table>
@@ -784,9 +817,10 @@ function ReportsPage() {
   const { admin } = useAuth();
   const [mode, setMode] = useState<'DAILY' | 'WEEKLY'>('DAILY');
   const [noticeDate, setNoticeDate] = useState(today());
+  const [noticeText, setNoticeText] = useState('');
   const [classFilter, setClassFilter] = useState('ALL');
 
-  const daily = useDailyDisciplineNotice(noticeDate);
+  const daily = useDailyDisciplineNotice(noticeDate, noticeDate === today());
   const weekly = useWeeklyDisciplineReport();
 
   const loading = mode === 'DAILY' ? daily.isLoading : weekly.isLoading;
@@ -797,8 +831,8 @@ function ReportsPage() {
     admin?.disciplineScope == null
     || admin.disciplineScope === 'ALL'
     || (admin.disciplineScope === 'ELEMENTARY' && grade >= 1 && grade <= 6)
-    || (admin.disciplineScope === 'MIDDLE' && grade >= 7 && grade <= 9)
-    || (admin.disciplineScope === 'HIGH' && grade >= 10 && grade <= 12);
+    || (admin.disciplineScope === 'MIDDLE' && grade >= 7 && grade <= 8)
+    || (admin.disciplineScope === 'HIGH' && grade >= 9 && grade <= 12);
 
   const dailyRows = (daily.data ?? []).filter((row) => scopeMatchesGrade(row.grade));
   const weeklyRows = admin?.isLead ? (weekly.data ?? []) : [];
@@ -859,7 +893,7 @@ function ReportsPage() {
       <PageHeader
         eyebrow="통지 · 보고"
         title="공지·출력"
-        copy="반별 일일 벌점 공지와 주말 체력훈련·정산 대상 명단을 같은 기준으로 출력합니다."
+        copy="오늘 반성문 미제출 대상과 이전 날짜에서 이월된 2배 제출 대상을 함께 공지합니다. 제출 완료 건은 자동 제외됩니다."
         action={<button className="btn btn-primary" onClick={() => window.print()} data-testid="button-print-report"><Printer size={15} /> 인쇄</button>}
       />
 
@@ -885,6 +919,7 @@ function ReportsPage() {
       </div>
     </div>
 
+    <div className="screen-only field" style={{ margin: '20px 0' }}><label htmlFor="report-note">함께 출력할 안내문</label><textarea id="report-note" className="input" rows={4} maxLength={2000} value={noticeText} onChange={e => setNoticeText(e.target.value)} placeholder="제출 장소·준비물·추가 안내를 입력하세요." /></div>
     <section className="print-sheet" data-testid="print-sheet">
       <header className="print-header">
         <div>
@@ -898,14 +933,15 @@ function ReportsPage() {
         </div>
       </header>
 
+      {noticeText.trim() && <p className="print-notice-text" style={{ whiteSpace: 'pre-wrap' }}>{noticeText}</p>}
       {mode === 'DAILY' ? <>
         <div className="print-summary">
-          <span>벌점 기록 <strong>{filteredDaily.length}</strong>건</span>
-          <span>반성문 미제출 <strong>{filteredDaily.filter((row) => row.reflectionStatus === 'MISSING').length}</strong>건</span>
+          <span>오늘 반성문 미제출 <strong>{filteredDaily.filter((row) => row.recordedAt === noticeDate && row.reflectionStatus === 'MISSING').length}</strong>건</span>
           <span>2배 제출 대상 <strong>{filteredDaily.filter((row) => row.reflectionStatus === 'DOUBLE').length}</strong>건</span>
+          <span>총 제출 필요 <strong>{filteredDaily.length}</strong>건</span>
         </div>
 
-        {dailyGroups.length === 0 ? <div className="print-empty">선택한 날짜/반의 벌점 공지 대상이 없습니다.</div> :
+        {dailyGroups.length === 0 ? <div className="print-empty">선택한 날짜/반에 미제출 반성문 또는 2배 제출 대상이 없습니다.</div> :
           dailyGroups.map(([className, rows]) => {
             return <section className="print-group" key={className}>
               <h2>{className}</h2>
@@ -913,14 +949,13 @@ function ReportsPage() {
                 <thead><tr><th style={{ width: '18%' }}>학생</th><th>벌점 사유</th><th style={{ width: '10%' }}>벌점</th><th style={{ width: '24%' }}>반성문</th></tr></thead>
                 <tbody>{rows.map((row) => <tr key={row.pointRecordId}>
                   <td><strong>{row.studentName}</strong></td>
-                  <td>{row.item}</td>
-                  <td>{row.points}</td>
+                  <td>{row.item}{row.recordedAt !== noticeDate && <div className="print-sub">발생일 {dateLabel(row.recordedAt)} · 이월</div>}</td>
+                  <td className="print-number">−{row.points}</td>
                   <td>
-                    {row.reflectionStatus === 'SUBMITTED' ? '제출 완료'
-                      : row.reflectionStatus === 'DOUBLE' ? '2배 제출 대상'
-                      : row.reflectionStatus === 'MISSING' ? '미제출'
-                      : '—'}
-                    {row.reflectionDueAt && row.reflectionStatus !== 'SUBMITTED' && <div className="print-sub">마감 {dateTimeLabel(row.reflectionDueAt)}</div>}
+                    <span className={'print-reflection-status ' + (row.reflectionStatus === 'DOUBLE' ? 'print-reflection-status-double' : 'print-reflection-status-missing')}>
+                      {row.reflectionStatus === 'DOUBLE' ? '2배 제출 대상' : '반성문 미제출'}
+                    </span>
+                    {row.reflectionDueAt && <div className="print-sub">마감 {dateTimeLabel(row.reflectionDueAt)}</div>}
                   </td>
                 </tr>)}</tbody>
               </table>
@@ -937,16 +972,16 @@ function ReportsPage() {
             return <section className="print-group" key={className}>
               <h2>{className}</h2>
               <table className="print-table">
-                <thead><tr><th>학생</th><th>벌점 횟수</th><th>주간 상점</th><th>주간 벌점</th><th>주간 NET</th><th>정산 NET</th><th>판정</th></tr></thead>
+                <thead><tr><th>학생</th><th>벌점 횟수</th><th>주간 상점</th><th>주간 벌점</th><th>주간 상벌NET</th><th>누적NET</th><th>판정</th></tr></thead>
                 <tbody>{rows.map((row) => <tr key={row.studentId}>
                   <td><strong>{row.studentName}</strong></td>
                   <td>{row.penaltyIncidentCount}</td>
                   <td>+{row.weeklyPositivePoints}</td>
-                  <td>{row.weeklyPenaltyPoints}</td>
-                  <td><strong>{row.weeklyNetPenaltyPoints}</strong></td>
-                  <td>{row.settlementNetPenaltyPoints}</td>
+                  <td>−{row.weeklyPenaltyPoints}</td>
+                  <td><strong>{row.weeklyPositivePoints - row.weeklyPenaltyPoints}</strong></td>
+                  <td>{row.settlementPositivePoints - row.settlementPenaltyPoints}</td>
                   <td>
-                    {row.physicalTrainingRequired && <div>체력훈련</div>}
+                    {row.physicalTrainingRequired && <div><strong>체력훈련</strong>{row.physicalTrainingReasons.length > 0 && <div className="print-sub">사유: {row.physicalTrainingReasons.join(' · ')}</div>}</div>}
                     {row.committeeRequired && <div>징계위원회</div>}
                   </td>
                 </tr>)}</tbody>
@@ -1042,7 +1077,7 @@ function SettlementPage() {
       <form className="card card-pad" onSubmit={submitStart}>
         <div className="eyebrow">현재 상태</div>
         <h2 className="section-title" style={{ marginTop: 10 }}>열린 정산기간 없음</h2>
-        <p className="section-copy">첫 정산 시작일을 지정하면 그 날짜부터 상점·벌점 NET이 누적됩니다.</p>
+        <p className="section-copy">첫 정산 시작일을 지정하면 그 날짜부터 누적NET(상점 − 벌점)이 계산됩니다.</p>
 
         <div className="form-grid" style={{ marginTop: 24 }}>
           <div className="field">
@@ -1081,8 +1116,8 @@ function SettlementPage() {
         <div className="eyebrow">판정 기준</div>
         <h2 className="section-title" style={{ marginTop: 10 }}>관리자가 종료할 때까지 누적</h2>
         <div className="activity-list" style={{ marginTop: 20 }}>
-          <div className="activity-row"><div className="activity-mark"><ShieldAlert size={15} /></div><div><div className="activity-label">주간 체력훈련</div><div className="record-meta">벌점 발생 3회 이상 또는 주간 NET 8점 이상</div></div></div>
-          <div className="activity-row"><div className="activity-mark"><AlertTriangle size={15} /></div><div><div className="activity-label">징계위원회</div><div className="record-meta">정산기간 내 체력훈련 판정 3주 이상 또는 NET 20점 이상</div></div></div>
+          <div className="activity-row"><div className="activity-mark"><ShieldAlert size={15} /></div><div><div className="activity-label">주간 체력훈련</div><div className="record-meta">주간 벌점 3회 이상 · 주간 상벌NET -8점 이하 · 2배 반성문 17시 미제출(익일)</div></div></div>
+          <div className="activity-row"><div className="activity-mark"><AlertTriangle size={15} /></div><div><div className="activity-label">징계위원회</div><div className="record-meta">이번 학기 체력훈련 대상이 3주 연속 발생 시</div></div></div>
         </div>
       </section>
     </div> : <div className="detail-grid" style={{ marginTop: 30 }}>
@@ -1496,8 +1531,8 @@ function AdminAccountsPage() {
   const scopeLabel = (scope: DisciplineScope | null) => ({
     ALL: '전체',
     ELEMENTARY: '초등 G1–6',
-    MIDDLE: '중등 G7–9',
-    HIGH: '고등 G10–12',
+    MIDDLE: '중등 G7–8',
+    HIGH: '고등 G9–12',
   }[scope ?? 'ALL'] ?? '—');
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: getAdminAccountsQueryKey() });
@@ -1674,8 +1709,8 @@ function AdminAccountsPage() {
             <label htmlFor="admin-scope">담당 범위</label>
             <select id="admin-scope" className="select" disabled={form.isLead} value={form.disciplineScope ?? 'MIDDLE'} onChange={(event) => setForm({ ...form, disciplineScope: event.target.value as DisciplineScope })}>
               <option value="ELEMENTARY">초등 G1–6</option>
-              <option value="MIDDLE">중등 G7–9</option>
-              <option value="HIGH">고등 G10–12</option>
+              <option value="MIDDLE">중등 G7–8</option>
+              <option value="HIGH">고등 G9–12</option>
               <option value="ALL">전체</option>
             </select>
           </div>}
@@ -1885,7 +1920,8 @@ function DepartmentMeritAdminPage() {
   const setMembership = useSetDepartmentStudentMembership();
   const setDepartmentActive = useSetDepartmentActive();
 
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
+  // null: initial selection pending; empty string: user is creating a department.
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentId, setStudentId] = useState('');
   const [membershipDate, setMembershipDate] = useState(currentWeekMonday());
@@ -1901,7 +1937,7 @@ function DepartmentMeritAdminPage() {
   const selectedDepartment = departmentRows.find((row) => row.departmentId === selectedDepartmentId) ?? null;
 
   useEffect(() => {
-    if (!selectedDepartmentId && departmentRows.length > 0) {
+    if (selectedDepartmentId === null && departmentRows.length > 0) {
       setSelectedDepartmentId(departmentRows[0].departmentId);
     }
   }, [departmentRows, selectedDepartmentId]);
@@ -1922,6 +1958,9 @@ function DepartmentMeritAdminPage() {
     queryClient.invalidateQueries({ queryKey: getDepartmentMembersQueryKey() });
     queryClient.invalidateQueries({ queryKey: getDepartmentMeritStatusQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: ['discipline-history'] });
+    queryClient.invalidateQueries({ queryKey: ['point-record-archive'] });
   };
 
   const currentMembers = (members.data ?? []).filter((row) => row.departmentId === selectedDepartmentId);
@@ -1989,7 +2028,7 @@ function DepartmentMeritAdminPage() {
 
   const removeMember = (coreStudentId: string) => {
     if (!selectedDepartmentId) return;
-    if (!window.confirm('이 학생의 현재 부서 소속을 종료할까요? 과거 상점 기록은 유지됩니다.')) return;
+    if (!window.confirm('오늘부터 이 학생을 현재 부서 명단에서 제외할까요? 이미 반영된 상점 기록은 유지됩니다.')) return;
 
     setMembership.mutate({
       departmentId: selectedDepartmentId,
@@ -2130,7 +2169,7 @@ function DepartmentMeritAdminPage() {
         <div>
           <div className="eyebrow">Membership</div>
           <h2 className="section-title" style={{ marginTop: 8 }}>{selectedDepartment ? selectedDepartment.name + ' 소속 학생' : '부서를 먼저 선택하세요'}</h2>
-          <p className="section-copy">소속 이력은 삭제하지 않고 시작일/종료일로 보존합니다.</p>
+          <p className="section-copy">종료일부터 현재 명단에서 제외됩니다. 시작일·종료일과 기존 상점 기록은 보존됩니다.</p>
         </div>
         {selectedDepartment && <span className="pill pill-positive">{currentMembers.length}명</span>}
       </div>
@@ -2178,7 +2217,7 @@ function DepartmentMeritAdminPage() {
                 <td>{row.homeroom ?? (row.grade ? 'G' + row.grade : '—')}</td>
                 <td className="muted">{row.studentNo ?? '미발급'}</td>
                 <td>{dateLabel(row.startsOn)}</td>
-                <td><button type="button" className="btn btn-outline" onClick={() => removeMember(row.coreStudentId)}>소속 종료</button></td>
+                <td><button type="button" className="btn btn-outline" disabled={setMembership.isPending} onClick={() => removeMember(row.coreStudentId)}>소속 종료</button></td>
               </tr>)}</tbody>
             </table>
           </div>}
@@ -2353,6 +2392,7 @@ function ProtectedRoutes() {
     <Route path="/points/negative" component={() => <RoleGate role="SEONDO"><PointEntryPage type="NEGATIVE" /></RoleGate>} />
     <Route path="/reflections" component={() => <RoleGate role="SEONDO"><ReflectionsPage /></RoleGate>} />
     <Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} />
+    <Route path="/history/import" component={() => <LeadGate><WeeklyImportPage /></LeadGate>} />
     <Route path="/settlement" component={() => <LeadGate><SettlementPage /></LeadGate>} />
     <Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} />
     <Route path="/admins" component={() => <LeadGate><AdminAccountsPage /></LeadGate>} />
@@ -2382,4 +2422,5 @@ function App() {
 }
 
 export default App;
+
 

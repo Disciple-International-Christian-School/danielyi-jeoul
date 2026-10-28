@@ -2,6 +2,8 @@
 
 **Language / 언어:** [English](spec.md) | [한국어](spec.ko.md)
 
+> For October 28 eligibility changes and G9 responsibility routing, use [current discipline rules](DISCIPLINE_RULES.md). Earlier designs and snapshots below remain dated historical evidence.
+
 > Historical requirements, not a current implementation contract. Later decisions supersede manual-author, calendar-month, student-CRUD, and stack assumptions. English labels below translate the original Korean UI wording; the operational application remains Korean. See [Change Log](CHANGELOG.md).
 
 Build a complete, production-ready full-stack web application called "Daniel's Scale".

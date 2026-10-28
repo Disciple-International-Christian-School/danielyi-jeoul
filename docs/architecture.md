@@ -2,6 +2,8 @@
 
 **Language / 언어:** [English](architecture.md) | [한국어](architecture.ko.md)
 
+> For October 28 eligibility changes and G9 responsibility routing, use [current discipline rules](DISCIPLINE_RULES.md). Earlier designs and snapshots below remain dated historical evidence.
+
 Student merit/demerit (Merits·Demerits) management console for DICS. Admin-only — two roles
 (Student guidance SEONDO, Residential life SASAENG), students never log in.
 

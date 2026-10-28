@@ -2,6 +2,8 @@
 
 **Language / 언어:** [English](DICS_CORE_ARCHITECTURE.md) | [한국어](DICS_CORE_ARCHITECTURE.ko.md)
 
+> 2026-10-28 이후의 판정·G9 담당범위는 [현재 생활지도 규칙](DISCIPLINE_RULES.ko.md)을 우선한다. 아래의 이전 설계·기록은 해당 시점의 근거로 보존한다.
+
 > **Target architecture · 2026-09-25**
 >
 > 다니엘의 저울, Study Planner, 컴퓨터실 사용기록, Assessment 계열 앱은 장기적으로 하나의 DICS Core Supabase 안에서 동일한 학생 Identity를 사용한다.

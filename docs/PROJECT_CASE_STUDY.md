@@ -49,3 +49,5 @@ For an extracurricular submission, identify the applicant's own work with specif
 School-wide student numbering policy, Study Planner migration completion, individual administrator adoption, and retirement of legacy compatibility require current owner verification. Photo-assisted intake and a unified student profile remain planned work in the cited records. No time-saved estimate, adoption rate, learning-outcome improvement, or independent security certification is claimed here.
 
 Use synthetic examples and aggregate evidence in submission materials. A historical account handout contained student identifiers and PINs; its replacement is a blank, bilingual template. That replacement does not erase old Git objects or establish that credentials have been rotated. The owner must review historical exposure and credential validity before sharing repository access.
+
+Subsequent weekly-ledger, manual-reset and eligibility work is recorded in [current rules](DISCIPLINE_RULES.md) and [history cut-over](HISTORY_AND_BACKFILL.md). Earlier counts above are historical observations, not current balances or target counts.

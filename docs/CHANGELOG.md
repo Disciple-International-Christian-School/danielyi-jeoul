@@ -144,3 +144,17 @@ Applied trigger-based creation/update of Daniel compatibility rows from active C
 ## October 26, 2026 — English-first bilingual documentation
 
 Expanded the existing bilingual overview PR to all maintained Markdown documents with English defaults and Korean counterparts. Added a project case study, language-maintenance checks, and historical-attachment translations. Replaced an account handout containing real student identifiers/PINs with a synthetic template. Historical Git objects still require owner review; document replacement is not credential rotation or history erasure. New commit messages are English-only. Existing-message rewriting is prepared separately from the owner-reviewed documentation PR.
+
+## October 28, 2026 — Reflection eligibility follows negative weekly NET
+
+Reflections now require current Monday–Sunday NET below zero and negative running NET when that penalty was entered. Covered early penalties never become retroactively overdue/double. Reflection, notice, point-history and dashboard summaries share the DB eligibility projection without altering source/audit records. Migration 20261028003013 was applied; the recorded check excluded 12 of 81 formerly active rows (including two double-status rows), leaving 69. Transaction-rollback regression tests passed. Deadline/training rules were unchanged at this checkpoint.
+
+## October 28, 2026 — Carried notices, G9 scope, and printed status
+
+Today's notice includes today's unsubmitted eligible records plus older current DOUBLE records; submitted or NET-offset targets are excluded. Historical-date notices do not carry forward rows. Reflection filters and Today counts use the same set, with 60-second refresh and submission-cache invalidation. Weekly penalties show an explicit minus sign; training is dark navy and DOUBLE remains red.
+
+G9 responsibility moved to HIGH across DB views, history RPC and frontend filters without changing enrollment. A4 margins became 16×17 mm, with 12.5px table text, expanded header/cell spacing, stable page splits and emphasized original dates/double status. Migration 20261028012114 was applied and G9 HIGH routing verified.
+
+## October 28, 2026 — Third physical-training criterion
+
+An unsubmitted double-reflection obligation after its 17:00 check deadline adds training from the following day. Existing weekly incident/NET conditions remain independent and all reasons are displayed. Checks cover deadlines, release upon submission, and no duplicate weekly qualification. Dashboard, detail, weekly print and periodic reads use the rule. See [current discipline rules](DISCIPLINE_RULES.md).

@@ -349,6 +349,54 @@
       "name": "sync_daniel_roster_from_core",
       "status": "TRACKED",
       "file": "supabase/migrations/20261015101921_sync_daniel_roster_from_core.sql"
+    },
+    {
+      "version": "20261026150507",
+      "name": "discipline_weekly_history_cutover",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261026150507_discipline_weekly_history_cutover.sql"
+    },
+    {
+      "version": "20261026150559",
+      "name": "discipline_history_student_index",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261026150559_discipline_history_student_index.sql"
+    },
+    {
+      "version": "20261027120410",
+      "name": "allow_manual_historical_dates",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261027120410_allow_manual_historical_dates.sql"
+    },
+    {
+      "version": "20261027123434",
+      "name": "consecutive_training_committee_rule",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261027123434_consecutive_training_committee_rule.sql"
+    },
+    {
+      "version": "20261027124319",
+      "name": "department_membership_end_exclusive",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261027124319_department_membership_end_exclusive.sql"
+    },
+    {
+      "version": "20261028003013",
+      "name": "reflection_weekly_net_eligibility",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261028003013_reflection_weekly_net_eligibility.sql"
+    },
+    {
+      "version": "20261028012114",
+      "name": "move_grade9_to_high_scope",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261028012114_move_grade9_to_high_scope.sql"
+    },
+    {
+      "version": "20261028120036",
+      "name": "double_reflection_training_next_day",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261028120036_double_reflection_training_next_day.sql"
     }
   ]
 }

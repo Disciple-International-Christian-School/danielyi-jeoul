@@ -2,6 +2,8 @@
 
 **Language / 언어:** [English](OPERATIONS_ROADMAP.md) | [한국어](OPERATIONS_ROADMAP.ko.md)
 
+> 2026-10-28 이후의 판정·G9 담당범위는 [현재 생활지도 규칙](DISCIPLINE_RULES.ko.md)을 우선한다. 아래의 이전 설계·기록은 해당 시점의 근거로 보존한다.
+
 > **ACTIVE DESIGN DOCUMENT · 2026-09-25**
 >
 > 이 문서는 초기 구축 기록이 아니라, 실제 DICS 운영에 맞춰 지금부터 개선할 기능과 데이터 구조를 정의한다.

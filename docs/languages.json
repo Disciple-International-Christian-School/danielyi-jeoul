@@ -92,6 +92,26 @@
     {
       "en": "docs/spec.md",
       "ko": "docs/spec.ko.md"
+    },
+    {
+      "en": "docs/DEPARTMENT_MERITS.md",
+      "ko": "docs/DEPARTMENT_MERITS.ko.md"
+    },
+    {
+      "en": "docs/DISCIPLINE_RULES.md",
+      "ko": "docs/DISCIPLINE_RULES.ko.md"
+    },
+    {
+      "en": "docs/HISTORY_AND_BACKFILL.md",
+      "ko": "docs/HISTORY_AND_BACKFILL.ko.md"
+    },
+    {
+      "en": "docs/IMPLEMENTATION_TODO.md",
+      "ko": "docs/IMPLEMENTATION_TODO.ko.md"
+    },
+    {
+      "en": "docs/OPERATIONS_2026-10-27.md",
+      "ko": "docs/OPERATIONS_2026-10-27.ko.md"
     }
   ],
   "aliases": [

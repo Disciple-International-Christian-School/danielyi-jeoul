@@ -2,6 +2,8 @@
 
 **Language / 언어:** [English](ADMIN_ACCOUNT_OPERATIONS.md) | [한국어](ADMIN_ACCOUNT_OPERATIONS.ko.md)
 
+> 2026-10-28 이후의 판정·G9 담당범위는 [현재 생활지도 규칙](DISCIPLINE_RULES.ko.md)을 우선한다. 아래의 이전 설계·기록은 해당 시점의 근거로 보존한다.
+
 공유 역할 계정에서 개인 인증 계정으로 전환하면서 업무 연속성과 감사 추적을 보존한다.
 
 ## 1. 개인계정의 이유

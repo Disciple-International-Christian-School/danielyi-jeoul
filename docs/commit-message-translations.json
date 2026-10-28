@@ -5,5 +5,7 @@
   "c0c1c5ea3237d46a058c7df7ce8cdc1f2447bf74": "Nest the student roster under administrator accounts",
   "fa8e9cd9ceb71912361661a4c830817d3fb22bb9": "Open target lists directly from dashboard cards",
   "2ae6f20e6dfad0f61a1b4446a178f8c74b7871ef": "Schedule weekly department merits at Monday midnight\n\n* Schedule weekly department merits at Monday midnight KST\n\n* Record successful Cron scheduler probe",
-  "e99e7b52219365ea42f2121dd1e480043642ab0d": "Reorganize navigation and dashboard around operational workflows\n\n* Align operations navigation and dashboard with weekly workflow\n\n* Handle unassigned discipline scope in dashboard filters"
+  "e99e7b52219365ea42f2121dd1e480043642ab0d": "Reorganize navigation and dashboard around operational workflows\n\n* Align operations navigation and dashboard with weekly workflow\n\n* Handle unassigned discipline scope in dashboard filters",
+  "0ecda8b948aa4dd665b01cf7fdbec79164f54eb2": "Migrate final weekly balances and begin daily operations on October 26 (#15)\n\n* feat: add read-only discipline date history and CORE semester totals\n\n* fix: preserve new department mode and capture manual point reasons\n\n* docs: define weekly settlement cutover and audit meeting requirements\n\n* feat: replace historical events with weekly ledger and continue daily accumulation",
+  "6370422106d1fa907ce64202dd4f8eafd7923f07": "fix: display weekly merit-minus-penalty balance as weekly merit/demerit NET"
 }

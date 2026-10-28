@@ -2,6 +2,8 @@
 
 **Language / 언어:** [English](OPERATIONS_ROADMAP.md) | [한국어](OPERATIONS_ROADMAP.ko.md)
 
+> For October 28 eligibility changes and G9 responsibility routing, use [current discipline rules](DISCIPLINE_RULES.md). Earlier designs and snapshots below remain dated historical evidence.
+
 > Active design record, September 25, 2026. Historical implementation checkboxes are preserved below; use the later [change log](CHANGELOG.md) and [cut-over record](DISCIPLINE_CORE_CUTOVER.md) for completed work. This document defines intended behavior, not a fresh audit of production.
 
 ## 1. Operational direction
