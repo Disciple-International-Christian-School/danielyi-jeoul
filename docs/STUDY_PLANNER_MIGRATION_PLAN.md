@@ -1,375 +1,71 @@
 # Study Planner → DICS Core Migration Plan
 
-> **Working cut-over plan · 2026-09-25**
->
-> 목적은 기존 SP 운영을 중단시키지 않고, 검증 가능한 단위로 데이터를 DICS Core의 `study_planner.*` target에 이관하는 것이다.
->
-> 이 문서는 실제 data copy 전에 dependency order, identity mapping, validation gate, rollback 기준을 명확히 한다.
+**Language / 언어:** [English](STUDY_PLANNER_MIGRATION_PLAN.md) | [한국어](STUDY_PLANNER_MIGRATION_PLAN.ko.md)
 
----
+> Working plan, September 25, 2026. Define dependency order, identity mappings, validation, and rollback before copying data. Preserve the source SP service throughout preparation.
 
-## 1. 현재 구조
+## 1. Source and target
 
-### Legacy SP project
+Legacy SP owns public.students/staff/terms/weeks/time_blocks/entry_windows/subject_tags/term_goals/week_plans/week_goals/plan_items/item_records/block_records/task_templates/teacher_comments. Its student and staff IDs equal external SP Auth UUIDs.
 
-```text
-public.students.id = SP auth.users.id
-public.staff.id    = SP auth.users.id
-
-public.terms
-public.weeks
-public.time_blocks
-public.entry_windows
-public.subject_tags
-public.term_goals
-public.week_plans
-public.week_goals
-public.plan_items
-public.item_records
-public.block_records
-public.task_templates
-public.teacher_comments
-```
-
-### DICS Core target
-
-```text
-core.students.id
-core.academic_terms.id
-
-study_planner.staff.id
-study_planner.weeks
-study_planner.time_blocks
-study_planner.entry_windows
-study_planner.subject_tags
-study_planner.term_goals
-study_planner.week_plans
-study_planner.week_goals
-study_planner.plan_items
-study_planner.item_records
-study_planner.block_records
-study_planner.task_templates
-study_planner.teacher_comments
-```
-
-학생 master와 term master는 target에 복제하지 않는다.
-
----
+Core reuses `core.students` and `core.academic_terms`; the learning-domain tables move under study_planner. Do not duplicate student or term masters.
 
 ## 2. Identity contracts
 
-### Student
+Student: verified SP student_no → Core student_no → canonical Core UUID. Preserve the external SP Auth UUID in `core.external_auth_identities`. PINs/passwords are excluded.
 
-Source:
-
-```text
-SP public.students.id
-= external SP Auth UUID
-```
-
-Target:
-
-```text
-core.students.id
-= canonical student UUID
-```
-
-Migration bridge:
-
-```text
-SP student_no
-   ↓ verified mapping
-core.students.student_no
-   ↓
-core.students.id
-```
-
-External Auth provenance:
-
-```text
-SP auth UUID
-   ↓
-core.external_auth_identities
-   ↓
-core.students.id
-```
-
-PIN/password는 migration dataset에 포함하지 않는다.
-
-### Staff
-
-Source:
-
-```text
-SP public.staff.id
-= external SP Auth UUID
-```
-
-Target:
-
-```text
-study_planner.staff.id
-= independent staff profile UUID
-
-study_planner.staff.auth_user_id
-= optional LOCAL DICS Core Auth UUID
-```
-
-External SP staff Auth:
-
-```text
-SP staff Auth UUID
-   ↓
-study_planner.external_staff_identities
-   ↓
-study_planner.staff.id
-```
-
----
+Staff: independent `study_planner.staff.id`, optional Core-local `auth_user_id`, and `study_planner.external_staff_identities` for the external SP account. An external project UUID is not a local Auth FK.
 
 ## 3. Data-copy dependency order
 
-실데이터 이관은 아래 순서를 지킨다.
-
 ### Stage A — Preconditions
 
-반드시 통과해야 한다.
+All source student mappings must be exact or explicitly pending, with zero ambiguous mappings. Obtain source inventory, verify expected-empty/baseline target inventory, confirm the current term and a backup/recovery point, and keep source SP running.
 
-- Core student mapping source rows 모두 exact 또는 명시적 pending
-- ambiguous mapping = 0
-- SP source inventory 확보
-- Core target inventory = expected empty/baseline
-- current academic term 확인
-- production backup/recovery point 확인
-- source SP 서비스는 계속 운영
+### Stage B — Reference tables
 
-### Stage B — Static/reference tables
-
-먼저 학생별 데이터와 독립적인 설정을 옮긴다.
-
-```text
-time_blocks
-entry_windows
-subject_tags
-```
-
-검증:
-
-```text
-source count = target count
-primary/code uniqueness 유지
-```
+Copy time_blocks, entry_windows, and subject_tags first. Require count parity and preserved PK/code uniqueness.
 
 ### Stage C — Academic weeks
 
-Legacy `terms` 자체를 복사하지 않는다.
+Explicitly map legacy terms to Core academic_terms; then copy weeks using verified term/week_no/monday relationships. Never assume the legacy term UUID is the Core term UUID.
 
-기존 SP term을 Core `core.academic_terms`에 명시적으로 매핑한 뒤:
+### Stage D — Staff
 
-```text
-weeks
-```
-
-를 복사한다.
-
-주의:
-
-- legacy term UUID를 Core term UUID라고 가정하지 않음
-- `week_no / monday`을 통해 verified term mapping 사용
-
-### Stage D — Staff profiles
-
-SP staff를:
-
-```text
-study_planner.staff
-```
-
-에 새 profile UUID로 생성한다.
-
-그 다음 기존 SP Auth UUID는:
-
-```text
-study_planner.external_staff_identities
-```
-
-에 기록한다.
-
-아직 Core local Auth가 없다면 `auth_user_id = null` 유지.
+Create independent staff profiles, then external staff identity bridges. Leave local auth_user_id null until Core-local accounts exist.
 
 ### Stage E — Student-level roots
 
-학생 mapping이 검증된 학생만:
-
-```text
-term_goals
-week_plans
-task_templates
-```
-
-를 복사한다.
-
-source `student_id`는 반드시:
-
-```text
-legacy SP student
-→ verified core_student_id
-```
-
-로 변환한다.
-
-학생 이름으로 join하지 않는다.
+Copy term_goals, week_plans, and task_templates only for verified students. Translate every student FK to canonical Core UUID. Do not join on student names.
 
 ### Stage F — Plan children
 
-부모 ID/FK가 준비된 뒤:
-
-```text
-week_goals
-plan_items
-```
-
-를 복사한다.
-
-가능한 경우 source record UUID는 그대로 보존해 migration traceability를 높인다.
+Copy week_goals and plan_items after parent IDs/FKs exist. Preserve source record UUIDs where possible for traceability.
 
 ### Stage G — Execution records
 
-```text
-item_records
-block_records
-```
+Copy item_records and block_records only after 100% parent parity for plan items/week plans.
 
-를 복사한다.
+### Stage H — Comments
 
-이 단계는 plan item / week plan parent parity가 100%일 때만 진행한다.
-
-### Stage H — Teacher comments
-
-마지막에:
-
-```text
-teacher_comments
-```
-
-를 복사한다.
-
-source staff ID를 target staff profile ID로 변환한다.
-
----
+Copy teacher_comments last, converting staff FKs to target profile IDs.
 
 ## 4. Validation gates
 
-각 stage 후 다음을 비교한다.
-
-### Count parity
-
-SP source:
-
-```text
-public.v_core_migration_inventory
-```
-
-Core target:
-
-```text
-public.get_study_planner_target_inventory()
-```
-
-내용을 노출하지 않고 entity별 row count만 비교한다.
-
-### Referential integrity
-
-모든 migrated record에 대해:
-
-- student FK가 Core 학생을 가리키는가
-- week → Core academic term 관계가 맞는가
-- week plan parent가 존재하는가
-- teacher comment의 target staff가 존재하는가
-
-를 검사한다.
-
-### Sampling
-
-자동 count parity 뒤에도 운영자가 소수의 실제 학생을 UI에서 직접 확인한다.
-
-예:
-
-- 학기목표
-- 한 주 계획
-- plan item
-- 실행 기록
-- 교사 comment
-
-이 단계에서 학생 이름 자체를 Git/Issue에 기록하지 않는다.
-
----
+Compare SP `public.v_core_migration_inventory` with Core `public.get_study_planner_target_inventory()` using aggregate counts. Verify student FKs, week-to-Core-term mapping, plan parents, and comment staff. After automatic parity, operators privately sample term goals, weekly plans, items, execution records, and comments in the UI. Do not post sampled identities to Git/issues.
 
 ## 5. Cut-over strategy
 
-한 번에 source를 종료하지 않는다.
+Keep the source live → shadow copy → parity/read-only verification → Core preview frontend → selected pilot login/workflow → write cut-over → legacy read-only retention → archival/retirement decision.
 
-```text
-Phase 1  source SP 계속 운영
-         Core target shadow copy
+## 6. Rollback
 
-Phase 2  parity/read-only verification
+Before cut-over, source SP remains the operational authority. Do not modify it to fit the target. Roll back/remove only the target batch, retain mappings and error reasons privately, resolve ambiguity, and rerun. Cross-project operations require idempotency because there is no shared transaction.
 
-Phase 3  Core-backed preview frontend
+## 7. Historical blockers, September 25
 
-Phase 4  selected pilot login/operation
-
-Phase 5  write cut-over
-
-Phase 6  legacy SP DB read-only retention
-
-Phase 7  archival/decommission decision
-```
-
----
-
-## 6. Rollback principle
-
-Cut-over 전에는 source SP가 operational source of truth다.
-
-Target migration 중 문제가 생기면:
-
-- source 데이터 수정 금지
-- target batch만 rollback/remove
-- mapping table과 error reason 보존
-- mapping ambiguity 해결 후 재실행
-
-**source를 target에 맞추기 위해 수정하지 않는다.**
-
----
-
-## 7. Blockers as of 2026-09-25
-
-- SP live aggregate inventory는 Claude lane에서 조회 대기
-- 29 pilot 학생 중 28명 student_no Core 보강 완료
-- 1명은 name discrepancy로 pending
-- G9-A/B 31명은 section source 대기
-- Core local student Auth 0명
-- external student Auth mapping 0명
-- target Study Planner content rows 0
-
-따라서 현재는 **schema/precondition phase**이며 live SP content copy는 아직 시작하지 않는다.
-
----
+SP live inventory was pending in the Claude lane. Of 29 pilot students, 28 numbers were enriched and one remained pending due to a name discrepancy. G9-A/B source assignments for 31 students were pending. Core-local student Auth, external student Auth mappings, and copied target content were all zero. This was schema/precondition preparation; live content copy had not started.
 
 ## 8. Completion definition
 
-Study Planner Core migration이 완료되었다고 부를 수 있는 기준:
-
-```text
-verified student mapping for all migrated SP students
-source ↔ target count parity
-referential integrity checks pass
-sample UI verification pass
-Core local/external Auth strategy verified
-no PIN/password copied
-production frontend uses Core student UUID
-legacy SP writes disabled only after successful pilot
-```
-
-이 완료선 이전에는 “통합 완료”라고 표현하지 않는다.
+Require verified mappings for every migrated student, count parity, FK checks, sampled UI behavior, verified local/external Auth strategy, no copied PIN/passwords, a frontend using Core student UUIDs, and legacy writes disabled only after a successful pilot. Do not claim integration complete before those gates pass.

@@ -1,26 +1,28 @@
-# DaS 주간 원장 / 일별 운영 전환 TODO
+# Weekly Ledger and Daily Operations — Implementation Checklist
 
-기준: 10/25까지 중고등 주간 확정값이 기존 입력을 대체. 10/26부터 일별 사건과 자동상점 합산. 초등 자료와 이전 원기록은 보존.
+**Language / 언어:** [English](IMPLEMENTATION_TODO.md) | [한국어](IMPLEMENTATION_TODO.ko.md)
 
-- [x] 1. 8주 원본 898행 보존, 연결된 주간값 873건, 미연결 22행 분리
-- [x] 2. 주간 원장·원본·수정 버전·중복 업로드 방지 구현 및 DB 적용
-- [x] 3. 기존 중고등 170건 공식 집계 제외, 과거 반성문 현재 대상에서 제외
-- [x] 4. 10/26 새 정산기간, 일별→주별·학기 조회, 초등 및 당일 40건 보존 검증
-- [x] 5. 과거 날짜·주차 조회, 학생별 추이·학기 누계, 비재학생 이력 조회 구현
-- [x] 6. 주간 XLSX 업로드, 미리보기·이상행·부분 파일 거부·이관 이력 구현
-- [x] 7. 현장 입력 수기 사유, 재시도 중복방지, 최근 입력 취소 구현
-- [x] 8. 반성문 다음날 17시 연장, 주말 발생은 월요일 17시, 구 RPC 호환
-- [x] 9. 출력 안내문 작성·미리보기 구현 (페이지 내 임시 작성)
-- [x] 10. 새 부서 생성 수정, 자동상점 재실행·동시 요청 중복방지 검증
-- [x] 11. 규정 시트와 앱 항목 비교 — HISTORY_AND_BACKFILL.md 차이 목록
-- [ ] 12. 원격 CI·운영 배포 확인 (로컬 타입·빌드·DB 권한/로직 검증 완료)
-- [ ] 13. 로그인한 실제 관리자 기기에서 입력·취소·이관·학생조회·인쇄 화면 확인
+Historical checklist for the October 26 cut-over: final secondary-school weekly balances through October 25 replace old events in official aggregation; daily events/automatic merits accumulate from October 26. Elementary data and original audit events are preserved. Later [reset](OPERATIONS_2026-10-27.md), [merit](DEPARTMENT_MERITS.md), and [rule](DISCIPLINE_RULES.md) decisions supersede the relevant initial state.
 
-별도 후속 과제:
+- [x] Preserve eight weeks/898 original rows, 873 linked balances, and 22 unlinked rows separately.
+- [x] Apply weekly-ledger/source/revision/idempotent-import schema.
+- [x] Exclude 170 superseded secondary events from official totals and historical reflections from current obligations.
+- [x] Start the October 26 settlement; verify daily/weekly/term reads and elementary/current-day 40-event preservation.
+- [x] Provide historical date/week reads, student trends, term totals, and inactive-student history.
+- [x] Provide multi-tab XLSX import, preview, anomaly/partial-file rejection, and import history.
+- [x] Require manual reasons, prevent retry duplication, and support recent-save undo.
+- [x] Extend reflections to next-day 17:00; weekend occurrences to Monday 17:00; preserve legacy RPC compatibility.
+- [x] Add page-local announcement drafting and print preview.
+- [x] Fix new-department mode and verify automatic-award rerun/concurrency safety.
+- [x] Compare source rules and application catalog; differences are in [history/backfill](HISTORY_AND_BACKFILL.md).
+- [ ] Verify remote CI/production deployment for that feature rollout (local type/build and DB rule/permission checks were complete at this checkpoint).
+- [ ] Perform authenticated device acceptance of entry, undo, import, student reads, and printing.
 
-- [ ] 미연결 역사적 신원 5개와 원본 100점 항목 확인. 데이터 보존 및 검토표시는 완료.
-- [ ] 규정 카탈로그 통일 여부/빈칸 점수 확정. 기존 항목과 수기입력은 유지.
-- [ ] 신규 부서의 점수·구성원 확정. 생성 기능은 수정 완료.
-- [ ] 이전에 미완료였던 학생 Auth/PIN 생성 확인. 학생 이름·인증정보는 코드 저장소에 기록하지 않음.
-- [ ] 담당자 개인계정 대상자 확정.
-- [ ] SP/학생 대시보드에서 공통 조회 API 연결. 이번 작업은 DaS와 공통 백엔드 범위.
+## Separate follow-ups
+
+- [ ] Resolve five unlinked historical identities and review the original 100-point merit; preservation/review markers are complete.
+- [ ] Decide catalog normalization and blank source scores; preserve existing items/manual entry meanwhile.
+- [ ] Confirm new department rules/memberships; creation behavior is fixed.
+- [ ] Confirm previously pending student Auth/PIN provisioning without committing identities or credentials.
+- [ ] Confirm individual staff-account assignees.
+- [ ] Connect the shared read API to SP/student dashboards; this feature covered DaS and the shared backend only.

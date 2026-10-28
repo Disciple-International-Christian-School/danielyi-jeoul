@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v5
@@ -59,6 +61,19 @@ jobs:
       - name: Check migration tool syntax
         run: node --check scripts/migrate-sp-external-identities.mjs
 
+      - name: Check bilingual documentation
+        run: npm run check:docs
+
+      - name: Check new commit language
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/check-commit-language.mjs "$BASE_SHA" "$HEAD_SHA"
+
+      - name: Check history tool syntax
+        run: python3 -m py_compile scripts/prepare-english-history.py
+
       - name: History regression checks
         run: node scripts/test-history.mjs && node scripts/test-weekly-import.mjs
 
@@ -67,4 +82,3 @@ jobs:
 
       - name: Build
         run: npm run build
-

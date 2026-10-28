@@ -1,36 +1,40 @@
-# Current point-display and discipline rules
+# Current Point Display and Discipline Rules
 
-Updated 2026-10-27 by user instruction. This supersedes earlier threshold descriptions.
+**Language / 언어:** [English](DISCIPLINE_RULES.md) | [한국어](DISCIPLINE_RULES.ko.md)
 
-- 주간 상벌NET = weekly merits minus weekly penalties.
-- 누적NET = merits minus penalties in the current operational settlement period. Starting/closing a period controls this cumulative score's bounds.
-- Weekly training: weekly NET <= -8 OR at least three penalty occurrence records in the same Monday–Sunday week. Merits offset scores, not occurrence count. Equal to -8 qualifies; -7 does not without three occurrences.
-- Discipline: three consecutive calendar weeks qualifying for training in the current academic term. This is independent of the settlement-period start and cumulative NET. A gap breaks the run. Previous 20-point and three nonconsecutive-week alternatives are removed.
-- `physical_training_weeks` now exposes the longest consecutive qualifying run in the current term through the settlement end. The UI labels it 最長/최장 연속 체력훈련 주차.
-- Imported weekly source rows do not invent missing occurrence counts. Archived and deleted event rows do not participate. The reset historical balances remain non-current and automatic merits remain paused.
-- Internal compatibility fields named `net_penalty_points` remain penalty-minus-merit. UI displays explicitly compute merit-minus-penalty from the components. The backend owns eligibility.
+Updated October 28, 2026. These recorded operational decisions supersede earlier threshold descriptions in the roadmap, initial specification, and journal. Later subsections also supersede conflicting earlier checkpoints below.
 
-Verification: SQL rollback regression checks cover three consecutive weeks across a settlement boundary, a missing middle week, a 20-point total without a streak, three low-point penalty occurrences despite offsetting merits, two occurrences, NET -7, and NET -8. Test records are not retained.
+## Scores and committee referral
 
-## Reflection-paper eligibility — 2026-10-28
+- Weekly NET = weekly merits minus weekly penalties. Cumulative NET = merits minus penalties within the current administrator-controlled settlement period.
+- Weekly training initially uses NET <= -8 OR at least three penalty occurrence records in the Monday–Sunday week. Merits offset points, not occurrence counts. NET -8 qualifies; -7 alone does not. The additional overdue-reflection criterion is defined below.
+- Committee eligibility requires three consecutive calendar weeks qualifying for training within the current academic term, independent of settlement start and cumulative NET. A gap breaks the run. The former 20-point and three nonconsecutive-week alternatives are removed.
+- `physical_training_weeks` exposes the longest consecutive qualifying run in the current term through settlement end; UI wording means longest consecutive training-week run.
+- Imported weekly rows never invent unknown occurrence counts. Archived/deleted events are excluded. Historical reset balances remain non-current. Automatic merits, initially paused, were subsequently resumed as recorded in [department merits](DEPARTMENT_MERITS.md).
+- Internal compatibility fields named `net_penalty_points` remain penalty-minus-merit. UI explicitly computes merit-minus-penalty from components; the backend owns eligibility.
 
-- **주간 상벌NET = 해당 월요일~일요일 상점 합계 − 벌점 합계.** Only NET < 0 makes the student a reflection-paper target; NET 0 or positive does not, even with penalty incidents.
-- Only penalties entered at a time when that week's running NET became negative contribute reflection obligations. Example: +10, -5, -6 means the -5 is covered; -6 makes NET -1 and becomes the first eligible reflection. The -5 must not retrospectively become 2x due.
-- When later merits bring the week's NET to 0 or positive, the corresponding reflection targets, missing/double badges, daily notices, and history statuses become inactive. Point events and underlying reflection audit rows are not deleted. When NET becomes negative again, eligible later penalties reappear.
-- The weekly physical-training rule remains independent: **NET <= -8 OR three penalty incidents**. Other thresholds, deadline schedules, and settled/historical source rows are unchanged.
-- DB canonical projection: `v_reflection_eligible_penalties` (creation-order running NET + current full-week NET), reused in `v_reflections`, `v_point_records`, `v_daily_discipline_notice`, and student-summary status aggregation.
+Recorded SQL rollback checks cover a consecutive run across settlement boundaries, a missing middle week, 20 points without a streak, three low-point incidents offset by merits, two incidents, NET -7, and NET -8. No test rows are retained.
 
-## Notice, visual status, and grade scope — 2026-10-28
+## Reflection eligibility — October 28
 
-- Responsibility: elementary G1–6, middle G7–8, high G9–12. Reflections and the history RPC must agree. This is a staff routing classification, not a change to the student's grade.
-- Current-date print notice contains today's unsubmitted eligible reflections plus all earlier unsubmitted reflections currently in DOUBLE status. Submitted and weekly-NET-ineligible penalty records are excluded from the **target notice**, though point audit history is preserved. Non-current date print notices do not automatically carry overdue rows into history.
-- The dashboard's Today target count reflects the same actionable new-plus-carried set. `DOUBLE` badges use the established red negative pill; physical training uses dark navy. Training criteria themselves are unchanged.
-- Sign conventions on dashboard and printed weekly report: weekly merits `+0`, weekly penalties `−0`, weekly NET remains signed merit minus penalty.
+Only a negative full Monday–Sunday weekly NET makes a student eligible for reflection work. NET zero or positive does not, even when penalty incidents exist.
 
-## 2026-10-28 — 체력훈련 사유 추가
+Only penalties whose entry-time running NET became or remained negative create actionable obligations. With +10, -5, -6, the -5 is covered; -6 makes NET -1 and is the first eligible reflection. The earlier covered record must not retrospectively become overdue double submission.
 
-- 세 조건 중 하나면 대상: 주간 벌점 3회 이상 / 주간 NET -8 이하 / 2배 반성문 17시 미제출 후 익일.
-- 최초 제출 마감이 17시 이전이면 해당일 17시, 17시 이후라면 다음날 17시를 2배 제출 확인 마감으로 사용.
-- 완료 표시되면 2배 미제출 사유는 비활성화하며 다른 조건은 독립 유지.
-- 3주 연속 대상 판정에서 2배 미제출 1건은 최초 대상 주차 1회만 인정.
-- 모든 해당 사유는 대시보드와 공지 출력에 표시.
+Later merits bringing the weekly NET to zero or positive deactivate related targets, missing/double badges, notices, and history statuses without deleting events or audit rows. Later eligible penalties reappear if NET becomes negative again. Existing weekly thresholds, deadlines, and historical source rows otherwise remain unchanged at this checkpoint.
+
+Canonical projection `v_reflection_eligible_penalties` combines creation-order running NET with current full-week NET, reused by reflection, point-record, daily-notice and student-summary views.
+
+## Notices, visual status, and responsibility scope — October 28
+
+Responsibility scopes are ELEMENTARY G1–6, MIDDLE G7–8, HIGH G9–12. Reflection and history access must agree. This routes staff work; it does not change student grade/enrollment.
+
+Today's print notice combines today's unsubmitted eligible reflections with all earlier unsubmitted records currently DOUBLE. Submitted and weekly-NET-ineligible records are excluded from the actionable notice, while audit history stays intact. Historical-date notices do not automatically carry overdue records into the past.
+
+The dashboard Today count uses the same actionable set. DOUBLE uses the existing red negative pill; training uses dark navy. Weekly printed/dashboard merits use +0, penalties use −0, and NET remains signed merit minus penalty.
+
+## Additional training reason — October 28
+
+A student qualifies through any of three independent reasons: at least three weekly penalty incidents; weekly NET <= -8; or an unsubmitted double-reflection obligation after its 17:00 check deadline, effective from the following day. Display all applicable reasons on dashboard and notice/report outputs.
+
+If the original submission deadline is before 17:00, use that day's 17:00 for the double-submission check; if it is after 17:00, use the next day's 17:00. Marking completion deactivates the double-missing reason; other reasons remain independent. For the three-consecutive-week rule, one double-missing obligation contributes only its first qualifying week, preventing duplicate weekly credit.

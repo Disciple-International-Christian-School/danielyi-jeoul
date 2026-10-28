@@ -1,5 +1,9 @@
 # Manual-entry testing state — 2026-10-27
 
+**Language / 언어:** [English](OPERATIONS_2026-10-27.md) | [한국어](OPERATIONS_2026-10-27.ko.md)
+
+> Historical reset checkpoint. The later [department-merit decision](DEPARTMENT_MERITS.md) resumes automation; use [current rules](DISCIPLINE_RULES.md) for subsequent eligibility changes.
+
 This operating decision supersedes the initial cutover restrictions documented in HISTORY_AND_BACKFILL.md.
 
 At the user's request all currently visible points were reset for manual-entry testing: 42 event rows were soft-deleted and 873 weekly balances marked non-current. The 898 original source rows and previous records remain archived. A private reset checkpoint stores the prior event, weekly-balance, automatic-rule and cron state. Four automatic department-merit rules and the weekly cron are paused. Restore/re-enable only following a new operating decision.

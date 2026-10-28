@@ -1,5 +1,7 @@
 # SP External Identity Migration Protocol
 
+**Language / 언어:** [English](SP_IDENTITY_MIGRATION_PROTOCOL.md) | [한국어](SP_IDENTITY_MIGRATION_PROTOCOL.ko.md)
+
 > Purpose: securely link existing Study Planner login identities to canonical DICS Core students without putting real mapping rows, PINs, or service credentials in Git.
 
 ## What moves

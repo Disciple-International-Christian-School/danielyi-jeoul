@@ -1,5 +1,7 @@
 # DICS Core Migration Governance
 
+**Language / 언어:** [English](CORE_MIGRATION_GOVERNANCE.md) | [한국어](CORE_MIGRATION_GOVERNANCE.ko.md)
+
 > Interim governance for a shared Supabase database used by multiple DICS applications.
 
 ## Why this exists
@@ -26,7 +28,7 @@ A shared database therefore needs an explicit migration owner and handoff contra
 
 Until a dedicated DICS-Core repository exists:
 
-    shualoalumin/danielyi-jeoul
+    Disciple-International-Christian-School/danielyi-jeoul
     supabase/migrations/
     supabase/migration-ledger.json
 
@@ -179,7 +181,7 @@ Contract:
 
 CI fails if a SQL file appears for a LIVE_ONLY_DATA version.
 
-Current reconciliation checkpoint:
+Historical reconciliation checkpoint (later migrations may increase these counts):
 
     production migrations 55
     TRACKED structural    51

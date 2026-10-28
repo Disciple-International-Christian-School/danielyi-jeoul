@@ -1,4 +1,12 @@
-Build a complete, production-ready full-stack web application called "다니엘의 저울".
+# Original Business Specification — 35 Sections
+
+**Language / 언어:** [English](spec.md) | [한국어](spec.ko.md)
+
+> For October 28 eligibility changes and G9 responsibility routing, use [current discipline rules](DISCIPLINE_RULES.md). Earlier designs and snapshots below remain dated historical evidence.
+
+> Historical requirements, not a current implementation contract. Later decisions supersede manual-author, calendar-month, student-CRUD, and stack assumptions. English labels below translate the original Korean UI wording; the operational application remains Korean. See [Change Log](CHANGELOG.md).
+
+Build a complete, production-ready full-stack web application called "Daniel's Scale".
 
 This is NOT just a UI mockup.
 Generate the actual working application code, including frontend, backend/server logic, database schema, authentication, authorization, validation, business rules, and data persistence.
@@ -10,22 +18,22 @@ The entire user-facing application must be in Korean.
 ==================================================
 
 Service name:
-"다니엘의 저울"
+"Daniel's Scale"
 
 Purpose:
 A school student council management system for managing:
-- 학생 기본 정보
-- 상점
-- 벌점
-- 벌점 항목
-- 반성문 제출 상태
-- 학생 처분
+- Basic student information
+- Merits
+- Demerits
+- Demerit item
+- Reflection submission status
+- Student sanctions
 - weekly/monthly automatic status detection
 
 There are exactly two administrative roles:
 
-1. 선도부
-2. 사생회
+1. Student guidance
+2. Residential life
 
 This is an internal administrative application.
 
@@ -68,10 +76,10 @@ Create an authentication system for administrators.
 There are two roles:
 
 - SEONDO
-  Korean display name: "선도부"
+  Display-name meaning: "Student guidance"
 
 - SASAENG
-  Korean display name: "사생회"
+  Display-name meaning: "Residential life"
 
 Administrators log in using:
 - ID/email
@@ -83,9 +91,9 @@ Store the user's role in the authenticated session.
 
 Implement server-side authorization.
 
-A user with role "선도부" must not be able to access restricted 사생회 functions.
+A user with role "Student guidance" must not be able to access restricted Residential life functions.
 
-A user with role "사생회" must not be able to modify 선도부-only settings.
+A user with role "Residential life" must not be able to modify Student guidance-only settings.
 
 Do not rely only on hiding buttons in the frontend for authorization.
 
@@ -115,10 +123,10 @@ Do not store:
 
 The system derives the following from records:
 
-- current 상점
-- current 벌점
-- weekly 벌점
-- monthly 벌점
+- current Merits
+- current Demerits
+- weekly Demerits
+- monthly Demerits
 - current punishment
 - reflection paper status
 - automatic status
@@ -140,19 +148,19 @@ Features:
 
 Default sorting:
 
-1. Highest current 벌점
+1. Highest current Demerits
 2. Grade
 3. Korean alphabetical order
 
 Student table:
 
-- 학년
-- 이름
-- 상점
-- 벌점
-- 현재 처분
-- 상태
-- 상세보기
+- Grade
+- Name
+- Merits
+- Demerits
+- Current sanction
+- Status
+- Details
 
 ==================================================
 6. POINT RECORDS
@@ -189,11 +197,11 @@ Create a penalty entry form/modal.
 
 Fields:
 
-- 학생
-- 벌점 항목
-- 벌점
-- 기입자
-- 반성문 제출
+- Student
+- Demerit item
+- Demerits
+- Entered by
+- Reflection submitted
 
 The student field should be a searchable dropdown.
 
@@ -201,17 +209,17 @@ The penalty item field should be a searchable combobox with a dropdown arrow.
 
 Preset items include:
 
-- 지각
-- 복장불량
-- 신발장 미정리
-- 선생님 재량 벌점
-- 기타 직접 입력
+- Tardiness
+- Uniform violation
+- Untidy shoe storage
+- Teacher-discretion demerit
+- Other (manual entry)
 
 IMPORTANT:
 Do NOT invent fixed point values for:
-- 지각
-- 복장불량
-- 신발장 미정리
+- Tardiness
+- Uniform violation
+- Untidy shoe storage
 
 Their point values must be configurable by administrators.
 
@@ -219,7 +227,7 @@ When a preset item with a configured fixed score is selected:
 - automatically populate the score
 - prevent accidental modification if the item is configured as fixed
 
-For "기타 직접 입력":
+For "Other (manual entry)":
 - allow manual item name
 - allow manual point input
 
@@ -227,17 +235,17 @@ For "기타 직접 입력":
 8. TEACHER-DISCRETION PENALTY
 ==================================================
 
-"선생님 재량 벌점" is a special item.
+"Teacher-discretion demerit" is a special item.
 
 It does NOT have a fixed point value.
 
 When selected, display:
 
-[ 1점 ]
-[ 2점 ]
-[ 3점 ]
-[ 4점 ]
-[ 5점 ]
+[ 1 points ]
+[ 2 points ]
+[ 3 points ]
+[ 4 points ]
+[ 5 points ]
 
 The administrator must select exactly one value.
 
@@ -248,20 +256,20 @@ Server-side validation MUST also enforce this rule.
 Do not trust client-side validation alone.
 
 ==================================================
-9. POSITIVE POINTS / 상점
+9. POSITIVE POINTS / Merits
 ==================================================
 
-Create a separate form for entering 상점.
+Create a separate form for entering Merits.
 
 Fields:
 
-- 학생
-- 상점 항목
-- 상점
-- 기입자
-- 날짜
+- Student
+- Merit item
+- Merits
+- Entered by
+- Date
 
-The same manual "기입자" rule applies.
+The same manual "Entered by" rule applies.
 
 Allow administrators to manage positive-point items in the future.
 
@@ -287,20 +295,20 @@ submitted = false
 
 The administrator must manually check:
 
-"☐ 반성문 제출"
+"☐ Reflection submitted"
 
 Checked:
-"제출 완료"
+"Submitted"
 
 Unchecked:
-"미제출"
+"Missing"
 
 IMPORTANT AUTOMATIC RULE:
 
 If the next calendar day has begun and submitted is still false:
 
 Set/display:
-"2배 제출 대상"
+"Double submission required"
 
 Do not delete the original record.
 
@@ -309,10 +317,10 @@ Store the original penalty date and deadline.
 Create a dedicated reflection paper management page.
 
 Filters:
-- 전체
-- 제출 완료
-- 미제출
-- 2배 제출 대상
+- All
+- Submitted
+- Missing
+- Double submission required
 
 ==================================================
 11. AUTOMATIC SEONDO RULES
@@ -328,7 +336,7 @@ OR
 - 8 or more penalty points in the same week
 
 Then:
-"체력훈련 대상"
+"Physical-training eligible"
 
 RULE B — MONTHLY:
 
@@ -336,7 +344,7 @@ If a student has:
 - 20 or more penalty points in the current month
 
 Then:
-"징계위원회 대상"
+"Committee referral eligible"
 
 These are automatic system statuses.
 
@@ -356,7 +364,7 @@ Weekly penalty points are calculated from historical penalty records.
 
 At the beginning of a new week:
 
-- The displayed "이번 주 벌점" becomes 0 for the new week.
+- The displayed "This week demerits" becomes 0 for the new week.
 - Historical records are NOT deleted.
 - Previous weekly totals remain available.
 - Historical weekly totals must remain queryable.
@@ -374,20 +382,20 @@ Make timezone configurable or use Asia/Seoul by default.
 13. SASAENGHOE / DORMITORY PUNISHMENT
 ==================================================
 
-Create a punishment management system for "사생회".
+Create a punishment management system for "Residential life".
 
 Punishment types:
 
-- 운동금지
-- 간식금지
-- 면회금지
-- 귀가 지연
-- 귀가 금지
+- Sports restriction
+- Snack restriction
+- Visitor restriction
+- Delayed home leave
+- Home-leave restriction
 
 IMPORTANT:
 The system must NOT automatically choose a punishment.
 
-The 사생회 administrator manually chooses the punishment.
+The Residential life administrator manually chooses the punishment.
 
 ==================================================
 14. WEEKLY 5+ RULE
@@ -397,13 +405,13 @@ If a student has 5 or more penalty points during the current week:
 
 Display:
 
-"처분 선택 필요"
+"Sanction selection required"
 
-Allow the 사생회 administrator to manually choose ONE punishment from:
+Allow the Residential life administrator to manually choose ONE punishment from:
 
-- 운동금지
-- 간식금지
-- 면회금지
+- Sports restriction
+- Snack restriction
+- Visitor restriction
 
 ==================================================
 15. WEEKLY 10+ RULE
@@ -411,14 +419,14 @@ Allow the 사생회 administrator to manually choose ONE punishment from:
 
 If a student has 10 or more penalty points during the current week:
 
-Allow the 사생회 administrator to manually choose TWO punishments from:
+Allow the Residential life administrator to manually choose TWO punishments from:
 
-- 운동금지
-- 간식금지
-- 면회금지
+- Sports restriction
+- Snack restriction
+- Visitor restriction
 
 The UI should clearly show:
-"처분 2개를 선택하세요."
+"Select two sanctions."
 
 Do not automatically select punishments.
 
@@ -432,7 +440,7 @@ If a student has 5 or more penalty points in each of three consecutive weeks:
 
 Display:
 
-"귀가금지 조건 충족"
+"Home-leave restriction condition met"
 
 The system should calculate this from historical weekly penalty data.
 
@@ -460,7 +468,7 @@ A punishment record contains:
 If an applied punishment is marked as violated:
 
 Display:
-"귀가금지"
+"Home-leave restriction"
 
 The interface should provide an action for authorized administrators to record a violation.
 
@@ -474,14 +482,14 @@ Create a punishment registration modal.
 
 Fields:
 
-- 학생
-- 이번 주 벌점
-- 처분 선택
-- 처분 시작일
-- 처분 종료일
-- 기입자
+- Student
+- This week demerits
+- Select sanction
+- Sanction start
+- Sanction end
+- Entered by
 
-"기입자" must be a manually typed text field.
+"Entered by" must be a manually typed text field.
 
 For 5+ weekly points:
 - allow one punishment selection
@@ -493,15 +501,15 @@ Show the current weekly penalty count inside the modal.
 
 Buttons:
 
-[ 취소 ]
-[ 처분 등록 ]
+[ Cancel ]
+[ Register sanction ]
 
 ==================================================
 19. POINT ITEM MANAGEMENT
 ==================================================
 
 Create a page:
-"벌점 항목 관리"
+"Demerit items"
 
 Administrators can:
 
@@ -522,12 +530,12 @@ Fields:
 
 Example items:
 
-지각
-복장불량
-신발장 미정리
-선생님 재량 벌점
+Tardiness
+Uniform violation
+Untidy shoe storage
+Teacher-discretion demerit
 
-For "선생님 재량 벌점":
+For "Teacher-discretion demerit":
 
 isFixed = false
 allowed range = 1–5
@@ -538,14 +546,14 @@ allowed range = 1–5
 
 Implement Excel import for penalty items.
 
-Provide an "Excel 가져오기" button.
+Provide an "Import Excel" button.
 
 Allow the administrator to upload an Excel file.
 
 Expected columns:
 
-벌점 항목
-벌점
+Demerit item
+Demerits
 
 Process:
 
@@ -559,7 +567,7 @@ Process:
 
 Do not immediately import invalid data.
 
-For "선생님 재량 벌점", support the special 1–5 rule rather than treating it as a fixed score.
+For "Teacher-discretion demerit", support the special 1–5 rule rather than treating it as a fixed score.
 
 ==================================================
 21. EDIT AND DELETE
@@ -599,39 +607,39 @@ Student name
 Grade
 
 Summary cards:
-- 현재 상점
-- 현재 벌점
-- 이번 주 벌점
-- 이번 달 벌점
+- Current merits
+- Current demerits
+- This week demerits
+- This month demerits
 
 Current status:
-- 정상
-- 체력훈련 대상
-- 징계위원회 대상
-- 반성문 미제출
-- 반성문 2배 제출 대상
-- 운동금지
-- 간식금지
-- 면회금지
-- 귀가금지
+- Normal
+- Physical-training eligible
+- Committee referral eligible
+- Missing reflection
+- Double reflection required
+- Sports restriction
+- Snack restriction
+- Visitor restriction
+- Home-leave restriction
 
 Penalty history table:
 
-- 날짜
-- 항목
-- 점수
-- 기입자
-- 반성문 상태
-- 수정
-- 삭제
+- Date
+- Item
+- Points
+- Entered by
+- Reflection status
+- Edit
+- Delete
 
 Punishment history:
 
-- 처분
-- 시작일
-- 종료일
-- 기입자
-- 상태
+- Sanction
+- Start date
+- End date
+- Entered by
+- Status
 
 ==================================================
 23. DASHBOARD
@@ -641,20 +649,20 @@ Create a real dashboard.
 
 Top cards:
 
-- 전체 학생
-- 이번 주 벌점 대상
-- 반성문 미제출
-- 2배 제출 대상
-- 현재 처분 중
+- All students
+- Weekly demerit targets
+- Missing reflection
+- Double submission required
+- Active sanctions
 
 Main student table:
 
-- 학년
-- 이름
-- 상점
-- 벌점
-- 처분
-- 상태
+- Grade
+- Name
+- Merits
+- Demerits
+- Sanction
+- Status
 
 Provide:
 - Search
@@ -662,7 +670,7 @@ Provide:
 - Status filter
 - Sorting
 
-Make "+ 벌점 입력" a prominent primary action.
+Make "+ Enter demerits" a prominent primary action.
 
 ==================================================
 24. NAVIGATION
@@ -670,31 +678,31 @@ Make "+ 벌점 입력" a prominent primary action.
 
 Sidebar:
 
-"⚖ 다니엘의 저울"
+"⚖ Daniel's Scale"
 
-- 대시보드
-- 학생 관리
-- 벌점 입력
-- 상점 입력
-- 반성문 관리
-- 처분 관리
-- 벌점 항목 관리
+- Dashboard
+- Students
+- Enter demerits
+- Enter merits
+- Reflection management
+- Sanctions
+- Demerit items
 
 Show role-specific navigation.
 
 For example:
-선도부:
-- 대시보드
-- 학생 관리
-- 벌점 입력
-- 상점 입력
-- 반성문 관리
-- 벌점 항목 관리
+Student guidance:
+- Dashboard
+- Students
+- Enter demerits
+- Enter merits
+- Reflection management
+- Demerit items
 
-사생회:
-- 대시보드
-- 학생 관리
-- 처분 관리
+Residential life:
+- Dashboard
+- Students
+- Sanctions
 
 ==================================================
 25. DATABASE
@@ -858,21 +866,21 @@ Implement clear Korean error messages.
 
 Examples:
 
-"학생을 선택해주세요."
-"벌점 항목을 선택해주세요."
-"벌점을 입력해주세요."
-"기입자 이름을 입력해주세요."
-"선생님 재량 벌점은 1~5점만 선택할 수 있습니다."
-"처분은 2개까지 선택할 수 있습니다."
-"처분을 선택해주세요."
+"Select a student."
+"Select a demerit item."
+"Enter demerit points."
+"Enter the operator name."
+"Teacher-discretion points must be between 1 and 5."
+"Select up to two sanctions."
+"Select a sanction."
 
 Success messages:
 
-"벌점이 등록되었습니다."
-"상점이 등록되었습니다."
-"처분이 등록되었습니다."
-"학생 정보가 수정되었습니다."
-"벌점 항목이 저장되었습니다."
+"Demerit recorded."
+"Merit recorded."
+"Sanction recorded."
+"Student information updated."
+"Demerit item saved."
 
 ==================================================
 30. SECURITY
@@ -909,7 +917,7 @@ Track important changes:
 - When it happened
 
 Remember:
-The "기입자" field is still a manually entered name and is separate from the authenticated administrator account.
+The "Entered by" field is still a manually entered name and is separate from the authenticated administrator account.
 
 ==================================================
 32. INITIAL SEED DATA
@@ -919,22 +927,22 @@ Create seed data for development.
 
 Create two administrator accounts:
 
-- 선도부
-- 사생회
+- Student guidance
+- Residential life
 
 Create sample students:
 
-- 홍길동 — 2학년
-- 김민지 — 1학년
-- 이준호 — 3학년
-- 박서연 — 2학년
+- Sample Student A — Grade 2
+- Sample Student B — Grade 1
+- Sample Student C — Grade 3
+- Sample Student D — Grade 2
 
 Create sample point items:
 
-- 지각
-- 복장불량
-- 신발장 미정리
-- 선생님 재량 벌점
+- Tardiness
+- Uniform violation
+- Untidy shoe storage
+- Teacher-discretion demerit
 
 Do not invent fixed scores for the first three items unless they are explicitly configured later.
 
@@ -946,31 +954,31 @@ Implement these rules exactly:
 
 Weekly:
 3 or more penalty records OR 8+ weekly penalty points
-→ 체력훈련 대상
+→ Physical-training eligible
 
 Monthly:
 20+ monthly penalty points
-→ 징계위원회 대상
+→ Committee referral eligible
 
 Weekly:
 5+ penalty points
-→ 사생회 manually selects 1 punishment
+→ Residential life manually selects 1 punishment
 
 Weekly:
 10+ penalty points
-→ 사생회 manually selects 2 punishments
+→ Residential life manually selects 2 punishments
 
 Three consecutive weeks:
 5+ penalty points every week
-→ 귀가금지 조건 충족
+→ Home-leave restriction condition met
 
 Punishment violation:
-→ 귀가금지
+→ Home-leave restriction
 
 Reflection:
 Same-day deadline.
 Next day + not submitted
-→ 2배 제출 대상
+→ Double submission required
 
 Weekly reset:
 Current weekly total resets for the new week.
@@ -980,12 +988,12 @@ Historical records remain.
 34. IMPORTANT DATA RULE
 ==================================================
 
-Do not calculate total 벌점 as:
-상점 - 벌점.
+Do not calculate total Demerits as:
+Merits - Demerits.
 
-"벌점" and "상점" are separate values.
+"Demerits" and "Merits" are separate values.
 
-Automatic punishment/status rules use the specified 벌점 values only.
+Automatic punishment/status rules use the specified Demerits values only.
 
 ==================================================
 35. FINAL REQUIREMENT
@@ -1023,4 +1031,4 @@ Add a README.md containing:
 Do not use fake buttons.
 Every major button should perform a real action.
 
-Build "다니엘의 저울" as a real full-stack application, not merely a visual prototype.
+Build "Daniel's Scale" as a real full-stack application, not merely a visual prototype.

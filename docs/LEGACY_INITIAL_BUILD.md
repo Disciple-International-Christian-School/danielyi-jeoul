@@ -1,139 +1,53 @@
-# Legacy Initial Build — 다니엘의 저울
+# Legacy Initial Build — Daniel's Scale
 
-DICS 상·벌점 관리 콘솔.
-학생은 로그인하지 않는다. 관리자 역할은 선도부(`SEONDO`)와 사생회(`SASAENG`) 두 개.
+**Language / 언어:** [English](LEGACY_INITIAL_BUILD.md) | [한국어](LEGACY_INITIAL_BUILD.ko.md)
 
-> **FROZEN LEGACY DOCUMENT — 2026-09-21**
->
-> 이 문서는 Lovable → Replit → Cursor → Supabase/Netlify로 이어진 **초기 구축 과정의 역사 기록**이다.
-> 2026-09-21 이후의 기능 개선, 정책 변경, GPT 작업, Cursor 재작업은 이 파일에 추가하지 않는다.
-> 이후 변경 과정은 [EVOLUTION_LOG.md](./EVOLUTION_LOG.md)에 기록한다.
->
-> 당시 설계 결정은 [architecture.md](./architecture.md), 원본 규칙은 [spec.md](./spec.md).
+> Frozen historical record, September 21, 2026. This English edition translates/reflows the initial-build account. Later work belongs in [CHANGELOG.md](CHANGELOG.md). Historical repository ownership, schema, seed state, and deployment methods below are not current operational instructions; see [deployment](netlify-deployment.md) and [migration governance](CORE_MIGRATION_GOVERNANCE.md).
 
-이 문서는 **초기 운영 프로토타입이 만들어지기까지 어떻게 왔는지**를 보존한다.
+DICS administrator console for merits/demerits. Students do not sign in. Roles are SEONDO (student guidance) and SASAENG (residential life).
 
----
+## Historical running environment
 
-## 지금 돌아가는 것
+App: https://dics-daniels-scale.netlify.app. The original working repository was shualoalumin/danielyi-jeoul on main, described as public at that time. Supabase was the DICS organization's daniels-scale project in Seoul, ref jgrzsfomcwfiukkaqtos. Login IDs seondo/sasaeng mapped to {id}@scale.dics.kr. Local setup copied .env.example to .env, installed npm dependencies, and started Vite. VITE_SUPABASE_* values were injected at build time, so changing them required redeployment.
 
-| | |
-|---|---|
-| 앱 | https://dics-daniels-scale.netlify.app |
-| GitHub | https://github.com/shualoalumin/danielyi-jeoul (`main`, public) |
-| Supabase | DICS org · 프로젝트 `daniels-scale` · ref `jgrzsfomcwfiukkaqtos` · Seoul |
-| 로그인 | 아이디 `seondo` / `sasaeng` → `{id}@scale.dics.kr` |
-| 로컬 개발 | `.env.example`을 `.env`로 복사 후 `npm install && npm run dev` |
+## Timeline
 
-`main`에 푸시하면 Netlify가 다시 빌드한다. Vite는 빌드 시점에 `VITE_SUPABASE_*`를 넣으므로, 키를 바꾸면 재배포가 필요하다.
+### 1. Lovable mockup
 
----
+The initial UI reference was https://pixel-perfect-match-0249.lovable.app/dashboard, including students/reflections/punishments/penalty-items screens. Code could not be extracted; it served only as a visual reference.
 
-## 연표
+### 2. Replit rebuild and limit
 
-### 1. Lovable 목업
+A full-stack rebuild produced Drizzle schema, Express API, OpenAPI/orval client, eight React screens, and Clerk authentication. Platform limits stopped work. After porting, only school.ts and Drizzle schema remained in ignored _replit; the original 35-section prompt became [spec.md](spec.md).
 
-화면을 Lovable에서 먼저 만들었다. 배포본은 아직 살아 있다.
+### 3. September 18 architecture decision
 
-- https://pixel-perfect-match-0249.lovable.app/dashboard
-- `/students` `/reflections` `/punishments` `/penalty-items`
+Do not host Express. Authentication needed replacement anyway; derived reads and write-time validation fit PostgreSQL views/triggers/RPCs. Reuse SP Manager's Supabase/RLS/Netlify operating pattern. The rejected alternative kept Express/Drizzle while using Supabase only as a PostgreSQL host.
 
-코드 추출이 안 돼서 이 주소는 **UI 레퍼런스**로만 쓴다.
+### 4. Repository cleanup and frontend port
 
-### 2. Replit에서 다시 빌드하다 limit
+The intended hylen707/daniels-scale destination was inaccessible to the machine's shualoalumin Git identity, so commits initially stayed local. Clerk became Supabase Auth with ID/password and sessionStorage; orval became src/lib/api.ts; schema/logic/RLS migrations and fictional seeds were prepared. NextSnap's free slots were full, preventing project creation there.
 
-같은 앱을 Replit에서 풀스택으로 다시 짰다. Drizzle 스키마, Express API, OpenAPI/orval 클라이언트, React 화면 8개가 나왔다. Auth는 Replit 기본값인 Clerk.
+### 5. September 21 recovery
 
-Limit에 걸려 중단. 그때까지 나온 파일을 이 워크스페이스로 가져왔다. 포팅이 끝난 뒤 덤프는 `_replit/`에 **원본 두 개만** 남겼다 (`school.ts`, Drizzle `schema/`). git에 안 올림.
+Re-extracting a ZIP lost three unpushed local commits. File contents were recovered from earlier session records. An empty shualoalumin/danielyi-jeoul repository became the working origin and accepted pushes.
 
-스펙 원문은 Replit `attached_assets/`에 35개 섹션짜리 프롬프트로 들어 있었고, 그걸 정리한 것이 `docs/spec.md`다.
+### 6. GitHub and Netlify
 
-### 3. 아키텍처 결정 (2026-09-18)
+The dics-daniels-scale site used an SPA rewrite to index.html and a GitHub deploy key for main. Without Supabase variables, the first deployment displayed a missing-configuration message.
 
-Express를 호스팅하지 않기로 했다.
+### 7. Supabase in the DICS organization
 
-- Clerk도, Express도 바꿔야 했음
-- 비즈니스 룰이 전부 “읽기 집계” 또는 “쓰기 검증” → 뷰 / 트리거 / RPC로 옮길 수 있음
-- 이미 운영 중인 SP Manager와 같은 모델 (Supabase + RLS + Netlify)
+The placement-test development project was paused to release a free slot. daniels-scale was created in ap-northeast-2, migrations and fictional seed applied, and VITE_SUPABASE_URL/ANON_KEY configured before redeployment. Two Auth users were linked to admins by role. Email confirmation was disabled for that initial login setup. This records what happened; it is not a recommendation to reset production or reuse shared credentials.
 
-버린 선택: Supabase를 Postgres 호스트로만 쓰고 Express+Drizzle 유지.
+## Repository layout and ownership
 
-### 4. 리포 정리와 프론트 포팅 (2026-09-18)
+src, supabase, and docs were tracked. _replit retained only source references; _local held private rosters/spreadsheets; .env held local configuration. Clerk/orval/nested Git/node_modules were removed from the imported dump. At that time hylen707/daniels-scale was empty and shualoalumin/danielyi-jeoul was the source. Current ownership is the school organization repository.
 
-목표 리포는 원래 https://github.com/hylen707/daniels-scale 이었으나, 이 머신 `gh`는 `shualoalumin`이라 푸시가 막혔다. 로컬에 커밋만 쌓아 뒀다.
+## Historical remote additions
 
-그 사이:
+The initial three migrations were supplemented with fictional seed, email-based admin bindings without hardcoded Auth UUIDs, and fixed function search_path/RPC grants. Later ledger reconciliation renamed draft migrations to live versions. The original reset recipe assumed a development environment; do not apply it to production data.
 
-- Clerk → Supabase Auth (아이디+비밀번호, `sessionStorage`)
-- orval REST 클라이언트 → `src/lib/api.ts`
-- 마이그레이션 SQL 작성 (`schema` / `logic` / `rls`) + 가상 seed
+## Unfinished at that checkpoint
 
-NextSnap 조직은 무료 슬롯이 가득 차서 프로젝트 생성은 못 했다.
-
-### 5. 로컬 작업 유실과 복구 (2026-09-21)
-
-zip을 다시 풀면서 로컬 커밋 3개가 사라졌다. GitHub에는 한 번도 안 올라가 있었다. 이전 세션 대화 기록에서 파일 내용을 복구했다.
-
-같은 날 빈 리포 https://github.com/shualoalumin/danielyi-jeoul 가 origin이 됐고, 여기는 푸시가 됐다.
-
-### 6. GitHub + Netlify (2026-09-21)
-
-- 사이트: `dics-daniels-scale`
-- `netlify.toml` SPA rewrite (`/*` → `index.html`)
-- GitHub deploy key로 `main` 자동 배포
-
-이 시점엔 Supabase 키가 없어서 앱은 “환경변수 없음” 안내만 보였다.
-
-### 7. DICS 조직에 프로젝트 (2026-09-21)
-
-무료 한도를 비우려고 [dics-placement-test-dev](https://supabase.com/dashboard/project/qghstnfqbvacesarbmzv)를 pause (`INACTIVE`).
-
-DICS org에 `daniels-scale` 생성 (`ap-northeast-2`, $0/월). 마이그레이션 적용, 가상 학생/항목 seed, Netlify에 `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` 넣고 재배포.
-
-Auth 유저 두 명을 대시보드에서 만든 뒤 `admins`에 역할을 붙였다.
-
-| 아이디 | email | 역할 |
-|---|---|---|
-| seondo | seondo@scale.dics.kr | 선도부 |
-| sasaeng | sasaeng@scale.dics.kr | 사생회 |
-
-Confirm email은 꺼 둔 상태여야 바로 로그인된다.
-
----
-
-## 폴더가 이렇게 된 이유
-
-| 경로 | git | 역할 |
-|---|---|---|
-| `src/` | 커밋 | 운영 앱 |
-| `supabase/` | 커밋 | 스키마 소스. 원격에 적용한 SQL의 원본 |
-| `docs/` | 커밋 | spec / architecture / 이 파일 |
-| `_replit/` | 무시 | 포팅 원본만. `school.ts` + Drizzle `schema/` (`audit-logs`는 아직 미구현) |
-| `_local/` | 무시 | 명단·엑셀. 미성년 개인정보. 절대 푸시하지 않음 |
-| `.env` | 무시 | 로컬 키. 예시는 `.env.example` |
-
-루트에 `danielyi-jeoul/`이 중첩돼 있던 것은 `_replit/`로 바꿨다가, Clerk·orval·중첩 git·node_modules는 지우고 원본 두 개만 남겼다.
-
-원래 만들려던 `hylen707/daniels-scale` 리포는 비어 있다. 운영 원본은 `shualoalumin/danielyi-jeoul`이다.
-
----
-
-## 원격에만 있고 이 폴더 SQL과 다른 것
-
-마이그레이션 파일 세 장(`schema` / `logic` / `rls`)이 소스다. 적용 직후 MCP로 넣은 추가분:
-
-- 가상 seed (`seed.dev.sql`과 동일 내용)
-- `admins` 역할 연결 (이메일로 lookup — UUID를 파일에 안 넣음)
-- 함수 `search_path` 고정 + RPC `GRANT` → `20260921000004_function_grants_search_path.sql`
-
-프로덕션 데이터를 리셋하면 `seed.dev.sql`을 다시 넣고, Auth 유저를 만든 다음 `admins`를 email로 다시 연결하면 된다.
-
----
-
-## 아직 안 한 것
-
-- 실제 학생 명단 Excel 가져오기 (`_local/student-roster-26Fall.xlsx`). 지금은 seed 가상 4명
-- 벌점 항목 고정 점수 설정 (spec: 처음 세 항목은 관리자가 나중에 넣음)
-- 감사 로그 (spec §31)
-- 커스텀 도메인
-- `hylen707/daniels-scale` 동기화 여부 — 필요하면 그때 미러
+Real-roster import, fixed point values for the first three items, audit logging, custom domain, and optional mirroring were not complete on September 21. Later records supersede those gaps. The fictional seed had four students; that was not the later operational roster.

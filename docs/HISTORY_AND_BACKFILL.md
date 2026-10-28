@@ -1,5 +1,9 @@
 # DaS weekly history and daily-entry cutover
 
+**Language / 언어:** [English](HISTORY_AND_BACKFILL.md) | [한국어](HISTORY_AND_BACKFILL.ko.md)
+
+> Initial cut-over record. Later [manual-entry reset](OPERATIONS_2026-10-27.md), [department-merit](DEPARTMENT_MERITS.md), and [current-rule](DISCIPLINE_RULES.md) decisions supersede its operational-state and eligibility checkpoints. Original source rows remain historical evidence.
+
 ## Operating contract
 
 The source workbook contains independent final weekly settlements, not running totals. The weekly net is merit minus penalty. The source's two component columns are retained as supplied; they are not a reconstruction of individual incidents.
@@ -54,7 +58,7 @@ Weekly periods are indivisible. A day query in the historical range returns the 
 - Student detail: semester weekly trend, source precision, component values, missing/no-school gaps, and an inactive-identity fallback. The editable daily list remains explicitly labeled as the most recent 100 events; totals come from the complete RPC, never that capped list.
 - Import: `.xlsx` multi-tab parser, completed-week filtering, source totals, duplicate/malformed-class/large-value warnings, unresolved identity preview, explicit replacement review, import history, and current unresolved source rows.
 - Entry: required custom reason (80-character DB limit), preset changes clear stale score, continuous student entry retains the selected reason, request UUID prevents retried saves from duplicating, recent-save undo, cutoff/future-date guards.
-- Operational penalty-minus-merit numbers are labeled **순벌점**. Historical source-compatible totals are labeled **최종값/학기 누계 = 상점 − 벌점**. Threshold formulas are unchanged.
+- Operational penalty-minus-merit numbers are labeled **`순벌점`**. Historical source-compatible totals are labeled **`최종값/학기 누계 = 상점 − 벌점`**. Threshold formulas are unchanged.
 - Reflection extension: occurrence date + one day at 17:00 KST; Saturday/Sunday occurrences extend to Monday 17:00. Friday therefore extends to Saturday under this literal policy. The default same-day deadline is unchanged. Already-submitted rows cannot be extended. Legacy RPC callers receive the new extension behavior too.
 - Reports: optional announcement text with immediate print preview. Text is retained only while the page remains open; it is not a shared saved announcement.
 - Department creation distinguishes first load from explicit new mode. Automatic merits retain source-key uniqueness, handle concurrent retries, and skip historical imported secondary weeks.
@@ -65,13 +69,13 @@ The source rules tab and active app rules were compared. No new school policy or
 
 | Difference | Source | Current app | Handling |
 | --- | --- | --- | --- |
-| Punctuation/spacing | 등교지각, 욕설·비속어 | 등교 지각, 욕설 | Recorded for canonical-name review |
-| Grouped vs split | 세상노래 가창/연주, each 7 | 세상노래, 7 | Existing score unchanged; splitting remains a policy/catalog decision |
-| Wording | 교실 미소등, 2 | 미소등, 2 | Existing score unchanged |
-| Blank source scores | 등교지각, 잔반 and other manual items | 등교 지각/잔반 currently 2 | A blank is not interpreted as zero or a request to erase an existing rule |
-| Fixed source-only items | 교실 미정리 2; 냉난방 문단속 2; 슬리퍼 등교 2; 복도통행 2; 성경책 미지참 5; 선풍기 가동 2; 체육복 미착용 2 | No matching preset | Available through custom reason/score; catalog synchronization is pending policy review |
-| Additional source-only blank items | 교외 실내화 착용; 교내 실외화 착용; 식사 후 테이블 미정리; 교내 취식; 복도 양치 | No matching preset | Custom input supported; fixed score not fabricated |
-| App-only items | Not listed in source tab | 암송 미완료; 일기 미제출; 수업태도 불량; 선생님 재량 벌점 | Retained; teacher-discretion 1–5 validator unchanged |
+| Punctuation/spacing | `등교지각, 욕설·비속어` | `등교 지각, 욕설` | Recorded for canonical-name review |
+| Grouped vs split | `세상노래 가창/연주`, each 7 | `세상노래`, 7 | Existing score unchanged; splitting remains a policy/catalog decision |
+| Wording | `교실 미소등`, 2 | `미소등`, 2 | Existing score unchanged |
+| Blank source scores | `등교지각, 잔반` and other manual items | `등교 지각/잔반` currently 2 | A blank is not interpreted as zero or a request to erase an existing rule |
+| Fixed source-only items | `교실 미정리 2; 냉난방 문단속 2; 슬리퍼 등교 2; 복도통행 2; 성경책 미지참 5; 선풍기 가동 2; 체육복 미착용` 2 | No matching preset | Available through custom reason/score; catalog synchronization is pending policy review |
+| Additional source-only blank items | `교외 실내화 착용; 교내 실외화 착용; 식사 후 테이블 미정리; 교내 취식; 복도 양치` | No matching preset | Custom input supported; fixed score not fabricated |
+| App-only items | Not listed in source tab | `암송 미완료; 일기 미제출; 수업태도 불량; 선생님 재량 벌점` | Retained; teacher-discretion 1–5 validator unchanged |
 
 ## Verification and remaining boundaries
 

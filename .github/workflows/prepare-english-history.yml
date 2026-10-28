@@ -1,0 +1,52 @@
+name: Prepare English history preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - docs/bilingual-readme-key-issues-20261026
+    paths:
+      - .github/workflows/prepare-english-history.yml
+      - scripts/prepare-english-history.py
+      - docs/commit-message-translations.json
+
+permissions:
+  contents: write
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Prepare and validate a new review branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          source_head=$(git rev-parse refs/remotes/origin/main)
+          preview_ref="refs/heads/review/english-history-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          python3 scripts/prepare-english-history.py --ref refs/remotes/origin/main
+          python3 scripts/prepare-english-history.py --ref refs/remotes/origin/main --preview-ref "$preview_ref" --apply | tee /tmp/english-history-result.txt
+          git diff --exit-code "$source_head" "$preview_ref"
+          git fetch origin main
+          test "$source_head" = "$(git rev-parse refs/remotes/origin/main)"
+          git push origin "$preview_ref:$preview_ref"
+          {
+            echo '## English history preview'
+            echo
+            echo "Source main: $source_head"
+            echo "Preview branch: ${preview_ref#refs/heads/}"
+            echo
+            echo 'Main was not changed. Review author/date preservation, graph, and the unchanged file tree before any owner-coordinated history replacement.'
+            echo
+            echo 'This preview reflects main at the source SHA above; regenerate it after merging subsequent documentation work.'
+            echo
+            echo '```json'
+            cat /tmp/english-history-result.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
