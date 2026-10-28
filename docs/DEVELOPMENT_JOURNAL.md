@@ -909,3 +909,12 @@ Dark-navy training and red DOUBLE status remain distinct. Weekly penalties show 
 ## October 28, 2026 — Submission checks connect to training
 
 Completing double submission by the 17:00 check avoids training for that missing obligation; continued non-submission activates it the next day. The three reasons are independent and may coexist, so dashboard/reports retain all of them rather than a single representative reason. Existing submission timestamps and score source rows were not changed. Rollback checks covered next-day activation, single-week credit and release upon completion.
+
+
+## October 29, 2026 — Save future events without making discipline happen early
+
+A staff request to enter merits/penalties for future dates exposed two independent blocks: an HTML input `max=today` and a guard in the Supabase point-record history cutover trigger. A simple UI edit would have appeared to work until submit, then the RPC would reject the future date. Both restrictions were examined. The database guard had a second, unrelated safeguard preventing edits of superseded historical records, which we preserved.
+
+The more subtle issue was that weekly score and reflection eligibility views used all rows for the same Monday–Sunday period. Allowing future rows without modifying these projections would make a Friday penalty alter Thursday's weekly NET, reflection eligibility and training status. We changed current effective-date projections to use KST `recorded_at <= today`. The pending future row and its reflection audit are stored on entry, but its actual discipline effect starts on the occurrence date. The original historical-import protections and CORE UUID identity remain unchanged.
+
+The browser now accepts future dates in both entry modes and labels them scheduled. The future-punishment shortcut for 'same-day reflection completed' is disabled because the future event has not occurred. Regression tests executed against the real admin RPC in a rolled-back transaction, confirming future positive and negative records save successfully without early changes to scores, reflection targets, training or committee results.
