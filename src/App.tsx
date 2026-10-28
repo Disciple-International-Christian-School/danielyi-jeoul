@@ -447,7 +447,7 @@ function StudentDetailPage() {
     updateRecord.mutate({ id: record.id, data: { points: Number(nextPoints), item: record.item, recordedAt: record.recordedAt, enteredByName: record.enteredByName, reflectionSubmitted: record.reflection?.submitted ?? null } }, { onSuccess: () => { refreshDetail(); notify('점수 기록을 수정했습니다.'); }, onError: (error) => notify(errText(error), 'error') });
   };
   const toggleViolated = (punishment: Punishment) => setViolation.mutate({ id: punishment.id, violated: !punishment.violated }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetStudentQueryKey(studentRef) }), onError: (error) => notify(errText(error), 'error') });
-  return <div><Link href="/students" className="btn btn-outline" data-testid="link-back-students"><ChevronLeft size={15} /> 학생 목록</Link><div style={{ marginTop: 25 }} className="detail-hero"><div><div className="eyebrow">학생 상세 기록</div><h1 className="heading">{student.name}</h1><p className="subheading">{student.homeroom ?? (student.grade + '학년')}{student.studentNo ? ' · ' + student.studentNo : ''} · 최근 생활점수와 상태 신호</p><div className="status-list">{student.statuses.length ? student.statuses.map((status) => <span className="pill pill-warning" key={status}>{status}</span>) : <span className="pill pill-positive"><Check size={11} /> 현재 양호</span>}</div>{student.physicalTrainingRequired && <p className="record-meta" style={{ marginTop: 9 }}>체력훈련 사유: {student.physicalTrainingReasons.join(' · ')}</p>}</div><div className="detail-avatar">{student.name.slice(0, 1)}</div></div>{student.isActive !== false && <div className="metric-grid" style={{ marginTop: 28 }}><div className="card metric-card"><div className="metric-label">주간 상점</div><div className="metric-value success-text">+{student.weeklyPositivePoints}</div></div><div className="card metric-card"><div className="metric-label">주간 벌점</div><div className="metric-value danger-text">−{student.weeklyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">주간 상벌NET</div><div className="metric-value">{student.weeklyPositivePoints - student.weeklyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">누적NET</div><div className="metric-value">{student.settlementPositivePoints - student.settlementPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">최장 연속 체력훈련 주차</div><div className="metric-value">{student.physicalTrainingWeeks}</div></div><div className="card metric-card"><div className="metric-label">기숙사 처분</div><div className="metric-value" style={{ fontSize: 14 }}>{student.punishment ?? '없음'}</div></div></div>}<div style={{ marginTop: 18 }}>{student.coreStudentId && <StudentHistory studentId={student.coreStudentId} />}</div><div className="detail-grid" style={{ marginTop: 18 }}><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">일별 점수 이력</h2><p className="section-copy">최근 100건입니다. 전체 주차와 누계는 위의 학기 추이에서 확인하세요.</p></div></div>{records.isLoading ? <div className="skeleton" style={{ height: 90, marginTop: 18 }} /> : records.isError ? <ErrorState error={records.error} retry={() => records.refetch()} /> : <div className="record-list">{(records.data ?? []).map((record) => <div className="record-row" key={record.id} data-testid={`row-record-${record.id}`}><div className="record-date">{dateLabel(record.recordedAt)}</div><div className="record-main"><div className="record-item">{record.item}</div><div className="record-meta">{record.enteredByName}{record.reflection ? ` · 반성문 ${record.reflection.status === 'SUBMITTED' ? '제출' : record.reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}` : ''}</div></div><div className={`record-points ${record.type === 'NEGATIVE' ? 'negative' : 'positive'}`}>{record.type === 'NEGATIVE' ? '-' : '+'}{record.points}<button className="btn btn-icon btn-outline" style={{ marginLeft: 8 }} onClick={() => editRecord(record)} aria-label="점수 기록 수정" data-testid={`button-edit-record-${record.id}`}><Pencil size={13} /></button><button className="btn btn-icon btn-danger" style={{ marginLeft: 6 }} onClick={() => removeRecord(record)} aria-label="점수 기록 삭제" data-testid={`button-delete-record-${record.id}`}><Trash2 size={13} /></button></div></div>)}{(records.data ?? []).length === 0 && <EmptyState title="점수 이력이 없습니다" copy="아직 등록된 생활점수가 없습니다." />}</div>}</section><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">기숙사 처분</h2><p className="section-copy">사생회가 기록한 처분입니다.</p></div></div>{student.punishments.length === 0 ? <EmptyState title="처분 이력 없음" copy="등록된 기숙사 처분이 없습니다." /> : <div className="activity-list">{student.punishments.map((punishment) => <div className="activity-row" key={punishment.id} data-testid={`row-punishment-${punishment.id}`}><div className="activity-mark"><BedDouble size={15} /></div><div><div className="activity-label">{punishment.types.join(' · ')}</div><div className="record-meta">{dateLabel(punishment.startDate)} — {dateLabel(punishment.endDate)}</div></div><button className={`pill ${punishment.violated ? 'pill-negative' : 'pill-neutral'}`} onClick={() => toggleViolated(punishment)} data-testid={`button-toggle-violation-${punishment.id}`}>{punishment.violated ? '위반 기록됨' : '위반 없음'}</button></div>)}</div>}</section></div></div>;
+  return <div><Link href="/students" className="btn btn-outline" data-testid="link-back-students"><ChevronLeft size={15} /> 학생 목록</Link><div style={{ marginTop: 25 }} className="detail-hero"><div><div className="eyebrow">학생 상세 기록</div><h1 className="heading">{student.name}</h1><p className="subheading">{student.homeroom ?? (student.grade + '학년')}{student.studentNo ? ' · ' + student.studentNo : ''} · 최근 생활점수와 상태 신호</p><div className="status-list">{student.statuses.length ? student.statuses.map((status) => <span className="pill pill-warning" key={status}>{status}</span>) : <span className="pill pill-positive"><Check size={11} /> 현재 양호</span>}</div>{student.physicalTrainingRequired && <p className="record-meta" style={{ marginTop: 9 }}>체력훈련 사유: {student.physicalTrainingReasons.join(' · ')}</p>}</div><div className="detail-avatar">{student.name.slice(0, 1)}</div></div>{student.isActive !== false && <div className="metric-grid" style={{ marginTop: 28 }}><div className="card metric-card"><div className="metric-label">주간 상점</div><div className="metric-value success-text">+{student.weeklyPositivePoints}</div></div><div className="card metric-card"><div className="metric-label">주간 벌점</div><div className="metric-value danger-text">−{student.weeklyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">주간 상벌NET</div><div className="metric-value">{student.weeklyPositivePoints - student.weeklyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">누적NET</div><div className="metric-value">{student.settlementPositivePoints - student.settlementPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">최장 연속 체력훈련 주차</div><div className="metric-value">{student.physicalTrainingWeeks}</div></div><div className="card metric-card"><div className="metric-label">기숙사 처분</div><div className="metric-value" style={{ fontSize: 14 }}>{student.punishment ?? '없음'}</div></div></div>}<div style={{ marginTop: 18 }}>{student.coreStudentId && <StudentHistory studentId={student.coreStudentId} />}</div><div className="detail-grid" style={{ marginTop: 18 }}><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">일별 점수 이력</h2><p className="section-copy">최근 100건입니다. 전체 주차와 누계는 위의 학기 추이에서 확인하세요.</p></div></div>{records.isLoading ? <div className="skeleton" style={{ height: 90, marginTop: 18 }} /> : records.isError ? <ErrorState error={records.error} retry={() => records.refetch()} /> : <div className="record-list">{(records.data ?? []).map((record) => <div className="record-row" key={record.id} data-testid={`row-record-${record.id}`}><div className="record-date">{dateLabel(record.recordedAt)}</div><div className="record-main"><div className="record-item">{record.item}</div><div className="record-meta">{record.enteredByName}{record.recordedAt > today() ? ' · 예정' : ''}{record.reflection ? ` · 반성문 ${record.reflection.status === 'SUBMITTED' ? '제출' : record.reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}` : ''}</div></div><div className={`record-points ${record.type === 'NEGATIVE' ? 'negative' : 'positive'}`}>{record.type === 'NEGATIVE' ? '-' : '+'}{record.points}<button className="btn btn-icon btn-outline" style={{ marginLeft: 8 }} onClick={() => editRecord(record)} aria-label="점수 기록 수정" data-testid={`button-edit-record-${record.id}`}><Pencil size={13} /></button><button className="btn btn-icon btn-danger" style={{ marginLeft: 6 }} onClick={() => removeRecord(record)} aria-label="점수 기록 삭제" data-testid={`button-delete-record-${record.id}`}><Trash2 size={13} /></button></div></div>)}{(records.data ?? []).length === 0 && <EmptyState title="점수 이력이 없습니다" copy="아직 등록된 생활점수가 없습니다." />}</div>}</section><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">기숙사 처분</h2><p className="section-copy">사생회가 기록한 처분입니다.</p></div></div>{student.punishments.length === 0 ? <EmptyState title="처분 이력 없음" copy="등록된 기숙사 처분이 없습니다." /> : <div className="activity-list">{student.punishments.map((punishment) => <div className="activity-row" key={punishment.id} data-testid={`row-punishment-${punishment.id}`}><div className="activity-mark"><BedDouble size={15} /></div><div><div className="activity-label">{punishment.types.join(' · ')}</div><div className="record-meta">{dateLabel(punishment.startDate)} — {dateLabel(punishment.endDate)}</div></div><button className={`pill ${punishment.violated ? 'pill-negative' : 'pill-neutral'}`} onClick={() => toggleViolated(punishment)} data-testid={`button-toggle-violation-${punishment.id}`}>{punishment.violated ? '위반 기록됨' : '위반 없음'}</button></div>)}</div>}</section></div></div>;
 }
 
 function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
@@ -470,7 +470,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
   const [reflectionSubmitted, setReflectionSubmitted] = useState(false);
   const [search, setSearch] = useState('');
   const [continuousMode, setContinuousMode] = useState(type === 'NEGATIVE');
-  const [recentEntries, setRecentEntries] = useState<Array<{ id: number; student: string; item: string; points: number }>>([]);
+  const [recentEntries, setRecentEntries] = useState<Array<{ id: number; student: string; item: string; points: number; recordedAt: string }>>([]);
 
   const negative = type === 'NEGATIVE';
   const needle = search.trim().toLowerCase();
@@ -519,7 +519,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
         points: pointValue,
         recordedAt,
         enteredByName: admin.displayName,
-        reflectionSubmitted: negative ? reflectionSubmitted : null,
+        reflectionSubmitted: negative && recordedAt <= today() ? reflectionSubmitted : false,
       },
     }, {
       onSuccess: (id) => {
@@ -531,7 +531,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
         queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() });
 
         setRecentEntries((current) => [
-          { id, student: studentName, item: itemName, points: pointValue },
+          { id, student: studentName, item: itemName, points: pointValue, recordedAt },
           ...current,
         ].slice(0, 6));
 
@@ -543,7 +543,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
           setPoints('');
         }
 
-        notify(studentName + ' · ' + (negative ? '벌점' : '상점') + ' ' + pointValue + '점 기록 완료');
+        notify(studentName + ' · ' + (negative ? '벌점' : '상점') + ' ' + pointValue + '점 ' + (recordedAt > today() ? '예정일로 저장했습니다.' : '기록 완료'));
       },
       onSettled: () => { savingRef.current = false; },
       onError: (error) => notify(errText(error), 'error'),
@@ -645,8 +645,12 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 
           <div className="field">
             <label htmlFor="entry-date">발생일</label>
-            <input id="entry-date" className="input" type="date" required max={today()} value={recordedAt} onChange={(event) => setRecordedAt(event.target.value)} data-testid="input-point-date" />
-            <span className="record-meta">과거 날짜도 선택할 수 있습니다. 선택한 발생일 기준으로 집계됩니다.</span>
+            <input id="entry-date" className="input" type="date" required value={recordedAt} onChange={(event) => {
+              setRecordedAt(event.target.value);
+              if (event.target.value > today()) setReflectionSubmitted(false);
+            }} data-testid="input-point-date" />
+            <span className="record-meta">과거·오늘·미래 날짜 모두 입력 가능합니다. 미래 기록은 즉시 저장되지만 발생일부터 상벌점 및 반성문 판정에 반영됩니다.</span>
+            {recordedAt > today() && <span className="record-meta" role="status" data-testid="notice-future-point">예정 기록 · {dateLabel(recordedAt)}부터 점수가 적용됩니다.</span>}
           </div>
 
           <div className="side-note field full">
@@ -659,7 +663,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
           </label>
 
           {negative && <label className="check-row field full">
-            <input type="checkbox" checked={reflectionSubmitted} onChange={(event) => setReflectionSubmitted(event.target.checked)} data-testid="checkbox-reflection-submitted" />
+            <input type="checkbox" checked={recordedAt <= today() && reflectionSubmitted} disabled={recordedAt > today()} onChange={(event) => setReflectionSubmitted(event.target.checked)} data-testid="checkbox-reflection-submitted" />
             같은 날 반성문 제출 완료
           </label>}
         </div>
@@ -691,7 +695,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
               <div className="activity-mark"><Check size={15} /></div>
               <div>
                 <div className="activity-label">{entry.student}</div>
-                <div className="record-meta">{entry.item + ' · ' + (negative ? '-' : '+') + entry.points + '점'}</div>
+                <div className="record-meta">{entry.item + ' · ' + (negative ? '-' : '+') + entry.points + '점 · ' + dateLabel(entry.recordedAt)}{entry.recordedAt > today() && ' · 예정'}</div>
               </div>
               <button type="button" className="btn btn-outline" disabled={undo.isPending} onClick={() => undo.mutate({ id: entry.id }, { onSuccess: () => { setRecentEntries(rows => rows.filter(r => r.id !== entry.id)); queryClient.invalidateQueries(); notify(entry.student + ' 기록을 취소했습니다.'); }, onError: e => notify(errText(e), 'error') })}>취소</button>
             </div>)}

@@ -397,6 +397,18 @@
       "name": "double_reflection_training_next_day",
       "status": "TRACKED",
       "file": "supabase/migrations/20261028120036_double_reflection_training_next_day.sql"
+    },
+    {
+      "version": "20261028185513",
+      "name": "future_point_records_effective_date",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261028185513_future_point_records_effective_date.sql"
+    },
+    {
+      "version": "20261028185542",
+      "name": "future_point_records_allow_write",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261028185542_future_point_records_allow_write.sql"
     }
   ]
 }
