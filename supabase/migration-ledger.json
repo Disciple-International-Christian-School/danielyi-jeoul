@@ -385,6 +385,12 @@
       "name": "reflection_weekly_net_eligibility",
       "status": "TRACKED",
       "file": "supabase/migrations/20261028003013_reflection_weekly_net_eligibility.sql"
+    },
+    {
+      "version": "20261028012114",
+      "name": "move_grade9_to_high_scope",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261028012114_move_grade9_to_high_scope.sql"
     }
   ]
 }

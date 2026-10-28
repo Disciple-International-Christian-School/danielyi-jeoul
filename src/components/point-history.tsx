@@ -15,7 +15,7 @@ export function PointHistory({ date, today, onDateChange, scope, studentId }: {
   const end = mode === 'TERM' ? (term.data ? [term.data.endsOn, today].sort()[0] : '') : mode === 'WEEK' ? [shiftDate(start, 6), today].sort()[0] : date;
   const history = useDisciplineHistory(start, end, studentId);
   const archive = usePointRecordArchive(start, end, studentId, mode === 'DAY');
-  const matchesScope = (grade: number) => !scope || scope === 'ALL' || (scope === 'ELEMENTARY' ? grade <= 6 : scope === 'MIDDLE' ? grade >= 7 && grade <= 9 : grade >= 10);
+  const matchesScope = (grade: number) => !scope || scope === 'ALL' || (scope === 'ELEMENTARY' ? grade <= 6 : scope === 'MIDDLE' ? grade >= 7 && grade <= 8 : grade >= 9);
   const needle = search.trim().toLowerCase();
   const identities = new Map((history.data?.students ?? []).map(s => [s.id, s]));
   const rows = (history.data?.rows ?? []).filter(r => matchesScope(r.grade) && (!needle || [r.student_name, r.student_no, r.homeroom].some(v => v?.toLowerCase().includes(needle))));

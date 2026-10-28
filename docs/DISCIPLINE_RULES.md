@@ -19,3 +19,10 @@ Verification: SQL rollback regression checks cover three consecutive weeks acros
 - When later merits bring the week's NET to 0 or positive, the corresponding reflection targets, missing/double badges, daily notices, and history statuses become inactive. Point events and underlying reflection audit rows are not deleted. When NET becomes negative again, eligible later penalties reappear.
 - The weekly physical-training rule remains independent: **NET <= -8 OR three penalty incidents**. Other thresholds, deadline schedules, and settled/historical source rows are unchanged.
 - DB canonical projection: `v_reflection_eligible_penalties` (creation-order running NET + current full-week NET), reused in `v_reflections`, `v_point_records`, `v_daily_discipline_notice`, and student-summary status aggregation.
+
+## Notice, visual status, and grade scope — 2026-10-28
+
+- Responsibility: elementary G1–6, middle G7–8, high G9–12. Reflections and the history RPC must agree. This is a staff routing classification, not a change to the student's grade.
+- Current-date print notice contains today's unsubmitted eligible reflections plus all earlier unsubmitted reflections currently in DOUBLE status. Submitted and weekly-NET-ineligible penalty records are excluded from the **target notice**, though point audit history is preserved. Non-current date print notices do not automatically carry overdue rows into history.
+- The dashboard's Today target count reflects the same actionable new-plus-carried set. `DOUBLE` badges use the established red negative pill; physical training uses dark navy. Training criteria themselves are unchanged.
+- Sign conventions on dashboard and printed weekly report: weekly merits `+0`, weekly penalties `−0`, weekly NET remains signed merit minus penalty.
