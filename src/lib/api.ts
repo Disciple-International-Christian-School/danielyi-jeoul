@@ -1572,20 +1572,44 @@ export function useEnsureWeeklyDepartmentMerits() {
   });
 }
 
-export function useDailyDisciplineNotice(recordedAt: string) {
+/** A daily notice lists only actionable reflection papers.
+ *  The current-day notice also carries every overdue, still-unsubmitted DOUBLE
+ *  from earlier days. A past-day notice does not rewrite historical notices.
+ *  The view owns weekly-NET eligibility; never infer targets from raw penalties.
+ */
+export function useDailyDisciplineNotice(recordedAt: string, includeOverdue = false) {
   return useQuery({
-    queryKey: getDailyDisciplineNoticeQueryKey(recordedAt),
+    queryKey: [...getDailyDisciplineNoticeQueryKey(recordedAt), includeOverdue],
+    refetchInterval: 60_000,
     queryFn: async (): Promise<DailyDisciplineNotice[]> => {
-      const rows = unwrap<DailyDisciplineNoticeRow[]>(
-        await supabase
-          .from('v_daily_discipline_notice')
-          .select('*')
-          .eq('recorded_at', recordedAt)
-          .order('grade', { ascending: true })
-          .order('homeroom', { ascending: true, nullsFirst: false })
-          .order('student_name', { ascending: true }),
-      );
-      return rows.map(mapDailyDisciplineNotice);
+      const current = supabase.from('v_daily_discipline_notice')
+        .select('*')
+        .eq('recorded_at', recordedAt)
+        .in('reflection_status', ['MISSING', 'DOUBLE']);
+      const overdue = includeOverdue
+        ? supabase.from('v_daily_discipline_notice').select('*')
+            .lt('recorded_at', recordedAt)
+            .eq('reflection_status', 'DOUBLE')
+        : null;
+      const [todayResult, overdueResult] = await Promise.all([
+        current,
+        overdue ?? Promise.resolve({ data: [] as DailyDisciplineNoticeRow[], error: null }),
+      ]);
+      const todayRows = unwrap<DailyDisciplineNoticeRow[]>(todayResult);
+      const carriedRows = unwrap<DailyDisciplineNoticeRow[]>(overdueResult);
+      const uniqueRows = new Map<number, DailyDisciplineNoticeRow>();
+      for (const row of [...todayRows, ...carriedRows]) {
+        if (row.reflection_status !== 'SUBMITTED' && row.reflection_id != null) {
+          uniqueRows.set(row.point_record_id, row);
+        }
+      }
+      return [...uniqueRows.values()].sort((a, b) =>
+        a.grade - b.grade
+        || (a.homeroom ?? '').localeCompare(b.homeroom ?? '', 'ko')
+        || a.student_name.localeCompare(b.student_name, 'ko')
+        || (a.reflection_status === 'DOUBLE' ? -1 : 1) - (b.reflection_status === 'DOUBLE' ? -1 : 1)
+        || a.point_record_id - b.point_record_id
+      ).map(mapDailyDisciplineNotice);
     },
     enabled: Boolean(recordedAt),
   });
