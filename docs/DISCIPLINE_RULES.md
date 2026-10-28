@@ -38,3 +38,10 @@ The dashboard Today count uses the same actionable set. DOUBLE uses the existing
 A student qualifies through any of three independent reasons: at least three weekly penalty incidents; weekly NET <= -8; or an unsubmitted double-reflection obligation after its 17:00 check deadline, effective from the following day. Display all applicable reasons on dashboard and notice/report outputs.
 
 If the original submission deadline is before 17:00, use that day's 17:00 for the double-submission check; if it is after 17:00, use the next day's 17:00. Marking completion deactivates the double-missing reason; other reasons remain independent. For the three-consecutive-week rule, one double-missing obligation contributes only its first qualifying week, preventing duplicate weekly credit.
+
+## Future-dated point entries — October 29, 2026
+
+- SEONDO staff may set the occurrence date of a new positive or negative point to a past, present, or future local calendar day. The original entry date and the authenticated writer remain auditable at write time.
+- Future entries are stored immediately, but become effective only when their `recorded_at` date arrives in Asia/Seoul. Weekly/lifetime/settlement balances, weekly incident counts, actionable reflection status and weekly training/committee indicators exclude future entries before that day. Existing history cutover protections remain in force.
+- An underlying penalty/reflection row is preserved for audit, but a future reflection is not an actionable target until the occurrence date. Staff cannot mark a future penalty's reflection as already submitted from the point-entry form.
+- Staff can verify saved upcoming events through the student record list, where future dates are marked `예정`. Affects only manually entered points, not DICS CORE enrollment or imported historical balances.
