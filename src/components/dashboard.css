@@ -19,6 +19,9 @@
 .desk-metric-note { display: block; font-size: 12px; line-height: 1.55; color: hsl(var(--muted-foreground)); min-height: 38px; word-break: keep-all; }
 .desk-metric-bottom { margin-top: 13px; border-top: 1px solid var(--desk-line); padding: 11px 0; display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 600; color: hsl(var(--muted-foreground)); }
 .desk-metric-watch .desk-metric-number { color: #8b581e; }
+.desk-metric-training { background: #edf2f8; border-color: #c4d0df; }
+.desk-metric-training .desk-metric-number, .desk-metric-training .desk-metric-top svg { color: #193657; }
+.desk-metric-training .desk-metric-bottom { border-top-color: #cbd5e1; }
 .desk-metric-urgent { background: #fff8f5; border-color: #e7c6ba; }
 .desk-metric-urgent .desk-metric-number, .desk-metric-urgent .desk-metric-top svg { color: #ab422b; }
 .desk-count-note { margin: 10px 2px 25px; color: hsl(var(--muted-foreground)); font-size: 12px; }
@@ -114,6 +117,9 @@
 .desk-week :focus-visible { outline-color: #e9f1e5; }
 #dashboard-students { scroll-margin-top: 100px; }
 .dark .desk-metric-watch .desk-metric-number { color: #ebc68a; }
+.dark .desk-metric-training { background: #1d3049; border-color: #3c5775; }
+.dark .desk-metric-training .desk-metric-number, .dark .desk-metric-training .desk-metric-top svg { color: #bbd8fa; }
+.dark .desk-metric-training .desk-metric-bottom { border-top-color: #415875; }
 .dark .desk-metric-urgent { background: #382b29; border-color: #765048; }
 .dark .desk-metric-urgent .desk-metric-number, .dark .desk-metric-urgent .desk-metric-top svg { color: #f2b4a6; }
 .dark .desk-week { background: #24463f; border-color: #45665c; }

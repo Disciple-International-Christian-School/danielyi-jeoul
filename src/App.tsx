@@ -161,8 +161,8 @@ function dashboardCalendar() {
 function matchesDisciplineScope(grade: number, scope: DisciplineScope | null | undefined) {
   return !scope || scope === 'ALL'
     || (scope === 'ELEMENTARY' && grade <= 6)
-    || (scope === 'MIDDLE' && grade >= 7 && grade <= 9)
-    || (scope === 'HIGH' && grade >= 10);
+    || (scope === 'MIDDLE' && grade >= 7 && grade <= 8)
+    || (scope === 'HIGH' && grade >= 9);
 }
 function errText(error: unknown) { return error instanceof Error ? error.message : '요청을 처리하지 못했습니다.'; }
 
@@ -722,15 +722,17 @@ function ReflectionsPage() {
   const scopeLabels: Array<[DisciplineScope, string]> = [
     ['ALL', '전체 학년'],
     ['ELEMENTARY', '초등 G1–6'],
-    ['MIDDLE', '중등 G7–9'],
-    ['HIGH', '고등 G10–12'],
+    ['MIDDLE', '중등 G7–8'],
+    ['HIGH', '고등 G9–12'],
   ];
   const allowedScopeLabels = admin?.disciplineScope === 'ALL'
     ? scopeLabels
     : scopeLabels.filter(([value]) => value === admin?.disciplineScope);
 
   const rows = (reflections.data ?? []).filter((reflection) =>
-    (filter === 'ALL' || (filter === 'TODAY' ? reflection.recordedAt.slice(0, 10) === today() : filter === 'MISSING' ? reflection.status !== 'SUBMITTED' : reflection.status === filter))
+    (filter === 'ALL' || (filter === 'TODAY'
+      ? !reflection.submitted && (reflection.recordedAt.slice(0, 10) === today() || reflection.status === 'DOUBLE')
+      : filter === 'MISSING' ? reflection.status !== 'SUBMITTED' : reflection.status === filter))
     && matchesDisciplineScope(reflection.grade, admin?.disciplineScope)
     && (scopeFilter === 'ALL' || reflection.assignedScope === scopeFilter)
   );
@@ -783,6 +785,9 @@ function ReflectionsPage() {
                 update.mutate({ id: reflection.id, data: { submitted: !reflection.submitted } }, {
                   onSuccess: () => {
                     queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() });
+                    queryClient.invalidateQueries({ queryKey: ['reports', 'daily-notice'] });
+                    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+                    queryClient.invalidateQueries({ queryKey: ['students'] });
                     notify('반성문 상태를 변경했습니다.');
                   },
                   onError: (error) => notify(errText(error), 'error'),
@@ -815,7 +820,7 @@ function ReportsPage() {
   const [noticeText, setNoticeText] = useState('');
   const [classFilter, setClassFilter] = useState('ALL');
 
-  const daily = useDailyDisciplineNotice(noticeDate);
+  const daily = useDailyDisciplineNotice(noticeDate, noticeDate === today());
   const weekly = useWeeklyDisciplineReport();
 
   const loading = mode === 'DAILY' ? daily.isLoading : weekly.isLoading;
@@ -826,8 +831,8 @@ function ReportsPage() {
     admin?.disciplineScope == null
     || admin.disciplineScope === 'ALL'
     || (admin.disciplineScope === 'ELEMENTARY' && grade >= 1 && grade <= 6)
-    || (admin.disciplineScope === 'MIDDLE' && grade >= 7 && grade <= 9)
-    || (admin.disciplineScope === 'HIGH' && grade >= 10 && grade <= 12);
+    || (admin.disciplineScope === 'MIDDLE' && grade >= 7 && grade <= 8)
+    || (admin.disciplineScope === 'HIGH' && grade >= 9 && grade <= 12);
 
   const dailyRows = (daily.data ?? []).filter((row) => scopeMatchesGrade(row.grade));
   const weeklyRows = admin?.isLead ? (weekly.data ?? []) : [];
@@ -888,7 +893,7 @@ function ReportsPage() {
       <PageHeader
         eyebrow="통지 · 보고"
         title="공지·출력"
-        copy="반별 일일 벌점 공지와 주말 체력훈련·정산 대상 명단을 같은 기준으로 출력합니다."
+        copy="오늘 반성문 미제출 대상과 이전 날짜에서 이월된 2배 제출 대상을 함께 공지합니다. 제출 완료 건은 자동 제외됩니다."
         action={<button className="btn btn-primary" onClick={() => window.print()} data-testid="button-print-report"><Printer size={15} /> 인쇄</button>}
       />
 
@@ -931,12 +936,12 @@ function ReportsPage() {
       {noticeText.trim() && <p className="print-notice-text" style={{ whiteSpace: 'pre-wrap' }}>{noticeText}</p>}
       {mode === 'DAILY' ? <>
         <div className="print-summary">
-          <span>벌점 기록 <strong>{filteredDaily.length}</strong>건</span>
-          <span>반성문 미제출 <strong>{filteredDaily.filter((row) => row.reflectionStatus === 'MISSING').length}</strong>건</span>
+          <span>오늘 반성문 미제출 <strong>{filteredDaily.filter((row) => row.recordedAt === noticeDate && row.reflectionStatus === 'MISSING').length}</strong>건</span>
           <span>2배 제출 대상 <strong>{filteredDaily.filter((row) => row.reflectionStatus === 'DOUBLE').length}</strong>건</span>
+          <span>총 제출 필요 <strong>{filteredDaily.length}</strong>건</span>
         </div>
 
-        {dailyGroups.length === 0 ? <div className="print-empty">선택한 날짜/반의 벌점 공지 대상이 없습니다.</div> :
+        {dailyGroups.length === 0 ? <div className="print-empty">선택한 날짜/반에 미제출 반성문 또는 2배 제출 대상이 없습니다.</div> :
           dailyGroups.map(([className, rows]) => {
             return <section className="print-group" key={className}>
               <h2>{className}</h2>
@@ -944,14 +949,13 @@ function ReportsPage() {
                 <thead><tr><th style={{ width: '18%' }}>학생</th><th>벌점 사유</th><th style={{ width: '10%' }}>벌점</th><th style={{ width: '24%' }}>반성문</th></tr></thead>
                 <tbody>{rows.map((row) => <tr key={row.pointRecordId}>
                   <td><strong>{row.studentName}</strong></td>
-                  <td>{row.item}</td>
-                  <td>{row.points}</td>
+                  <td>{row.item}{row.recordedAt !== noticeDate && <div className="print-sub">발생일 {dateLabel(row.recordedAt)} · 이월</div>}</td>
+                  <td className="print-number">−{row.points}</td>
                   <td>
-                    {row.reflectionStatus === 'SUBMITTED' ? '제출 완료'
-                      : row.reflectionStatus === 'DOUBLE' ? '2배 제출 대상'
-                      : row.reflectionStatus === 'MISSING' ? '미제출'
-                      : '—'}
-                    {row.reflectionDueAt && row.reflectionStatus !== 'SUBMITTED' && <div className="print-sub">마감 {dateTimeLabel(row.reflectionDueAt)}</div>}
+                    <span className={'print-reflection-status ' + (row.reflectionStatus === 'DOUBLE' ? 'print-reflection-status-double' : 'print-reflection-status-missing')}>
+                      {row.reflectionStatus === 'DOUBLE' ? '2배 제출 대상' : '반성문 미제출'}
+                    </span>
+                    {row.reflectionDueAt && <div className="print-sub">마감 {dateTimeLabel(row.reflectionDueAt)}</div>}
                   </td>
                 </tr>)}</tbody>
               </table>
@@ -973,7 +977,7 @@ function ReportsPage() {
                   <td><strong>{row.studentName}</strong></td>
                   <td>{row.penaltyIncidentCount}</td>
                   <td>+{row.weeklyPositivePoints}</td>
-                  <td>{row.weeklyPenaltyPoints}</td>
+                  <td>−{row.weeklyPenaltyPoints}</td>
                   <td><strong>{row.weeklyPositivePoints - row.weeklyPenaltyPoints}</strong></td>
                   <td>{row.settlementPositivePoints - row.settlementPenaltyPoints}</td>
                   <td>
@@ -1527,8 +1531,8 @@ function AdminAccountsPage() {
   const scopeLabel = (scope: DisciplineScope | null) => ({
     ALL: '전체',
     ELEMENTARY: '초등 G1–6',
-    MIDDLE: '중등 G7–9',
-    HIGH: '고등 G10–12',
+    MIDDLE: '중등 G7–8',
+    HIGH: '고등 G9–12',
   }[scope ?? 'ALL'] ?? '—');
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: getAdminAccountsQueryKey() });
@@ -1705,8 +1709,8 @@ function AdminAccountsPage() {
             <label htmlFor="admin-scope">담당 범위</label>
             <select id="admin-scope" className="select" disabled={form.isLead} value={form.disciplineScope ?? 'MIDDLE'} onChange={(event) => setForm({ ...form, disciplineScope: event.target.value as DisciplineScope })}>
               <option value="ELEMENTARY">초등 G1–6</option>
-              <option value="MIDDLE">중등 G7–9</option>
-              <option value="HIGH">고등 G10–12</option>
+              <option value="MIDDLE">중등 G7–8</option>
+              <option value="HIGH">고등 G9–12</option>
               <option value="ALL">전체</option>
             </select>
           </div>}
