@@ -158,3 +158,12 @@ G9 responsibility moved to HIGH across DB views, history RPC and frontend filter
 ## October 28, 2026 — Third physical-training criterion
 
 An unsubmitted double-reflection obligation after its 17:00 check deadline adds training from the following day. Existing weekly incident/NET conditions remain independent and all reasons are displayed. Checks cover deadlines, release upon submission, and no duplicate weekly qualification. Dashboard, detail, weekly print and periodic reads use the rule. See [current discipline rules](DISCIPLINE_RULES.md).
+
+
+## October 29, 2026 — Future-dated merit and penalty entries
+
+- Removed the point-entry form's HTML `max=today` restriction for both positive and negative points. Shows the effective date and indicates upcoming records as scheduled.
+- Removed the DB cutover trigger's future-date prohibition while retaining immutable superseded historical rows and write-audit behavior.
+- New effective-day SQL projections gate weekly totals, penalty incidents, lifetime scores, reflection-paper eligibility, and closed/current settlement values at KST current date. Future entries are saved and auditable now but do not prematurely influence discipline status.
+- Disabled the point-entry 'same-day reflection submitted' shortcut for future negative records. Added a scheduled marker to recent session entries and student detail history.
+- Applied production migrations `20261028185513_future_point_records_effective_date` and `20261028185542_future_point_records_allow_write`. Live rollback test saved a future merit + penalty through the real admin RPC and confirmed that current scoring, reflections, training and committee indicators were unchanged.
