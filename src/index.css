@@ -237,6 +237,7 @@
 .pill-neutral { background:hsl(var(--muted)); color:hsl(var(--muted-foreground)); }
 .pill-warning { background:hsl(37 74% 87%); color:hsl(31 57% 35%); }
 .pill-dark { background:hsl(183 24% 20%); color:hsl(42 33% 94%); }
+.pill-training { background: #203c5e; color: #f0f6ff; }
 .metric-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
 .metric-card { padding:17px; min-height:112px; }
 .metric-value { margin-top:14px; font:24px var(--app-font-mono); letter-spacing:-.09em; }
@@ -300,8 +301,11 @@
 
 .report-controls .field { min-width: 180px; }
 .print-sheet {
-  margin-top: 28px;
-  padding: 34px;
+  margin: 28px auto 0;
+  width: 100%;
+  max-width: 1040px;
+  box-sizing: border-box;
+  padding: 38px 42px;
   background: #fff;
   color: #172129;
   border: 1px solid #dfe3e6;
@@ -319,11 +323,11 @@
 .print-header h1 {
   margin: 7px 0 0;
   font-family: var(--app-font-serif);
-  font-size: 25px;
+  font-size: 27px;
   letter-spacing: -.04em;
 }
 .print-kicker {
-  font: 9px var(--app-font-mono);
+  font: 10px var(--app-font-mono);
   letter-spacing: .12em;
   color: #66757b;
 }
@@ -344,13 +348,14 @@
   background: #f5f7f7;
   border: 1px solid #e1e5e6;
   border-radius: 8px;
-  font-size: 11px;
+  font-size: 13px;
 }
-.print-summary strong { font-family: var(--app-font-mono); font-size: 13px; }
+.print-summary strong { font-family: var(--app-font-mono); font-size: 15px; }
 .print-group {
-  break-inside: avoid;
   margin: 0 0 24px;
+  break-inside: auto;
 }
+.print-group h2 { break-after: avoid; page-break-after: avoid; }
 .print-group h2 {
   margin: 0 0 7px;
   font-family: var(--app-font-serif);
@@ -360,26 +365,32 @@
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 11px;
+  font-size: 12.5px;
 }
 .print-table th,
 .print-table td {
   border: 1px solid #cfd6d8;
-  padding: 8px 9px;
+  padding: 10px 11px;
+  line-height: 1.55;
   vertical-align: top;
   word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 .print-table th {
   background: #f0f3f3;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   text-align: left;
 }
 .print-sub {
   margin-top: 3px;
   color: #6c797e;
-  font-size: 9px;
+  font-size: 11px;
 }
+.print-number { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.print-reflection-status { display: inline-block; font-size: 12px; font-weight: 750; line-height: 1.45; }
+.print-reflection-status-double { color: #a12c31; }
+.print-reflection-status-missing { color: #795420; }
 .print-empty {
   padding: 42px 16px;
   text-align: center;
@@ -396,11 +407,11 @@
   padding-top: 10px;
   border-top: 1px solid #d9dfe1;
   color: #7c888c;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 @media print {
-  @page { size: A4 portrait; margin: 12mm; }
+  @page { size: A4 portrait; margin: 16mm 17mm; }
 
   html, body {
     background: #fff !important;
@@ -429,6 +440,9 @@
 
   .print-sheet {
     display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
     margin: 0 !important;
     padding: 0 !important;
     border: 0 !important;
@@ -447,16 +461,22 @@
 
   .print-group {
     margin-bottom: 6mm;
-    page-break-inside: avoid;
+    break-inside: auto;
+    page-break-inside: auto;
   }
+  .print-group h2 { break-after: avoid; page-break-after: avoid; }
 
   .print-table thead {
     display: table-header-group;
   }
 
   .print-table tr {
+    break-inside: avoid;
     page-break-inside: avoid;
   }
+  .print-table th, .print-table td { padding: 9px 10px; }
+  .print-reflection-status-double { color: #a12c31 !important; }
+  .print-reflection-status-missing { color: #795420 !important; }
 
   .print-footer {
     margin-top: 8mm;
@@ -564,6 +584,7 @@ html { -webkit-text-size-adjust: 100%; }
 .dark .pill-positive { background: hsl(158 35% 25%); color: hsl(150 47% 82%); }
 .dark .pill-negative { background: hsl(8 39% 28%); color: hsl(11 70% 84%); }
 .dark .pill-warning { background: hsl(33 41% 28%); color: hsl(39 75% 84%); }
+.dark .pill-training { background: #304e73; color: #f3f7ff; }
 .dark .department-row-button:hover { background: hsl(var(--muted) / .5); }
 .dark .department-row-button.selected { background: hsl(var(--muted)); box-shadow: inset 3px 0 0 hsl(var(--primary)); }
 .dark .audit-json { border-color: hsl(var(--border)); background: hsl(var(--muted)); }
@@ -596,9 +617,12 @@ html { -webkit-text-size-adjust: 100%; }
 }
 @media (max-width: 390px) { .metric-grid, .sasaeng-metrics { grid-template-columns: 1fr; } }
 @media print {
-  .print-table { font-size: 11.5px; }
-  .print-table th { font-size: 11px; }
-  .print-sub, .print-footer { font-size: 10px; }
+  .print-header h1 { font-size: 25px; }
+  .print-summary { font-size: 12.5px; }
+  .print-table { font-size: 12.5px; }
+  .print-table th { font-size: 12px; }
+  .print-sub { font-size: 11px; }
+  .print-footer { font-size: 10.5px; }
 }
 
 /* Dashboard status cards open the corresponding operational list. */
