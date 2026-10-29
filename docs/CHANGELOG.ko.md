@@ -1,6 +1,111 @@
-# 다니엘의 저울 — Change Log
+# 다니엘의 저울 — 변경 이력
 
 **Language / 언어:** [English](CHANGELOG.md) | [한국어](CHANGELOG.ko.md)
+
+2026-10-29 현재 main `30f90a4`까지 대조했다. 최신 항목을 먼저 표시한다. 날짜는 Asia/Seoul의 커밋 시각 기준이며 실제 처리일이 다르면 본문에 구분한다. 과거 검증 기록은 새로운 운영 감사 결과가 아니다.
+
+## 2026년 10월 — 커밋 대조표
+
+| 한국 날짜 | 커밋 | 변경 |
+| --- | --- | --- |
+| 2026-10-29 | [30f90a4](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/30f90a4168ae97df69a201cb0089d80f14be8fce) | 미래일 상·벌점 저장과 KST 발생일 효력 |
+| 2026-10-28 | [0b375c3](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/0b375c32a45605f3bd14d1b1ae0e0b93db9ac48f) | 영어 기본 영·한 문서와 검사 |
+| 2026-10-28 | [e682248](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/e682248d717b042fb8074ed32a4c9e3819a2daf3) | 2배 반성문 미제출의 익일 체력훈련 |
+| 2026-10-28 | [6db9325](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/6db932596db56c6c654f04a0c5e62e38372fc931) | 미제출 공지 이월·G9 고등 담당 전환 |
+| 2026-10-28 | [beb53fd](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/beb53fdd0cd7a3381cc6c532060ec0be5eba0f79) | 주간 음수 NET 기반 반성문 대상 |
+| 2026-10-27 | [5223116](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/5223116c37219a93e7bddd11a43d202da97c8045) | 부서 소속 즉시 종료·자동 상점 재개 |
+| 2026-10-27 | [cd9fe25](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/cd9fe25670e508c9e2b74e04968dfd5ff398b3a9) | 연속 체력훈련 주차·누적 NET |
+| 2026-10-27 | [6370422](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/6370422106d1fa907ce64202dd4f8eafd7923f07) | 주간 상점−벌점 NET 표시 |
+| 2026-10-27 | [56a8296](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/56a8296c81210d7e698c3364c0ac956eeba7ec17) | 점수 기록 보유 학생 우선 정렬 |
+| 2026-10-27 | [6c5036e](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/6c5036e59aafc5e2cc30191b68085e6009f58236) | 수기 입력의 과거 발생일 허용 |
+| 2026-10-27 | [0ecda8b](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/0ecda8b948aa4dd665b01cf7fdbec79164f54eb2) | 주간 확정 원장 이관·일별 운영 전환 |
+| 2026-10-15 | [537b3db](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/537b3dbbb728f5aa76efd07b7b8a1bf08e9a541a) | Core 명부 자동 동기화 |
+| 2026-10-06 | [c4a26a5](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/c4a26a5f76ecd5bf6d43804558397dfb5c6da8ed) | 과거 계정 안내 추가·후속 가상 양식 대체 |
+| 2026-10-04 | [7a0622c](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/7a0622c17390bae6be63a037dbce0af55ff07037) | 조직 저장소 Netlify CLI 배포 경로 |
+
+## 2026-10-29 — 미래일 상·벌점과 발생일 효력
+
+상점·벌점 입력의 HTML 오늘 상한과 DB 미래일 금지를 제거하고 대체된 과거 원본의 수정 방지·감사 기록은 보존했다. 미래 행은 즉시 저장하지만 KST 발생일까지 주간·누적·정산 점수, 벌점 횟수, 반성문과 체력훈련·위원회 판정에는 반영하지 않는다. 미래 벌점은 입력 시 제출완료를 선택할 수 없으며 최근 입력·상세 이력에 예정으로 표시한다.
+
+운영 이관 20261028185513_future_point_records_effective_date와 20261028185542_future_point_records_allow_write를 기록했다. 기존 기록에 따르면 실제 관리자 RPC의 미래 상·벌점 저장을 롤백 시험하고 현재 점수·반성문·훈련·위원회 상태가 변하지 않음을 확인했다. 이번 문서 갱신에서 운영 시험을 새로 실행한 것은 아니다.
+
+
+관련 커밋: [30f90a4](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/30f90a4168ae97df69a201cb0089d80f14be8fce).
+
+## 2026-10-28 — 반성문 주간 NET 음수 판정
+
+- 벌점 1건만으로 자동으로 반성문 대상자로 표시하던 읽기 경로를 수정. 월~일 주간 상벌NET이 **0 미만**이며, 해당 벌점 입력 당시 NET도 0 미만으로 전환/유지된 건만 반성문 대상으로 조회.
+- 상점을 먼저 확보한 학생의 초기 벌점이 사후에 소급 미제출/2배 대상으로 처리되지 않도록 방지.
+- `v_reflections`·공지·포인트 기록·학생 상태(대시보드 포함)를 같은 DB 기준으로 동기화. 2배 마감 시간 규칙 및 체력훈련 규칙은 별도 유지. 벌점 원장과 감사 기록은 수정하지 않음.
+- 운영 DB에 마이그레이션 `20261028003013_reflection_weekly_net_eligibility` 적용. 변경 전 활성 반성문 81건 중 12건 판정 제외(이중 2건 기존의 2배 미제출 상태), 적용 후 69건으로 확인. 트랜잭션 롤백 테스트 통과.
+
+관련 커밋: [beb53fd](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/beb53fdd0cd7a3381cc6c532060ec0be5eba0f79).
+
+## 2026-10-28 — 공지 이월 / G9 담당 변경 / 인쇄·대시보드 UI
+
+- 공지 날짜가 오늘이면 오늘 미제출 반성문 대상과 이전 날짜에 발생해 현재 2배 제출 대상인 미제출 건을 함께 표시. 제출 완료와 NET 상계된 대상은 자동 제외. 과거 날짜 선택 시 이월하지 않음. 60초 폴링과 제출 상태 변경 시 캐시 무효화 적용.
+- 반성문 페이지의 오늘 대상 필터 및 대시보드 오늘 대상 카드도 신규 미제출과 이월된 2배 대상으로 일치. 실제 주간 NET의 DB eligibility view는 유지.
+- 주간 벌점 `−0` 형식, 체력훈련 다크 네이비 상태 배지·대시보드 카드, 2배 제출 기존 빨간 배지 적용.
+- 담당 범위 G9를 고등부로 변경 (DB view 및 discipline history RPC / 프런트 전체 범위 필터); 학생 학적 자체는 변경하지 않음.
+- 인쇄 A4 여백 16×17mm, 표 12.5px·출력 헤더·셀 여백 확장, 페이지 간 분할 안정화, 과거 발생일·2배 제출 표시 강조.
+- 운영 DB migration `20261028012114_move_grade9_to_high_scope` 적용 및 G9 reflection scope=HIGH 검증.
+
+관련 커밋: [6db9325](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/6db932596db56c6c654f04a0c5e62e38372fc931).
+
+## 2026-10-28 — 체력훈련 세 번째 기준 적용
+
+- 2배 반성문 17시 미제출 시 익일부터 체력훈련 대상으로 추가 분류.
+- 주간 벌점 횟수·NET 기존 기준은 유지하며 사유를 각각 표기.
+- 17시 제출 기한과 제출 완료 후 자동 해제, 중복 주차 방지 검증.
+- 대시보드, 학생 상세, 주간 출력물 및 정기 조회 반영.
+
+관련 커밋: [e682248](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/e682248d717b042fb8074ed32a4c9e3819a2daf3).
+
+## 2026-10-28 — 영·한 문서 병합 (10/26 준비 시작)
+
+모든 유지 Markdown에 언어 선택과 한국어판을 적용하고 사례 연구·언어 검사·과거 첨부 읽기판을 추가했다. 실명/PIN 계정 안내는 가상 빈 양식으로 대체했다. 과거 Git 객체와 인증정보는 Owner가 별도 확인해야 한다. 새 커밋은 영어이며 기존 메시지 재작성은 별도 미리보기 절차로 준비했다.
+
+관련 커밋: [0b375c3](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/0b375c32a45605f3bd14d1b1ae0e0b93db9ac48f).
+
+## 2026-10-27 — 주간 이력·일별 운영과 후속 교정
+
+이 날짜의 커밋은 10/26 UTC에 적용한 이관을 기록한다. 원본 898행·연결 주간값 873건·비공개 미해결 22행을 보존하고 기존 중고등 사건 170건을 공식 집계에서 대체했다. 초등과 당시 현재 사건 40건은 유지했다. 주간 확정값을 일점수로 오인하지 않도록 표시하며 누락·비운영 주를 0으로 채우지 않는다. XLSX 미리보기·수정 이관·재시도 중복방지·취소·범위별 이력 조회를 추가했다. [이력 전환](HISTORY_AND_BACKFILL.ko.md)을 참조한다.
+
+후속 수기 시험 초기화는 사건 42건을 논리삭제하고 주간값 873건을 비현재로 표시하되 원본과 비공개 점검값을 보존했다. 학기 이전을 포함한 과거 발생일을 허용했으며 당시 미래일은 거부했다. 이 제한은 10/29 효력일 변경으로 대체됐다. [초기화 기록](OPERATIONS_2026-10-27.ko.md)을 참조한다.
+
+점수 기록 보유 학생 우선 정렬, 화면 NET의 상점−벌점 표기, 현재 학기의 달력 주차 3주 연속 체력훈련에 따른 위원회 판정을 반영했다. 중간 주가 빠지면 연속이 끊기고 기존 20점·비연속 3주 대안은 제거됐다. 소속 종료일은 미포함으로 통일하고 자동상점 규칙 4개·월요일 Cron을 재개했다. 기록된 생성 38/38건은 중복 없이 유지됐으며 현재 명단과 월요일 대상 인원은 다른 시점을 나타낸다. [현재 규칙](DISCIPLINE_RULES.ko.md)과 [부서상점](DEPARTMENT_MERITS.ko.md)을 참조한다.
+
+이는 저장소의 당시 기록이며 이번 작업에서 운영 DB를 새로 감사한 결과가 아니다. 상단 커밋표의 날짜와 본문에 기록한 실제 처리 날짜를 구분한다.
+
+
+관련 커밋: [5223116](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/5223116c37219a93e7bddd11a43d202da97c8045), [cd9fe25](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/cd9fe25670e508c9e2b74e04968dfd5ff398b3a9), [6370422](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/6370422106d1fa907ce64202dd4f8eafd7923f07), [56a8296](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/56a8296c81210d7e698c3364c0ac956eeba7ec17), [6c5036e](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/6c5036e59aafc5e2cc30191b68085e6009f58236), [0ecda8b](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/0ecda8b948aa4dd665b01cf7fdbec79164f54eb2).
+
+## 2026-10-15 — CORE 명부 실시간 동기화
+
+- 다니엘의 저울 학생 명부 호환행을 DICS CORE의 활성 학생과 현재 학적에서 자동 생성·갱신하도록 production migration 적용.
+- CORE 학생의 이름·활성상태 변경과 현재 학적의 추가·변경·종료를 trigger로 반영.
+- 활성 학생 + 현재 학적이면 명부에 즉시 표시하고, 비활성 또는 현재 학적 종료 상태이면 명부에서 자동으로 숨김.
+- 새 학기 전환 시 전체 학생 bridge를 다시 동기화.
+- 기존에 CORE에만 있던 활성 학생 1명을 backfill하여 다니엘의 저울 명부에 반영.
+- 호환 테이블은 기존 화면과 numeric URL을 위한 bridge로만 유지하며, 학생 원본은 계속 `core.students.id`를 사용.
+- live migration: `20261015101921_sync_daniel_roster_from_core.sql`.
+
+관련 커밋: [537b3db](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/537b3dbbb728f5aa76efd07b7b8a1bf08e9a541a).
+
+## 2026-10-06 — 과거 계정 안내 추가
+
+메시지가 빈 커밋의 파일 차이에서 계정 배부 HTML 추가를 확인했다. 빈 메시지를 배포 성공 근거로 삼지 않는다. 이후 영·한 문서 변경에서 현재 파일을 가상 양식으로 대체했다. 과거 객체와 인증정보 유효성은 Owner의 별도 확인 대상이며 값은 이 변경 이력에 재기재하지 않는다.
+
+
+관련 커밋: [c4a26a5](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/c4a26a5f76ecd5bf6d43804558397dfb5c6da8ed).
+
+## 2026-10-04 — 조직 저장소 배포 경로
+
+비공개 조직 저장소를 위한 GitHub Actions 검증과 고정 버전 Netlify CLI 배포를 추가했다. 기존 사이트·운영 환경을 사용하며 PR은 검증만 수행하고 main 앱·빌드 변경은 배포할 수 있다. 설정 커밋만으로 실제 배포 성공을 단정하지 않는다. 10/4는 UTC 10/3 커밋의 한국 날짜다. [배포 절차](netlify-deployment.ko.md)를 참조한다.
+
+관련 커밋: [7a0622c](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/commit/7a0622c17390bae6be63a037dbce0af55ff07037).
+
+## 2026년 9월 — 설계·구축 기록
 
 > **ACTIVE DOCUMENT — 2026-09-21 이후 계속 갱신**
 >
@@ -1154,7 +1259,6 @@ Git에는 이름 목록을 넣지 않았다. 행 데이터는 Supabase에만 있
 - 로그인 카드와 입력 칸 크기를 늘리고 모바일 화면 확대를 막던 viewport 제한을 제거했다. 인쇄물의 작은 주석·표 헤더도 읽기 좋게 조정했다.
 - 글꼴: [Pretendard OFL 1.1](https://github.com/orioncactus/pretendard/blob/main/LICENSE). 아이콘: 기존 lucide-react 유지.
 
-
 ## 2026-09-28 — 대시보드 디자인 기준 화면 (PR #11)
 
 - 날짜·주차 및 입력 바로가기, 5개 대상자 카드, 주간 업무, 학생 점수 순으로 정보 위계 재설계.
@@ -1164,43 +1268,3 @@ Git에는 이름 목록을 넣지 않았다. 행 데이터는 Supabase에만 있
 - 체력훈련/징계위원회 카드 클릭 시 검색을 초기화해 대상자가 검색어로 숨겨지는 문제 방지.
 - 밝은/어두운 화면, 320/390px 모바일 시각 검증. 타입 검사·빌드 및 PR CI 통과.
 - 디자인 원칙과 가상 데이터 검증 이미지: `docs/UI_DESIGN_SYSTEM.md`.
-
-## 2026-10-15 — CORE 명부 실시간 동기화
-
-- 다니엘의 저울 학생 명부 호환행을 DICS CORE의 활성 학생과 현재 학적에서 자동 생성·갱신하도록 production migration 적용.
-- CORE 학생의 이름·활성상태 변경과 현재 학적의 추가·변경·종료를 trigger로 반영.
-- 활성 학생 + 현재 학적이면 명부에 즉시 표시하고, 비활성 또는 현재 학적 종료 상태이면 명부에서 자동으로 숨김.
-- 새 학기 전환 시 전체 학생 bridge를 다시 동기화.
-- 기존에 CORE에만 있던 활성 학생 1명을 backfill하여 다니엘의 저울 명부에 반영.
-- 호환 테이블은 기존 화면과 numeric URL을 위한 bridge로만 유지하며, 학생 원본은 계속 `core.students.id`를 사용.
-- live migration: `20261015101921_sync_daniel_roster_from_core.sql`.
-
-## 2026-10-26 — 영어 기본 영·한 문서
-
-모든 유지 Markdown에 언어 선택과 한국어판을 적용하고 사례 연구·언어 검사·과거 첨부 읽기판을 추가했다. 실명/PIN 계정 안내는 가상 빈 양식으로 대체했다. 과거 Git 객체와 인증정보는 Owner가 별도 확인해야 한다. 새 커밋은 영어이며 기존 메시지 재작성은 별도 미리보기 절차로 준비했다.
-
-
-## 2026-10-28 — 반성문 주간 NET 음수 판정
-
-- 벌점 1건만으로 자동으로 반성문 대상자로 표시하던 읽기 경로를 수정. 월~일 주간 상벌NET이 **0 미만**이며, 해당 벌점 입력 당시 NET도 0 미만으로 전환/유지된 건만 반성문 대상으로 조회.
-- 상점을 먼저 확보한 학생의 초기 벌점이 사후에 소급 미제출/2배 대상으로 처리되지 않도록 방지.
-- `v_reflections`·공지·포인트 기록·학생 상태(대시보드 포함)를 같은 DB 기준으로 동기화. 2배 마감 시간 규칙 및 체력훈련 규칙은 별도 유지. 벌점 원장과 감사 기록은 수정하지 않음.
-- 운영 DB에 마이그레이션 `20261028003013_reflection_weekly_net_eligibility` 적용. 변경 전 활성 반성문 81건 중 12건 판정 제외(이중 2건 기존의 2배 미제출 상태), 적용 후 69건으로 확인. 트랜잭션 롤백 테스트 통과.
-
-
-## 2026-10-28 — 공지 이월 / G9 담당 변경 / 인쇄·대시보드 UI
-
-- 공지 날짜가 오늘이면 오늘 미제출 반성문 대상과 이전 날짜에 발생해 현재 2배 제출 대상인 미제출 건을 함께 표시. 제출 완료와 NET 상계된 대상은 자동 제외. 과거 날짜 선택 시 이월하지 않음. 60초 폴링과 제출 상태 변경 시 캐시 무효화 적용.
-- 반성문 페이지의 오늘 대상 필터 및 대시보드 오늘 대상 카드도 신규 미제출과 이월된 2배 대상으로 일치. 실제 주간 NET의 DB eligibility view는 유지.
-- 주간 벌점 `−0` 형식, 체력훈련 다크 네이비 상태 배지·대시보드 카드, 2배 제출 기존 빨간 배지 적용.
-- 담당 범위 G9를 고등부로 변경 (DB view 및 discipline history RPC / 프런트 전체 범위 필터); 학생 학적 자체는 변경하지 않음.
-- 인쇄 A4 여백 16×17mm, 표 12.5px·출력 헤더·셀 여백 확장, 페이지 간 분할 안정화, 과거 발생일·2배 제출 표시 강조.
-- 운영 DB migration `20261028012114_move_grade9_to_high_scope` 적용 및 G9 reflection scope=HIGH 검증.
-
-
-## 2026-10-28 — 체력훈련 세 번째 기준 적용
-
-- 2배 반성문 17시 미제출 시 익일부터 체력훈련 대상으로 추가 분류.
-- 주간 벌점 횟수·NET 기존 기준은 유지하며 사유를 각각 표기.
-- 17시 제출 기한과 제출 완료 후 자동 해제, 중복 주차 방지 검증.
-- 대시보드, 학생 상세, 주간 출력물 및 정기 조회 반영.

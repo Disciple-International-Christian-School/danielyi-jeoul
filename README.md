@@ -14,6 +14,49 @@ The project began with paper discipline sheets. Integrating learning and school-
 
 The repository records the move from a prototype to database-enforced rules, authenticated audit actors, staged UUID migration, parity checks, and a migration ledger. Historical evidence and its limits are explained in the [case study](docs/PROJECT_CASE_STUDY.md); planned work and dated operational snapshots are labeled separately from completed implementation.
 
+## How records become operational decisions
+
+Manual entries, Monday department awards, and imported weekly settlements share a canonical Core student UUID. The storage retains each source's precision and audit history; a weekly import never invents daily incidents. Access is scoped to authenticated roles and responsibility groups.
+
+```mermaid
+flowchart TD
+    M[Manual merit or penalty] --> I[Core UUID and scoped authorization]
+    A[Idempotent department awards] --> I
+    H[Verified weekly import] --> I
+    I --> L[Audited events and versioned weekly balances]
+    L --> E[Source-aware effective-date views]
+    E --> D[Dashboard and student history]
+    E --> N[Actionable notices and weekly reports]
+```
+
+### Effective-day and eligibility algorithm
+
+A future-dated entry is saved immediately for audit but excluded from current point-event scoring until its occurrence date arrives in **Asia/Seoul**. Weekly NET shown to operators is **merits minus penalties**. Reflection and training eligibility are separate calculations: a covered penalty can count as an incident without creating an actionable reflection.
+
+```mermaid
+flowchart TD
+    P[Saved point event] --> G{Occurrence date reached in KST?}
+    G -->|No| Q[Scheduled history only]
+    G -->|Yes| W[Effective weekly events]
+    W --> R{Full-week and entry-running NET below zero?}
+    R -->|Eligible penalty| F[Reflection obligation and deadline]
+    F --> O[Unsubmitted double reflection after check deadline: next-day reason]
+    W --> S[Weekly NET at most -8 or at least 3 penalty incidents]
+    S --> T[Any active training reason]
+    O --> T
+    T --> C[Deduplicate qualifying calendar weeks in current term]
+    C --> J{Longest consecutive run at least 3 weeks?}
+    J -->|Yes| V[Committee referral eligibility]
+```
+
+The double-reflection reason ends on submission and contributes only its first qualifying week to the consecutive-week calculation. All applicable training reasons remain visible. Missing historical incident counts are not inferred; archived or superseded source rows do not participate as current events. These are eligibility signals, not automatic sanction selection.
+
+Implementation references: [current rules](docs/DISCIPLINE_RULES.md), [source/history contract](docs/HISTORY_AND_BACKFILL.md), [effective-day projection](supabase/migrations/20261028185513_future_point_records_effective_date.sql), and [double-reflection rule](supabase/migrations/20261028120036_double_reflection_training_next_day.sql).
+
+## Recent engineering changes
+
+The [October commit register](docs/CHANGELOG.md#october-2026--commit-register) traces the deployment workflow, Core roster synchronization, weekly-ledger cut-over, operator corrections, reflection/training rules, bilingual documentation, and future-date effective-day scoring through October 29. Entries link to their source commits and distinguish historical operations from current policy.
+
 ## Reading paths
 
 | Audience | Start here |
