@@ -409,6 +409,12 @@
       "name": "future_point_records_allow_write",
       "status": "TRACKED",
       "file": "supabase/migrations/20261028185542_future_point_records_allow_write.sql"
+    },
+    {
+      "version": "20261102110207",
+      "name": "restore_2026_fall_weekly_history_read_path",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261102110207_restore_2026_fall_weekly_history_read_path.sql"
     }
   ]
 }
