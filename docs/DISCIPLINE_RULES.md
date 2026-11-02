@@ -45,3 +45,11 @@ If the original submission deadline is before 17:00, use that day's 17:00 for th
 - Future entries are stored immediately, but become effective only when their `recorded_at` date arrives in Asia/Seoul. Weekly/lifetime/settlement balances, weekly incident counts, actionable reflection status and weekly training/committee indicators exclude future entries before that day. Existing history cutover protections remain in force.
 - An underlying penalty/reflection row is preserved for audit, but a future reflection is not an actionable target until the occurrence date. Staff cannot mark a future penalty's reflection as already submitted from the point-entry form.
 - Staff can verify saved upcoming events through the student record list, where future dates are marked `예정`. Affects only manually entered points, not DICS CORE enrollment or imported historical balances.
+
+## Historical weekly balances restored — November 2, 2026
+
+- The accepted 2026 Fall Google Sheet import was committed on 2026-10-26 with 898 source rows, 876 linked source rows and 873 aggregated student-week balances across eight operational weeks (August 24 through October 25; the August 19–23 camp and September 21–27 holiday weeks are excluded).
+- The October 27 score-screen reset set all 873 `discipline.weekly_balances.is_current` flags to false. This preserved the imported source but hid every imported weekly balance from the authenticated `get_discipline_history` query, making the semester history and its student totals incomplete.
+- On November 2, restored only the 873 rows in the previously approved import batch to `is_current=true`. No point event, reflection, training rule or settlement-period computation was changed; `is_current` is consumed by the term-history RPC.
+- Authenticated supervisor query now returns 873 weekly rows plus 160 post-October-26 daily weekly aggregates for the current reporting range, a total of 1,033 student-week rows. The term cumulative NET in the history panel is merits minus penalties across these effective rows; `누적NET` on the main dashboard remains the separate current-settlement-period net.
+- Twenty-two source rows remain unlinked to CORE IDs and are intentionally excluded from student totals pending identity review. They represent five distinct source names, including inactive or renamed students. No speculative links were created.
