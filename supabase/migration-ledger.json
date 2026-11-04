@@ -411,22 +411,22 @@
       "file": "supabase/migrations/20261028185542_future_point_records_allow_write.sql"
     },
     {
-      "version": "20261104170113",
+      "version": "20261104170344",
       "name": "homeroom_web_push",
       "status": "TRACKED",
-      "file": "supabase/migrations/20261104170113_homeroom_web_push.sql"
+      "file": "supabase/migrations/20261104170344_homeroom_web_push.sql"
     },
     {
-      "version": "20261104170431",
+      "version": "20261104170456",
       "name": "homeroom_push_schedule",
       "status": "TRACKED",
-      "file": "supabase/migrations/20261104170431_homeroom_push_schedule.sql"
+      "file": "supabase/migrations/20261104170456_homeroom_push_schedule.sql"
     },
     {
-      "version": "20261104170634",
+      "version": "20261104170704",
       "name": "homeroom_push_rpc_grants",
       "status": "TRACKED",
-      "file": "supabase/migrations/20261104170634_homeroom_push_rpc_grants.sql"
+      "file": "supabase/migrations/20261104170704_homeroom_push_rpc_grants.sql"
     }
   ]
 }
