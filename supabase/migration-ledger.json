@@ -409,6 +409,24 @@
       "name": "future_point_records_allow_write",
       "status": "TRACKED",
       "file": "supabase/migrations/20261028185542_future_point_records_allow_write.sql"
+    },
+    {
+      "version": "20261104170113",
+      "name": "homeroom_web_push",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261104170113_homeroom_web_push.sql"
+    },
+    {
+      "version": "20261104170431",
+      "name": "homeroom_push_schedule",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261104170431_homeroom_push_schedule.sql"
+    },
+    {
+      "version": "20261104170634",
+      "name": "homeroom_push_rpc_grants",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261104170634_homeroom_push_rpc_grants.sql"
     }
   ]
 }
