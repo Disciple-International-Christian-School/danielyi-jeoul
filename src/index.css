@@ -521,7 +521,7 @@
 /* Operations console: stronger hierarchy, readable Korean UI, and persistent theme. */
 body { font-size: 16px; line-height: 1.6; font-synthesis: none; text-rendering: optimizeLegibility; }
 html { -webkit-text-size-adjust: 100%; }
-.nav-list { overflow-y: auto; min-height: 0; padding-right: 3px; }
+.nav-list { overflow: visible; min-height: auto; padding-right: 0; gap: 2px; }
 .nav-label { font: 700 12px var(--app-font-sans); letter-spacing: .03em; text-transform: none; }
 .nav-section-label { padding-top: 22px; margin-top: 10px; border-top: 1px solid hsl(42 33% 96% / .14); }
 .nav-link { font-size: 15px; font-weight: 600; line-height: 1.4; }
@@ -697,3 +697,29 @@ html { -webkit-text-size-adjust: 100%; }
 .student-detail-metrics .metric-card { min-height: 0; padding: 10px 12px; border-top: 1px solid hsl(var(--border)); box-shadow: none; }
 .student-detail-metrics .metric-value { margin-top: 4px; font-size: 20px; }
 @media (max-width: 480px) { .roster-grade { grid-template-columns: 1fr; gap: 4px; } }
+
+/* Keep the operations sidebar compact without a nested menu scrollbar. */
+.sidebar { padding-top: 18px; padding-bottom: 12px; }
+.sidebar .brand { padding-bottom: 15px; }
+.sidebar .nav-label { padding-bottom: 6px; }
+.sidebar .nav-link { padding-top: 8px; padding-bottom: 8px; }
+.sidebar .nav-child { padding-top: 6px; padding-bottom: 6px; }
+.sidebar-bottom { padding-top: 9px; }
+.sidebar-bottom .build-version { padding-bottom: 5px; }
+.sidebar-bottom .user-mini { padding-top: 5px; padding-bottom: 5px; }
+@media (max-width: 820px) and (min-width: 561px) {
+  .sidebar .brand { padding-bottom: 15px; }
+  .sidebar .nav-link { padding: 9px 8px; }
+  .sidebar .nav-child { padding: 7px 8px; }
+}
+@media (max-width: 560px) {
+  .sidebar { padding: 18px 14px 12px; overflow-y: auto; }
+  .sidebar .brand { padding-bottom: 14px; }
+  .sidebar .nav-link { padding: 8px 11px; }
+  .sidebar .nav-child { padding: 7px 10px; }
+}
+@media (max-height: 650px) and (min-width: 561px) {
+  /* On unusually short viewports, scroll the whole navigation shell rather than a nested list. */
+  .sidebar { overflow-y: auto; }
+  .sidebar-bottom { margin-top: 16px; }
+}

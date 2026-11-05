@@ -239,7 +239,6 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const nav = [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard, roles: ['SEONDO', 'SASAENG'] as Role[], leadOnly: false, group: 'work', child: false },
-    { href: '/students', label: '학생 명부', icon: Users, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: false },
     { href: '/points/positive', label: '상점 입력', icon: ArrowUpRight, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: false },
     { href: '/points/positive/departments', label: '부서상점 자동반영', icon: RefreshCw, roles: ['SEONDO'] as Role[], leadOnly: true, group: 'work', child: true },
     { href: '/points/positive/items', label: '상점항목관리', icon: SlidersHorizontal, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: true },
@@ -247,6 +246,7 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
     { href: '/points/negative/items', label: '벌점항목관리', icon: SlidersHorizontal, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: true },
     { href: '/reflections', label: '반성문 대상자', icon: BookOpenCheck, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: false },
     { href: '/reports', label: '공지·출력', icon: Printer, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: false },
+    { href: '/students', label: '학생 명부', icon: Users, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: false },
     { href: '/punishments', label: '기숙사 처분', icon: BedDouble, roles: ['SASAENG'] as Role[], leadOnly: false, group: 'work', child: false },
     { href: '/admins', label: '관리자 계정', icon: ShieldAlert, roles: ['SEONDO'] as Role[], leadOnly: true, group: 'manage', child: false },
     { href: '/core-setup', label: 'Core 설정', icon: Users, roles: ['SEONDO'] as Role[], leadOnly: true, group: 'manage', child: false },
