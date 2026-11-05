@@ -689,8 +689,8 @@ html { -webkit-text-size-adjust: 100%; }
 .roster-grade { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 12px; padding: 12px 16px; }
 .roster-grade h3 { margin: 7px 0 0; font-size: 15px; }
 .roster-grade h3 span { margin-left: 6px; font-size: 12px; font-weight: 400; }
-.roster-grade ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; list-style: none; padding: 0; margin: 0; }
-.roster-grade a { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; min-height: 34px; padding: 7px 3px; border-bottom: 1px solid hsl(var(--border)); color: inherit; }
+.roster-grade ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 106px), 1fr)); gap: 0 12px; list-style: none; padding: 0; margin: 0; }
+.roster-grade a { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; min-height: 32px; padding: 6px 3px; border-bottom: 1px solid hsl(var(--border)); color: inherit; }
 .roster-grade a:hover { text-decoration: underline; }
 .roster-grade a .muted { font-size: 11px; text-align: right; }
 .student-detail-metrics { margin-top: 16px; gap: 8px; }
