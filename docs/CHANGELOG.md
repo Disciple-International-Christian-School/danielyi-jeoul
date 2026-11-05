@@ -175,4 +175,4 @@ An unsubmitted double-reflection obligation after its 17:00 check deadline adds 
 - Confirmed the 2026-10-26 import batch retained 898 original source rows, including 22 unresolved rows; no records were re-imported or duplicated.
 - Verified supervisor `get_discipline_history` output increased from 160 post-cutover daily aggregates with no weekly rows to 1,033 rows (873 imported weekly + 160 daily aggregates). The student detail term-history panel and whole-school semester totals rely on this same API.
 - Kept current settlement `누적NET` and weekly discipline calculation distinct from retrospective semester totals; no point, reflection, punishment, or settlement rows were changed.
-- Production data restoration tracked as `20261102110207_restore_2026_fall_weekly_history_read_path`.
+- Production data restoration recorded as `LIVE_ONLY_DATA` in the migration ledger (version `20261102110207`).
