@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'wouter';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCoreSetupStatus, useDisciplineHistory, usePointRecordArchive, type DisciplineScope, type StudentSummary } from '@/lib/api';
-import { shiftDate, weekStart } from '@/lib/history';
+import { operatingDays, shiftDate, weekStart } from '@/lib/history';
 
 export function PointHistory({ date, today, onDateChange, scope, studentId }: {
   date: string; today: string; onDateChange: (date: string) => void;
@@ -33,12 +33,18 @@ export function PointHistory({ date, today, onDateChange, scope, studentId }: {
   const negative = rows.reduce((sum, row) => sum + row.negative_points, 0);
   const secondary = scope !== 'ELEMENTARY' && (!studentId || (identities.get(studentId)?.grade ?? 7) >= 7);
   const calendar = secondary ? history.data?.calendar ?? [] : [];
+  const identity = studentId ? identities.get(studentId) : undefined;
+  const admissionDate = identity?.admission_date;
+  const averageDays = admissionDate && start && end
+    ? operatingDays(admissionDate > start ? admissionDate : start, identity?.left_on && identity.left_on < end ? identity.left_on : end, history.data?.calendar ?? [])
+    : 0;
   const weekly = rows.some(r => r.source === 'WEEKLY');
   const error = history.error ?? (mode === 'DAY' ? archive.error : null) ?? term.error;
   const pending = history.isLoading || (mode === 'DAY' && archive.isLoading) || (mode === 'TERM' && term.isLoading);
   const trend = useMemo(() => {
     if (!studentId || !start || !end) return [];
-    const values = new Map((history.data?.rows ?? []).map(r => [r.week_start, r.net]));
+    const values = new Map<string, number>();
+    for (const row of history.data?.rows ?? []) values.set(row.week_start, (values.get(row.week_start) ?? 0) + row.net);
     const breaks = new Map((history.data?.calendar ?? []).filter(c => c.kind === 'NO_SCHOOL').map(c => [c.week_start, c.label]));
     const points: { week: string; value: number | null; label?: string }[] = [];
     for (let week = weekStart(start); week <= end; week = shiftDate(week, 7)) points.push({ week, value: values.get(week) ?? null, label: breaks.get(week) });
@@ -48,7 +54,7 @@ export function PointHistory({ date, today, onDateChange, scope, studentId }: {
   return <section className="card card-pad point-history" id="point-history" aria-labelledby="point-history-title">
     <div className="section-row" style={{ margin: 0 }}>
       <div><h2 className="section-title" id="point-history-title">{studentId ? '학기 추이' : '지난 기록 · 학기 누계'}</h2>
-        <p className="section-copy">주간 확정값과 일별 기록을 이어서 조회합니다. 최종값 = 상점 − 벌점.</p></div>
+        {!studentId && <p className="section-copy">주간 확정값과 일별 기록을 이어서 조회합니다. 최종값 = 상점 − 벌점.</p>}</div>
       <div className="desk-filter-tabs" role="group" aria-label="기록 조회 단위">
         {([['DAY', '일별'], ['WEEK', '주별'], ['TERM', '학기 누계']] as const).map(([value, label]) =>
           <button key={value} type="button" aria-pressed={mode === value} className={mode === value ? 'is-active' : ''} onClick={() => setMode(value)}>{label}</button>)}
@@ -66,13 +72,17 @@ export function PointHistory({ date, today, onDateChange, scope, studentId }: {
     {mode === 'WEEK' && <p className="section-copy">{start} – {end}</p>}
     {error ? <div role="alert"><p className="danger-text">기록 조회에 실패했습니다. 누계가 0이라는 뜻은 아닙니다.</p><button className="btn btn-outline" onClick={() => { history.refetch(); archive.refetch(); term.refetch(); }}>다시 시도</button></div>
       : pending ? <p role="status">기록을 불러오는 중입니다.</p> : <>
-        <p className="history-totals" aria-live="polite">상점 <span className="success-text">{positive}점</span> · 벌점 <span className="danger-text">{negative}점</span> · {mode === 'TERM' ? '학기 누계' : '최종값'} <strong>{positive - negative}점</strong></p>
-        {secondary && history.data?.daily_starts_on && <p className="section-copy">기록 기준은 각 주차에 표시됩니다. 일별 입력은 선택한 발생일에 합산되며, 누계는 조회된 기록 기준입니다.</p>}
+        <p className="history-totals" aria-live="polite">상점 <span className="success-text">{positive}점</span> · 벌점 <span className="danger-text">{negative}점</span> · {mode === 'TERM' ? '학기 누계' : '최종값'} <strong>{positive - negative}점</strong>
+          {studentId && mode === 'TERM' && <> · 일평균 벌점 <strong>{averageDays > 0
+            ? `${(negative / averageDays).toFixed(2)}점`
+            : admissionDate ? '—' : '입학일 확인 필요'}</strong>
+            {averageDays > 0 && <span className="muted"> ({averageDays}일)</span>}</>}
+        </p>
+        {!studentId && secondary && history.data?.daily_starts_on && <p className="section-copy">기록 기준은 각 주차에 표시됩니다. 일별 입력은 선택한 발생일에 합산되며, 누계는 조회된 기록 기준입니다.</p>}
         {mode === 'DAY' && weekly && <p role="status">이 날짜는 주간 확정값만 있습니다. 아래 점수는 해당 주 전체이며 일별 사유·발생 횟수는 확인할 수 없습니다.</p>}
-        {calendar.filter(c => c.kind === 'NO_SCHOOL').map(c => <p className="section-copy" key={c.week_start}>{c.week_start} 주 · {c.label} · 비운영</p>)}
+        {!studentId && calendar.filter(c => c.kind === 'NO_SCHOOL').map(c => <p className="section-copy" key={c.week_start}>{c.week_start} 주 · {c.label} · 비운영</p>)}
         {studentId && mode === 'TERM' && trend.length > 0 && <figure className="history-trend">
-          <figcaption>주간 최종값 · 위쪽은 상점, 아래쪽은 벌점 우세</figcaption>
-          <svg viewBox="0 0 660 200" role="img" aria-label="학생 주간 최종값 추이. 정확한 값은 아래 표에서 확인할 수 있습니다.">
+          <svg viewBox="0 0 660 200" role="img" aria-label="학생 주간 NET 추이">
             <line x1="30" x2="645" y1="90" y2="90" stroke="currentColor" opacity=".35" /><text x="5" y="94" fill="currentColor" fontSize="12">0</text>
             {trend.map((p, i) => {
               const x = 40 + i * 590 / Math.max(1, trend.length - 1), y = 90 - (p.value ?? 0) / extent * 65;
@@ -91,7 +101,7 @@ export function PointHistory({ date, today, onDateChange, scope, studentId }: {
             <td><Link href={'/students/' + id}>{r.name}</Link></td><td>{identities.get(id)?.student_no} / {identities.get(id)?.homeroom}</td>
             <td>{r.positive}</td><td>{r.negative}</td><td>{r.positive-r.negative}<div className="record-meta">기록 {r.weeks}주</div></td>
           </tr>)}</tbody></table></div>}
-        {rows.length > 0 && (mode !== 'DAY' || weekly) && <div className="table-wrap"><table className="data-table"><caption className="desk-sr-only">주차별 확정 또는 일별 합산</caption>
+        {rows.length > 0 && !(studentId && mode === 'TERM') && (mode !== 'DAY' || weekly) && <div className="table-wrap"><table className="data-table"><caption className="desk-sr-only">주차별 확정 또는 일별 합산</caption>
           <thead><tr><th>주차</th>{!studentId && <th>학생</th>}<th>상점</th><th>벌점</th><th>최종값</th><th>기록 기준</th></tr></thead>
           <tbody>{rows.map(r => <tr key={r.core_student_id+r.week_start+r.source}>
             <td>{r.week_start} – {r.week_end.slice(5)}</td>{!studentId && <td><Link href={'/students/'+r.core_student_id}>{r.student_name}</Link> <span className="muted">{r.homeroom}</span></td>}
