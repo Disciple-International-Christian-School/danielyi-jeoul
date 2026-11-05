@@ -127,6 +127,7 @@ export interface Reflection {
   homeroom: string | null;
   weekStart: string;
   weeklyNet: number;
+  isCurrentStudent: boolean;
   item: string;
   points: number;
   recordedAt: string;
@@ -446,7 +447,7 @@ interface StudentSummaryRow {
 }
 interface ReflectionRow {
   id: number; point_record_id: number; student_id: number; core_student_id: string; student_name: string;
-  homeroom: string | null; week_start: string; weekly_net: number; double_submit_deadline: string;
+  homeroom: string | null; week_start: string; weekly_net: number; double_submit_deadline: string; is_current_student: boolean;
   grade: number; item: string; points: number; recorded_at: string;
   submitted: boolean; submission_deadline: string; due_at: string;
   deadline_change_reason: string | null; submitted_at: string | null;
@@ -716,6 +717,7 @@ function mapReflection(row: ReflectionRow): Reflection {
     homeroom: row.homeroom,
     weekStart: row.week_start,
     weeklyNet: row.weekly_net,
+    isCurrentStudent: row.is_current_student,
     item: row.item,
     points: row.points,
     recordedAt: row.recorded_at,
@@ -1178,7 +1180,7 @@ export function useListPointItems(params?: { type?: PointType; includeInactive?:
 }
 
 export function reflectionIsOnNotice(reflection: Reflection, date: string, today: string) {
-  return reflection.status !== 'SUBMITTED'
+  return reflection.isCurrentStudent && reflection.status !== 'SUBMITTED'
     && (reflection.recordedAt === date
       || (date === today && reflection.recordedAt < date && reflection.status === 'DOUBLE'));
 }
