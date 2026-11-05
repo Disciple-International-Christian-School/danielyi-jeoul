@@ -68,12 +68,10 @@
 .desk-action-row:hover .desk-action-copy strong { color: hsl(var(--primary)); text-decoration: underline; text-underline-offset: 4px; }
 .desk-action-icon { display: grid; place-items: center; background: var(--desk-soft); color: hsl(var(--primary)); width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; }
 .desk-action-copy { display: grid; gap: 3px; flex: 1; min-width: 0; }
-.desk-action-copy strong, .desk-settlement-note strong { font-size: 14px; font-weight: 650; }
-.desk-action-copy > span, .desk-settlement-note span { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.5; }
+.desk-action-copy strong { font-size: 14px; font-weight: 650; }
+.desk-action-copy > span { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.5; }
 .desk-action-row > svg { color: hsl(var(--muted-foreground)); flex-shrink: 0; }
 .desk-action-badge { color: #8b581e; background: #fcf0d9; border-radius: 6px; padding: 4px 7px; font-size: 11px; font-weight: 650; white-space: nowrap; }
-.desk-settlement-note { display: flex; gap: 12px; align-items: center; padding: 15px 0 0; border-top: 1px solid var(--desk-line); }
-.desk-settlement-note > div { display: grid; gap: 3px; }
 .desk-students { background: hsl(var(--card)); border: 1px solid var(--desk-line); border-radius: 16px; overflow: hidden; }
 .desk-students-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 24px 24px 19px; }
 .desk-students-heading h2 { display: flex; gap: 10px; align-items: center; margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -.025em; }

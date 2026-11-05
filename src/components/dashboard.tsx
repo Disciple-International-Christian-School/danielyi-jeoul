@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowDownRight, ArrowRight, ArrowUpRight, BookOpenCheck, CalendarDays, Check, ChevronRight, CircleCheck, Clock3, Dumbbell, FileClock, Printer, Search, ShieldAlert, Users, X } from 'lucide-react';
 import { Link } from 'wouter';
-import type { DepartmentMeritStatus, DisciplineScope, Reflection, SettlementPeriod, StudentSummary } from '@/lib/api';
+import { reflectionIsOnNotice, type DepartmentMeritStatus, type DisciplineScope, type Reflection, type StudentSummary } from '@/lib/api';
 import './dashboard.css';
 import { PointHistory } from './point-history';
 
@@ -14,7 +14,6 @@ type Props = {
   scope?: DisciplineScope | null;
   isLead: boolean;
   departments: ReadState<DepartmentMeritStatus[]>;
-  settlement: ReadState<SettlementPeriod | null>;
 };
 
 const scopeLabels = { ALL: '전체 학년', ELEMENTARY: '초등', MIDDLE: '중등', HIGH: '고등' };
@@ -30,7 +29,7 @@ function ActionRow({ href, icon, title, copy, badge }: { href: string; icon: Rea
   </Link>;
 }
 
-export function DashboardView({ students, reflections, calendar, scope, isLead, departments, settlement }: Props) {
+export function DashboardView({ students, reflections, calendar, scope, isLead, departments }: Props) {
   const [historyDate, setHistoryDate] = useState(calendar.date);
   const [historyVersion, setHistoryVersion] = useState(0);
   const historyPanel = useRef<HTMLDivElement>(null);
@@ -63,7 +62,7 @@ export function DashboardView({ students, reflections, calendar, scope, isLead, 
   const personCount = (predicate: (reflection: Reflection) => boolean) => new Set(reflections.filter(predicate).map(row => row.coreStudentId)).size;
   const missing = personCount(row => row.status !== 'SUBMITTED');
   const metrics = [
-    { label: '반성문 대상자', value: personCount(row => !row.submitted && (row.recordedAt.slice(0, 10) === calendar.date || row.status === 'DOUBLE')), note: '오늘 미제출 + 이월 2배', icon: BookOpenCheck, href: '/reflections?view=TODAY', tone: 'normal' },
+    { label: '반성문 대상자', value: personCount(row => reflectionIsOnNotice(row, calendar.date, calendar.date)), note: '오늘 미제출 + 이월 2배', icon: BookOpenCheck, href: '/reflections?view=TODAY', tone: 'normal' },
     { label: '반성문 미제출자', value: missing, note: '이전 날짜 포함 · 미제출 전체', icon: FileClock, href: '/reflections?view=MISSING', tone: 'watch' },
     { label: '2배 제출 대상자', value: personCount(row => row.status === 'DOUBLE'), note: '미제출자 중 마감 경과', icon: Clock3, href: '/reflections?view=DOUBLE', tone: 'urgent' },
     { label: '체력훈련 대상자', value: students.filter(row => row.physicalTrainingRequired).length, note: '벌점 3회 / NET -8 / 2배 미제출', icon: Dumbbell, target: 'PHYSICAL' as Target, tone: 'training' },
@@ -86,8 +85,6 @@ export function DashboardView({ students, reflections, calendar, scope, isLead, 
   const total = departments.data?.length ?? 0;
   const generated = departments.data?.filter(row => row.generated).length ?? 0;
   const meritLabel = departments.loading ? '반영 내역 확인 중' : departments.error ? '반영 내역 확인 필요' : total === 0 ? '자동반영 대상 설정 필요' : generated === total ? '이번 주 자동반영 완료' : '이번 주 미반영 내역 확인';
-  const settlementLabel = settlement.loading ? '정산기간 확인 중' : settlement.error ? '정산기간 조회 실패' : settlement.data?.label ?? '정산기간 미설정';
-  const settlementCopy = settlement.loading ? '잠시만 기다려 주세요.' : settlement.error ? '정산 관리에서 다시 확인해 주세요.' : settlement.data ? shortDate(settlement.data.startsOn) + '부터 누적 중' : isLead ? '정산 관리에서 기간을 시작해 주세요.' : '담당 관리자에게 기간 설정을 요청해 주세요.';
 
   return <div className="dashboard-desk">
     <header className="desk-header">
@@ -121,17 +118,16 @@ export function DashboardView({ students, reflections, calendar, scope, isLead, 
       <section className="desk-work" aria-labelledby="desk-work-title"><div className="desk-panel-heading"><div><span className="desk-panel-kicker">업무 바로가기</span><h2 id="desk-work-title">확인하고 이어가기</h2></div></div>
         <ActionRow href="/reflections?view=MISSING" icon={<BookOpenCheck size={20} />} title="반성문 제출 확인" copy={missing > 0 ? '미제출 명단에서 제출 여부를 확인하세요.' : '현재 미제출 대상자가 없습니다.'} badge={missing > 0 ? missing + '명 미제출' : undefined} />
         <ActionRow href="/reports" icon={<Printer size={20} />} title="공지·명단 출력" copy="생활지도 공지와 주간 명단을 준비하세요." />
-        {isLead ? <ActionRow href="/settlement" icon={<CalendarDays size={20} />} title={settlementLabel} copy={settlementCopy} /> : <div className="desk-settlement-note"><CalendarDays size={18} /><div><strong>{settlementLabel}</strong><span>{settlementCopy}</span></div></div>}
       </section>
     </div>
 
     <section className="desk-students" aria-labelledby="dashboard-students">
-      <div className="desk-students-heading"><div><h2 id="dashboard-students" ref={listHeading} tabIndex={-1}>학생 생활점수<span className="desk-row-count" aria-live="polite">{rows.length}명</span></h2><p>주간 점수와 현재 정산기간의 누적 점수를 확인합니다.</p></div><span className="desk-net-legend">주간 상벌NET · 누적NET = 상점 − 벌점</span></div>
+      <div className="desk-students-heading"><div><h2 id="dashboard-students" ref={listHeading} tabIndex={-1}>학생 생활점수<span className="desk-row-count" aria-live="polite">{rows.length}명</span></h2><p>주간 점수와 생활지도 상태를 확인합니다.</p></div><span className="desk-net-legend">주간 상벌NET = 상점 − 벌점</span></div>
       <div className="desk-filter-bar"><div className="desk-filter-tabs" role="group" aria-label="대상자 필터">{targetLabels.map(([value, label]) => <button key={value} type="button" aria-pressed={target === value} className={target === value ? 'is-active' : ''} onClick={() => setTarget(value)}>{label}</button>)}</div>
         <div className="desk-search-tools"><div className="search-box"><Search size={17} aria-hidden="true" /><input className="input" value={search} onChange={event => setSearch(event.target.value)} placeholder="이름 · 학번 · 반" aria-label="학생 검색" data-testid="input-dashboard-search" />{search && <button type="button" className="desk-clear-search" aria-label="검색어 지우기" onClick={() => setSearch('')}><X size={15} /></button>}</div><select className="select" value={sort} onChange={event => setSort(event.target.value as typeof sort)} aria-label="학생 정렬" data-testid="select-dashboard-sort"><option value="net">주간 상벌NET 낮은 순</option><option value="grade">학년/반 순</option><option value="name">이름 순</option></select></div>
       </div>
-      <div className="table-wrap"><table className="data-table desk-student-table"><caption className="desk-sr-only">학생별 주간 상점, 벌점, 상벌NET 및 정산기간 상태</caption><thead><tr><th scope="col">학생</th><th scope="col">학년 / 반</th><th scope="col" className="desk-number">주간 상점</th><th scope="col" className="desk-number">주간 벌점</th><th scope="col" className="desk-number desk-net-cell">주간 상벌NET</th><th scope="col" className="desk-number">누적NET</th><th scope="col">상태</th></tr></thead><tbody>{rows.map(student => <tr key={student.id} data-testid={'row-dashboard-student-' + student.id}>
-        <td><Link className="desk-student-identity" href={'/students/' + (student.coreStudentId ?? student.id)} data-testid={'link-dashboard-student-' + student.id}><span className="desk-student-avatar" aria-hidden="true">{student.name.slice(0, 1)}</span><span><strong>{student.name}</strong><small>{student.studentNo ?? '학번 미등록'}</small></span></Link></td><td>{student.homeroom ?? student.grade + '학년'}</td><td className="desk-number success-text">+{student.weeklyPositivePoints}</td><td className="desk-number">−{student.weeklyPenaltyPoints}</td><td className={'desk-number desk-net-cell' + (student.weeklyNetPenaltyPoints >= 8 ? ' danger-text' : '')}>{student.weeklyPositivePoints - student.weeklyPenaltyPoints}</td><td className="desk-number">{student.settlementPositivePoints - student.settlementPenaltyPoints}</td><td><div className="status-list">{student.statuses.length > 0 ? student.statuses.map(status => status === '체력훈련 대상'
+      <div className="table-wrap"><table className="data-table desk-student-table"><caption className="desk-sr-only">학생별 주간 상점, 벌점, 상벌NET 및 생활지도 상태</caption><thead><tr><th scope="col">학생</th><th scope="col">학년 / 반</th><th scope="col" className="desk-number">주간 상점</th><th scope="col" className="desk-number">주간 벌점</th><th scope="col" className="desk-number desk-net-cell">주간 상벌NET</th><th scope="col">상태</th></tr></thead><tbody>{rows.map(student => <tr key={student.id} data-testid={'row-dashboard-student-' + student.id}>
+        <td><Link className="desk-student-identity" href={'/students/' + (student.coreStudentId ?? student.id)} data-testid={'link-dashboard-student-' + student.id}><span className="desk-student-avatar" aria-hidden="true">{student.name.slice(0, 1)}</span><span><strong>{student.name}</strong><small>{student.studentNo ?? '학번 미등록'}</small></span></Link></td><td>{student.homeroom ?? student.grade + '학년'}</td><td className="desk-number success-text">+{student.weeklyPositivePoints}</td><td className="desk-number">−{student.weeklyPenaltyPoints}</td><td className={'desk-number desk-net-cell' + (student.weeklyNetPenaltyPoints >= 8 ? ' danger-text' : '')}>{student.weeklyPositivePoints - student.weeklyPenaltyPoints}</td><td><div className="status-list">{student.statuses.length > 0 ? student.statuses.map(status => status === '체력훈련 대상'
           ? <span className="desk-training-status" key={status}><span className="pill pill-training">{status}</span>
             {student.physicalTrainingReasons.length > 0 && <small className="desk-training-reasons">사유: {student.physicalTrainingReasons.join(' · ')}</small>}
             </span>
