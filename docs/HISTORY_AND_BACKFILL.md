@@ -85,4 +85,6 @@ Supabase advisors found no newly introduced security finding. A new history fore
 
 Live sign-in is required for device/browser acceptance of staff-only pages. The cloud browser reached the production login page but had no administrator session; authenticated visual acceptance must not be claimed as complete.
 
-Student-facing SP/dashboard integration, unresolved former-student identity decisions, review of the original 100-point merit, optional catalog synchronization, personal staff-account assignments, and previously pending student Auth/PIN onboarding remain explicit follow-ups. The shared CORE read API is ready; those other apps were not modified by this change.
+Review of the 22 unlinked source rows is complete. The original rows were retained, including 20 historical records for students no longer on the CORE roster and two zero-NET rows with a suspected source labeling error. Student mappings and point totals were unchanged.
+
+Student-facing SP/dashboard integration, review of the original 100-point merit, optional catalog synchronization, personal staff-account assignments, and previously pending student Auth/PIN onboarding remain explicit follow-ups. The shared CORE read API is ready; those other apps were not modified by this change.
