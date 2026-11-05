@@ -745,7 +745,7 @@ function ReflectionsPage() {
   const rows = scoped.filter((row) => {
     if (filter === 'TODAY') return reflectionIsOnNotice(row, date, date);
     if (historyFilter) return row.weekStart === historyWeek && (filter === 'ALL' || row.status === 'SUBMITTED');
-    return filter === 'MISSING' ? row.status !== 'SUBMITTED' : row.status === 'DOUBLE';
+    return row.isCurrentStudent && (filter === 'MISSING' ? row.status !== 'SUBMITTED' : row.status === 'DOUBLE');
   });
 
   return <div>

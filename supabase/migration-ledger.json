@@ -439,6 +439,12 @@
       "name": "reflection_notice_term_streak",
       "status": "TRACKED",
       "file": "supabase/migrations/20261105164644_reflection_notice_term_streak.sql"
+    },
+    {
+      "version": "20261105165243",
+      "name": "reflection_notice_active_roster",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261105165243_reflection_notice_active_roster.sql"
     }
   ]
 }
