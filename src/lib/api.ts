@@ -124,12 +124,16 @@ export interface Reflection {
   coreStudentId: string;
   studentName: string;
   grade: number;
+  homeroom: string | null;
+  weekStart: string;
+  weeklyNet: number;
   item: string;
   points: number;
   recordedAt: string;
   submitted: boolean;
   submissionDeadline: string;
   dueAt: string;
+  actionDueAt: string;
   deadlineChangeReason: string | null;
   submittedAt: string | null;
   status: ReflectionStatus;
@@ -170,31 +174,6 @@ export interface Grade9Assignment {
   grade: number;
   section: string | null;
   homeroom: string | null;
-}
-
-export interface SettlementPeriod {
-  id: number;
-  label: string;
-  startsOn: string;
-  endsOn: string | null;
-  createdAt: string;
-}
-
-export interface DailyDisciplineNotice {
-  pointRecordId: number;
-  recordedAt: string;
-  studentId: number;
-  coreStudentId: string | null;
-  studentNo: string | null;
-  studentName: string;
-  grade: number;
-  homeroom: string | null;
-  item: string;
-  points: number;
-  reflectionId: number | null;
-  reflectionSubmitted: boolean | null;
-  reflectionDueAt: string | null;
-  reflectionStatus: ReflectionStatus | null;
 }
 
 export interface AdminAccount {
@@ -467,6 +446,7 @@ interface StudentSummaryRow {
 }
 interface ReflectionRow {
   id: number; point_record_id: number; student_id: number; core_student_id: string; student_name: string;
+  homeroom: string | null; week_start: string; weekly_net: number; double_submit_deadline: string;
   grade: number; item: string; points: number; recorded_at: string;
   submitted: boolean; submission_deadline: string; due_at: string;
   deadline_change_reason: string | null; submitted_at: string | null;
@@ -502,14 +482,6 @@ interface Grade9AssignmentRow {
   grade: number;
   section: string | null;
   homeroom: string | null;
-}
-
-interface SettlementPeriodRow {
-  id: number;
-  label: string;
-  starts_on: string;
-  ends_on: string | null;
-  created_at: string;
 }
 
 interface DisciplineCoreCutoverStatusRow {
@@ -580,23 +552,6 @@ interface CoreStudentReadinessRow {
   has_external_auth_link: boolean;
   homeroom: string | null;
   readiness_status: 'READY' | 'PARTIAL' | 'CORE_ONLY';
-}
-
-interface DailyDisciplineNoticeRow {
-  point_record_id: number;
-  recorded_at: string;
-  student_id: number;
-  core_student_id: string | null;
-  student_no: string | null;
-  student_name: string;
-  grade: number;
-  homeroom: string | null;
-  item: string;
-  points: number;
-  reflection_id: number | null;
-  reflection_submitted: boolean | null;
-  reflection_due_at: string | null;
-  reflection_status: ReflectionStatus | null;
 }
 
 interface AdminAccountRow {
@@ -758,12 +713,16 @@ function mapReflection(row: ReflectionRow): Reflection {
     coreStudentId: row.core_student_id,
     studentName: row.student_name,
     grade: row.grade,
+    homeroom: row.homeroom,
+    weekStart: row.week_start,
+    weeklyNet: row.weekly_net,
     item: row.item,
     points: row.points,
     recordedAt: row.recorded_at,
     submitted: row.submitted,
     submissionDeadline: row.submission_deadline,
     dueAt: row.due_at,
+    actionDueAt: row.status === 'DOUBLE' ? row.double_submit_deadline : row.due_at,
     deadlineChangeReason: row.deadline_change_reason,
     submittedAt: row.submitted_at,
     status: row.status,
@@ -933,25 +892,6 @@ function mapDepartmentMeritStatus(row: DepartmentMeritStatusRow): DepartmentMeri
   };
 }
 
-function mapDailyDisciplineNotice(row: DailyDisciplineNoticeRow): DailyDisciplineNotice {
-  return {
-    pointRecordId: row.point_record_id,
-    recordedAt: row.recorded_at,
-    studentId: row.student_id,
-    coreStudentId: row.core_student_id,
-    studentNo: row.student_no,
-    studentName: row.student_name,
-    grade: row.grade,
-    homeroom: row.homeroom,
-    item: row.item,
-    points: row.points,
-    reflectionId: row.reflection_id,
-    reflectionSubmitted: row.reflection_submitted,
-    reflectionDueAt: row.reflection_due_at,
-    reflectionStatus: row.reflection_status,
-  };
-}
-
 function mapWeeklyDisciplineReport(row: WeeklyDisciplineReportRow): WeeklyDisciplineReport {
   return {
     weekStart: row.week_start,
@@ -1002,16 +942,6 @@ function mapGrade9Assignment(row: Grade9AssignmentRow): Grade9Assignment {
     grade: row.grade,
     section: row.section,
     homeroom: row.homeroom,
-  };
-}
-
-function mapSettlementPeriod(row: SettlementPeriodRow): SettlementPeriod {
-  return {
-    id: row.id,
-    label: row.label,
-    startsOn: row.starts_on,
-    endsOn: row.ends_on,
-    createdAt: row.created_at,
   };
 }
 
@@ -1087,8 +1017,6 @@ export const getListPointItemsQueryKey = (params?: { type?: PointType; includeIn
   ['point-items', params ?? {}] as const;
 export const getListReflectionsQueryKey = () => ['reflections'] as const;
 export const getListPunishmentsQueryKey = () => ['punishments'] as const;
-export const getCurrentSettlementQueryKey = () => ['settlement', 'current'] as const;
-export const getDailyDisciplineNoticeQueryKey = (recordedAt: string) => ['reports', 'daily-notice', recordedAt] as const;
 export const getWeeklyDisciplineReportQueryKey = () => ['reports', 'weekly'] as const;
 export const getDepartmentMeritStatusQueryKey = () => ['department-merits', 'current-week'] as const;
 export const getDepartmentMeritAdminQueryKey = () => ['department-merits', 'admin'] as const;
@@ -1249,17 +1177,30 @@ export function useListPointItems(params?: { type?: PointType; includeInactive?:
   });
 }
 
-/** Fetches every reflection row; the page filters ALL/SUBMITTED/MISSING/DOUBLE
- *  client-side (status is computed in the view, so it is always current). */
-export function useListReflections() {
+export function reflectionIsOnNotice(reflection: Reflection, date: string, today: string) {
+  return reflection.status !== 'SUBMITTED'
+    && (reflection.recordedAt === date
+      || (date === today && reflection.recordedAt < date && reflection.status === 'DOUBLE'));
+}
+
+export function useListReflections(enabled = true) {
   return useQuery({
     queryKey: getListReflectionsQueryKey(),
+    enabled,
     refetchInterval: 60_000, // Deadline-derived status can change while the console stays open.
     queryFn: async (): Promise<Reflection[]> => {
-      const rows = unwrap<ReflectionRow[]>(
-        await supabase.from('v_reflections').select('*').order('recorded_at', { ascending: false }),
-      );
-      return rows.map(mapReflection);
+      const pageSize = 500;
+      const reflections: Reflection[] = [];
+      for (let offset = 0; ; offset += pageSize) {
+        const rows = unwrap<ReflectionRow[]>(
+          await supabase.from('v_reflections').select('*')
+            .order('recorded_at', { ascending: false })
+            .order('id', { ascending: false })
+            .range(offset, offset + pageSize - 1),
+        );
+        reflections.push(...rows.map(mapReflection));
+        if (rows.length < pageSize) return reflections;
+      }
     },
   });
 }
@@ -1580,52 +1521,10 @@ export function useEnsureWeeklyDepartmentMerits() {
   });
 }
 
-/** A daily notice lists only actionable reflection papers.
- *  The current-day notice also carries every overdue, still-unsubmitted DOUBLE
- *  from earlier days. A past-day notice does not rewrite historical notices.
- *  The view owns weekly-NET eligibility; never infer targets from raw penalties.
- */
-export function useDailyDisciplineNotice(recordedAt: string, includeOverdue = false) {
-  return useQuery({
-    queryKey: [...getDailyDisciplineNoticeQueryKey(recordedAt), includeOverdue],
-    refetchInterval: 60_000,
-    queryFn: async (): Promise<DailyDisciplineNotice[]> => {
-      const current = supabase.from('v_daily_discipline_notice')
-        .select('*')
-        .eq('recorded_at', recordedAt)
-        .in('reflection_status', ['MISSING', 'DOUBLE']);
-      const overdue = includeOverdue
-        ? supabase.from('v_daily_discipline_notice').select('*')
-            .lt('recorded_at', recordedAt)
-            .eq('reflection_status', 'DOUBLE')
-        : null;
-      const [todayResult, overdueResult] = await Promise.all([
-        current,
-        overdue ?? Promise.resolve({ data: [] as DailyDisciplineNoticeRow[], error: null }),
-      ]);
-      const todayRows = unwrap<DailyDisciplineNoticeRow[]>(todayResult);
-      const carriedRows = unwrap<DailyDisciplineNoticeRow[]>(overdueResult);
-      const uniqueRows = new Map<number, DailyDisciplineNoticeRow>();
-      for (const row of [...todayRows, ...carriedRows]) {
-        if (row.reflection_status !== 'SUBMITTED' && row.reflection_id != null) {
-          uniqueRows.set(row.point_record_id, row);
-        }
-      }
-      return [...uniqueRows.values()].sort((a, b) =>
-        a.grade - b.grade
-        || (a.homeroom ?? '').localeCompare(b.homeroom ?? '', 'ko')
-        || a.student_name.localeCompare(b.student_name, 'ko')
-        || (a.reflection_status === 'DOUBLE' ? -1 : 1) - (b.reflection_status === 'DOUBLE' ? -1 : 1)
-        || a.point_record_id - b.point_record_id
-      ).map(mapDailyDisciplineNotice);
-    },
-    enabled: Boolean(recordedAt),
-  });
-}
-
-export function useWeeklyDisciplineReport() {
+export function useWeeklyDisciplineReport(enabled = true) {
   return useQuery({
     queryKey: getWeeklyDisciplineReportQueryKey(),
+    enabled,
     refetchInterval: 60_000,
     queryFn: async (): Promise<WeeklyDisciplineReport[]> => {
       const rows = unwrap<WeeklyDisciplineReportRow[]>(
@@ -1708,58 +1607,6 @@ export function useAssignCurrentGrade9Section() {
         p_section: section,
       });
       if (error) throw new Error(error.message);
-    },
-  });
-}
-
-export function useCurrentSettlement() {
-  return useQuery({
-    queryKey: getCurrentSettlementQueryKey(),
-    queryFn: async (): Promise<SettlementPeriod | null> => {
-      const { data, error } = await supabase
-        .from('v_current_settlement')
-        .select('id,label,starts_on,ends_on,created_at')
-        .maybeSingle();
-      if (error) throw new Error(error.message);
-      return data ? mapSettlementPeriod(data as SettlementPeriodRow) : null;
-    },
-  });
-}
-
-export function useStartSettlementPeriod() {
-  return useMutation({
-    mutationFn: async ({ startsOn, label }: { startsOn: string; label: string }) => {
-      const { data, error } = await supabase.rpc('start_settlement_period', {
-        p_starts_on: startsOn,
-        p_label: label,
-      });
-      if (error) throw new Error(error.message);
-      return data as number;
-    },
-  });
-}
-
-export function useCloseSettlementPeriod() {
-  return useMutation({
-    mutationFn: async ({
-      periodId,
-      endDate,
-      openNext = true,
-      nextLabel = null,
-    }: {
-      periodId: number;
-      endDate: string;
-      openNext?: boolean;
-      nextLabel?: string | null;
-    }) => {
-      const { data, error } = await supabase.rpc('close_settlement_period', {
-        p_period_id: periodId,
-        p_end_date: endDate,
-        p_open_next: openNext,
-        p_next_label: nextLabel,
-      });
-      if (error) throw new Error(error.message);
-      return data as number | null;
     },
   });
 }

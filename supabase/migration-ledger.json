@@ -433,6 +433,12 @@
       "name": "homeroom_push_rpc_grants",
       "status": "TRACKED",
       "file": "supabase/migrations/20261104170704_homeroom_push_rpc_grants.sql"
+    },
+    {
+      "version": "20261105164644",
+      "name": "reflection_notice_term_streak",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261105164644_reflection_notice_term_streak.sql"
     }
   ]
 }
