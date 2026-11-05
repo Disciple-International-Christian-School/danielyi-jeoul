@@ -35,8 +35,10 @@ export function PointHistory({ date, today, onDateChange, scope, studentId }: {
   const calendar = secondary ? history.data?.calendar ?? [] : [];
   const identity = studentId ? identities.get(studentId) : undefined;
   const admissionDate = identity?.admission_date;
-  const averageDays = admissionDate && start && end
-    ? operatingDays(admissionDate > start ? admissionDate : start, identity?.left_on && identity.left_on < end ? identity.left_on : end, history.data?.calendar ?? [])
+  const needsAdmissionDate = identity?.joined_midterm && (!admissionDate || admissionDate <= start);
+  const averageStart = identity?.joined_midterm && admissionDate && admissionDate > start ? admissionDate : start;
+  const averageDays = identity && !needsAdmissionDate && averageStart && end
+    ? operatingDays(averageStart, identity?.left_on && identity.left_on < end ? identity.left_on : end, history.data?.calendar ?? [])
     : 0;
   const weekly = rows.some(r => r.source === 'WEEKLY');
   const error = history.error ?? (mode === 'DAY' ? archive.error : null) ?? term.error;
@@ -75,7 +77,7 @@ export function PointHistory({ date, today, onDateChange, scope, studentId }: {
         <p className="history-totals" aria-live="polite">상점 <span className="success-text">{positive}점</span> · 벌점 <span className="danger-text">{negative}점</span> · {mode === 'TERM' ? '학기 누계' : '최종값'} <strong>{positive - negative}점</strong>
           {studentId && mode === 'TERM' && <> · 일평균 벌점 <strong>{averageDays > 0
             ? `${(negative / averageDays).toFixed(2)}점`
-            : admissionDate ? '—' : '입학일 확인 필요'}</strong>
+            : needsAdmissionDate ? '입학일 확인 필요' : '—'}</strong>
             {averageDays > 0 && <span className="muted"> ({averageDays}일)</span>}</>}
         </p>
         {!studentId && secondary && history.data?.daily_starts_on && <p className="section-copy">기록 기준은 각 주차에 표시됩니다. 일별 입력은 선택한 발생일에 합산되며, 누계는 조회된 기록 기준입니다.</p>}

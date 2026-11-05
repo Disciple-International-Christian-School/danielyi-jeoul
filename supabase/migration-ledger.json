@@ -451,6 +451,12 @@
       "name": "student_history_admission_date",
       "status": "TRACKED",
       "file": "supabase/migrations/20261105175416_student_history_admission_date.sql"
+    },
+    {
+      "version": "20261105180322",
+      "name": "classify_term_admissions",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261105180322_classify_term_admissions.sql"
     }
   ]
 }
