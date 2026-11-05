@@ -1,0 +1,14 @@
+import vm from 'node:vm';
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const handlers={},shown=[],opened=[];
+const self={location:{origin:'https://school.example'},registration:{showNotification:async(...args)=>shown.push(args)},clients:{matchAll:async()=>[],openWindow:async(url)=>opened.push(url)},addEventListener:(name,fn)=>handlers[name]=fn};
+vm.runInNewContext(fs.readFileSync('public/push-sw.js','utf8'),{self,URL});
+let pending;
+handlers.push({data:{json:()=>{throw Error('bad payload');}},waitUntil:p=>pending=p});await pending;
+assert.equal(shown.length,1);assert.match(shown[0][1].body,/알림/);
+handlers.notificationclick({notification:{close(){},data:{url:'https://evil.example'}},waitUntil:p=>pending=p});await pending;
+assert.equal(opened[0],'https://school.example/teacher');
+handlers.push({data:{json:()=>({body:'대상자 발생',tag:'event-1',url:'https://evil.example'})},waitUntil:p=>pending=p});await pending;
+assert.equal(shown[1][1].tag,'event-1');assert.equal(shown[1][1].data.url,'/teacher');
+console.log('Service worker checks passed: malformed payload fallback and fixed same-origin notification target.');

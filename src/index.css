@@ -658,3 +658,8 @@ html { -webkit-text-size-adjust: 100%; }
 @media (max-width: 560px) { .topbar { height: 64px; } .content { padding-top: 25px; } }
 .mobile-brand .brand-mark, .landing .brand-mark { color: hsl(var(--primary)); border-color: hsl(var(--primary) / .5); }
 .sidebar :focus-visible { outline-color: #c6d6a9; }
+
+
+.teacher-portal { max-width: 960px; margin: 0 auto; padding: 28px 18px; display: grid; gap: 18px; }
+.teacher-portal .section-row { margin: 0 0 18px; }
+.teacher-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
