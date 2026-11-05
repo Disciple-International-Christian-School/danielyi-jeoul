@@ -445,6 +445,12 @@
       "name": "reflection_notice_active_roster",
       "status": "TRACKED",
       "file": "supabase/migrations/20261105165243_reflection_notice_active_roster.sql"
+    },
+    {
+      "version": "20261105175416",
+      "name": "student_history_admission_date",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261105175416_student_history_admission_date.sql"
     }
   ]
 }
