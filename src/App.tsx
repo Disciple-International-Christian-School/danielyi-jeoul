@@ -2,7 +2,7 @@ import { TeacherPortal } from '@/components/teacher-portal';
 import { StudentHistory } from '@/components/point-history';
 import { shiftDate, weekStart } from '@/lib/history';
 import { WeeklyImportPage } from '@/components/weekly-import';
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -420,6 +420,9 @@ function StudentsPage() {
 function StudentDetailPage() {
   const params = useParams<{ id: string }>();
   const studentRef = params.id;
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [studentRef]);
   const queryClient = useQueryClient();
   const detail = useGetStudent(studentRef);
   const records = useListPointRecords({ studentRef, limit: 100 });
