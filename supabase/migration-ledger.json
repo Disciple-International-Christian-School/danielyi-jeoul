@@ -411,6 +411,12 @@
       "file": "supabase/migrations/20261028185542_future_point_records_allow_write.sql"
     },
     {
+      "version": "20261102110207",
+      "name": "restore_2026_fall_weekly_history_read_path",
+      "status": "LIVE_ONLY_DATA",
+      "rationale": "Production-only reactivation of the approved Fall weekly import. A fresh database does not have this import batch."
+    },
+    {
       "version": "20261104170344",
       "name": "homeroom_web_push",
       "status": "TRACKED",

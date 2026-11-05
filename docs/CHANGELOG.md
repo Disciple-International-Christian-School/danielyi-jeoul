@@ -167,3 +167,12 @@ An unsubmitted double-reflection obligation after its 17:00 check deadline adds 
 - New effective-day SQL projections gate weekly totals, penalty incidents, lifetime scores, reflection-paper eligibility, and closed/current settlement values at KST current date. Future entries are saved and auditable now but do not prematurely influence discipline status.
 - Disabled the point-entry 'same-day reflection submitted' shortcut for future negative records. Added a scheduled marker to recent session entries and student detail history.
 - Applied production migrations `20261028185513_future_point_records_effective_date` and `20261028185542_future_point_records_allow_write`. Live rollback test saved a future merit + penalty through the real admin RPC and confirmed that current scoring, reflections, training and committee indicators were unchanged.
+
+
+## November 2, 2026 — Restore imported semester point history
+
+- Re-enabled the already-imported 2026 Fall weekly balances (873 student-week rows, 111 CORE-linked students, 8 weeks) for the authenticated semester history view, after identifying that the October 27 reset had set all imported balances inactive.
+- Confirmed the 2026-10-26 import batch retained 898 original source rows, including 22 unresolved rows; no records were re-imported or duplicated.
+- Verified supervisor `get_discipline_history` output increased from 160 post-cutover daily aggregates with no weekly rows to 1,033 rows (873 imported weekly + 160 daily aggregates). The student detail term-history panel and whole-school semester totals rely on this same API.
+- Kept current settlement `누적NET` and weekly discipline calculation distinct from retrospective semester totals; no point, reflection, punishment, or settlement rows were changed.
+- Production data restoration recorded as `LIVE_ONLY_DATA` in the migration ledger (version `20261102110207`).
