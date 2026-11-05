@@ -14,7 +14,7 @@ export interface HistoryBalance {
 }
 export interface DisciplineHistory {
   rows: HistoryBalance[];
-  students: { id: string; name: string; student_no: string; homeroom: string; grade: number; is_active: boolean; admission_date?: string | null; left_on?: string | null }[];
+  students: { id: string; name: string; student_no: string; homeroom: string; grade: number; is_active: boolean; admission_date?: string | null; joined_midterm?: boolean | null; left_on?: string | null }[];
   calendar: { week_start: string; kind: 'WEEKLY' | 'NO_SCHOOL'; label: string }[];
   daily_starts_on: string | null;
 }
