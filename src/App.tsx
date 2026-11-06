@@ -952,17 +952,17 @@ function ReportsPage() {
             return <section className="print-group" key={className}>
               <h2>{className}</h2>
               <table className="print-table">
-                <thead><tr><th style={{ width: '18%' }}>학생</th><th>벌점 사유</th><th style={{ width: '10%' }}>벌점</th><th style={{ width: '24%' }}>반성문</th></tr></thead>
+                <thead><tr><th style={{ width: '18%' }}>학생</th><th>벌점 사유</th><th style={{ width: '12%' }}>주간NET</th><th style={{ width: '18%' }}>처분</th><th style={{ width: '20%' }}>마감</th></tr></thead>
                 <tbody>{rows.map((row) => <tr key={row.pointRecordId}>
                   <td><strong>{row.studentName}</strong></td>
                   <td>{row.item}{row.recordedAt !== noticeDate && <div className="print-sub">발생일 {dateLabel(row.recordedAt)} · 이월</div>}</td>
-                  <td className="print-number">−{row.points}</td>
+                  <td className="print-number">{row.weeklyNet}</td>
                   <td>
                     <span className={'print-reflection-status ' + (row.status === 'DOUBLE' ? 'print-reflection-status-double' : 'print-reflection-status-missing')}>
                       {row.status === 'DOUBLE' ? '2배 제출 대상' : '반성문 미제출'}
                     </span>
-                    {row.actionDueAt && <div className="print-sub">마감 {dateTimeLabel(row.actionDueAt)}</div>}
                   </td>
+                  <td>{row.actionDueAt ? dateTimeLabel(row.actionDueAt) : '—'}</td>
                 </tr>)}</tbody>
               </table>
             </section>;
