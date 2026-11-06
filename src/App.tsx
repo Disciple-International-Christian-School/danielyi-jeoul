@@ -952,10 +952,11 @@ function ReportsPage() {
             return <section className="print-group" key={className}>
               <h2>{className}</h2>
               <table className="print-table">
-                <thead><tr><th style={{ width: '18%' }}>학생</th><th>벌점 사유</th><th style={{ width: '12%' }}>벌점</th><th style={{ width: '18%' }}>처분</th><th style={{ width: '20%' }}>마감</th></tr></thead>
+                <thead><tr><th style={{ width: '14%' }}>학생</th><th>벌점 사유</th><th style={{ width: '13%' }}>발생일</th><th style={{ width: '9%' }}>벌점</th><th style={{ width: '18%' }}>처분</th><th style={{ width: '20%' }}>마감</th></tr></thead>
                 <tbody>{rows.map((row) => <tr key={row.pointRecordId}>
                   <td><strong>{row.studentName}</strong></td>
-                  <td>{row.item}{row.recordedAt !== noticeDate && <div className="print-sub">발생일 {dateLabel(row.recordedAt)} · 이월</div>}</td>
+                  <td>{row.item}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{dateLabel(row.recordedAt)}</td>
                   <td className="print-number">−{row.points}</td>
                   <td>
                     <span className={'print-reflection-status ' + (row.status === 'DOUBLE' ? 'print-reflection-status-double' : 'print-reflection-status-missing')}>
