@@ -589,6 +589,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
                 ref={searchRef}
                 id="entry-student"
                 className="input"
+                lang="ko"
                 value={search}
                 onChange={(event) => {
                   setSearch(event.target.value);
@@ -597,6 +598,9 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
                 onKeyDown={handleSearchKeyDown}
                 placeholder="이름 · 학번 · 반 검색"
                 autoComplete="off"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
                 data-testid="input-point-student-search"
               />
             </div>
