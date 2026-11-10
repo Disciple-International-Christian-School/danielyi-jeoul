@@ -463,6 +463,12 @@
       "name": "group_penalties_and_elementary_deadlines",
       "status": "TRACKED",
       "file": "supabase/migrations/20261110145143_group_penalties_and_elementary_deadlines.sql"
+    },
+    {
+      "version": "20261111100000",
+      "name": "reflection_notice_pages",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261111100000_reflection_notice_pages.sql"
     }
   ]
 }

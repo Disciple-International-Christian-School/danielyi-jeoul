@@ -704,3 +704,36 @@ html { -webkit-text-size-adjust: 100%; }
   .sidebar { overflow-y: auto; }
   .sidebar-bottom { margin-top: 16px; }
 }
+
+.sidebar-header { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-bottom: 15px; }
+.sidebar .sidebar-header .brand { min-width: 0; padding: 0 0 0 4px; gap: 7px; }
+.sidebar .sidebar-header .brand-mark { width: 34px; height: 34px; flex-basis: 34px; font-size: 11px; }
+.sidebar .sidebar-header .brand-name { font-size: 16px; }
+.sidebar-toggle { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border: 0; border-radius: 7px; background: transparent; color: inherit; cursor: pointer; }
+.sidebar-toggle:hover { background: #ffffff14; }
+.sidebar-mobile-close { display: none; }
+.sidebar .nav-link svg { flex-shrink: 0; }
+.print-date { white-space: nowrap; }
+.print-pages { text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; }
+
+@media (min-width: 561px) {
+  .sidebar.is-collapsed { width: 64px; flex-basis: 64px; padding-inline: 8px; }
+  .sidebar.is-collapsed .sidebar-header { justify-content: center; }
+  .sidebar.is-collapsed .brand, .sidebar.is-collapsed .nav-label,
+  .sidebar.is-collapsed .nav-link span, .sidebar.is-collapsed .user-mini-copy,
+  .sidebar.is-collapsed .build-version { display: none; }
+  .sidebar.is-collapsed .nav-link { justify-content: center; margin-left: 0; padding: 8px; border-left: 0; border-radius: 8px; }
+  .sidebar.is-collapsed .user-mini { justify-content: center; padding-inline: 0; }
+}
+@media (min-width: 561px) and (max-width: 820px) {
+  .sidebar:not(.is-collapsed) { width: 220px; flex-basis: 220px; padding-inline: 12px; }
+  .sidebar:not(.is-collapsed) .brand-name, .sidebar:not(.is-collapsed) .nav-label,
+  .sidebar:not(.is-collapsed) .nav-link span, .sidebar:not(.is-collapsed) .user-mini-copy { display: initial; }
+  .sidebar:not(.is-collapsed) .nav-link, .sidebar:not(.is-collapsed) .user-mini { justify-content: flex-start; }
+  .sidebar:not(.is-collapsed) .nav-child { margin-left: 12px; }
+}
+@media (max-width: 560px) {
+  .sidebar:not(.is-open) { visibility: hidden; }
+  .sidebar-desktop-toggle { display: none; }
+  .sidebar-mobile-close { display: grid; }
+}

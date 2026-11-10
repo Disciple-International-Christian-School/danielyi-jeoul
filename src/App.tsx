@@ -27,6 +27,8 @@ import {
   Moon,
   Sun,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Trash2,
   Users,
   X,
@@ -237,6 +239,18 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
   const [, setLocation] = useLocation();
   const [notice, setNotice] = useState<{ message: string; tone: NoticeTone } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const compact = window.matchMedia('(max-width: 820px)').matches;
+    try {
+      const preference = window.localStorage.getItem('daniels-sidebar-collapsed');
+      return preference === null ? compact : preference === 'true';
+    } catch {
+      return compact;
+    }
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem('daniels-sidebar-collapsed', String(sidebarCollapsed)); } catch { /* Storage unavailable. */ }
+  }, [sidebarCollapsed]);
   const nav = [
     { href: '/dashboard', label: '대시보드', icon: LayoutDashboard, roles: ['SEONDO', 'SASAENG'] as Role[], leadOnly: false, group: 'work', child: false },
     { href: '/points/positive', label: '상점 입력', icon: ArrowUpRight, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: false },
@@ -259,8 +273,19 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
   const handleSignOut = async () => { await signOut(); setLocation('/'); };
   return <NoticeContext.Provider value={(message, tone = 'success') => setNotice({ message, tone })}><div className="app-shell">
     {role === 'SEONDO' && <WeeklyMeritBootstrap />}
-    <aside className={`sidebar ${mobileMenuOpen ? 'is-open' : ''}`}>
-      <Brand />
+    <aside id="app-sidebar" className={`sidebar${sidebarCollapsed ? ' is-collapsed' : ''}${mobileMenuOpen ? ' is-open' : ''}`}
+      onKeyDown={(event) => { if (event.key === 'Escape' && mobileMenuOpen) setMobileMenuOpen(false); }}>
+      <div className="sidebar-header">
+        <Brand />
+        <button type="button" className="sidebar-toggle sidebar-desktop-toggle"
+          aria-label={sidebarCollapsed ? '왼쪽 메뉴 펼치기' : '왼쪽 메뉴 접기'} aria-expanded={!sidebarCollapsed}
+          title={sidebarCollapsed ? '왼쪽 메뉴 펼치기' : '왼쪽 메뉴 접기'} onClick={() => setSidebarCollapsed((value) => !value)}>
+          {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+        </button>
+        <button type="button" className="sidebar-toggle sidebar-mobile-close" aria-label="메뉴 닫기" onClick={() => setMobileMenuOpen(false)}>
+          <X size={18} />
+        </button>
+      </div>
       <div className="nav-label">운영 메뉴</div>
       <nav className="nav-list" aria-label="주요 메뉴">
         {visibleNav.map((item, index) => {
@@ -268,7 +293,7 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
           const active = location === item.href || (location.startsWith(item.href + '/') && !visibleNav.some((other) => other.href !== item.href && other.href.startsWith(item.href + '/') && (location === other.href || location.startsWith(other.href + '/'))));
           return <div key={item.href}>
             {item.group === 'manage' && visibleNav[index - 1]?.group !== 'manage' && <div className="nav-label nav-section-label">관리·기준</div>}
-            <Link href={item.href} className={`nav-link ${item.child ? 'nav-child ' : ''}${active ? 'active' : ''}`} title={item.label} onClick={() => setMobileMenuOpen(false)} aria-current={active ? 'page' : undefined} data-testid={`link-nav-${item.href.slice(1).replaceAll('/', '-')}`}>
+            <Link href={item.href} className={`nav-link ${item.child ? 'nav-child ' : ''}${active ? 'active' : ''}`} title={item.label} aria-label={item.label} onClick={() => setMobileMenuOpen(false)} aria-current={active ? 'page' : undefined} data-testid={`link-nav-${item.href.slice(1).replaceAll('/', '-')}`}>
               <Icon size={16} strokeWidth={1.8} /><span>{item.label}</span>
             </Link>
           </div>;
@@ -280,13 +305,13 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
           <div className="avatar" data-testid="avatar-admin">{displayName.slice(0, 1)}</div>
           <div className="user-mini-copy"><div className="user-mini-name" data-testid="text-admin-name">{displayName}</div><div className="user-mini-meta">{roleLabel}</div></div>
         </div>
-        <button className="nav-link" onClick={handleSignOut} data-testid="button-sign-out"><LogOut size={16} /><span>로그아웃</span></button>
+        <button className="nav-link" aria-label="로그아웃" title="로그아웃" onClick={handleSignOut} data-testid="button-sign-out"><LogOut size={16} /><span>로그아웃</span></button>
       </div>
     </aside>
     {mobileMenuOpen && <button type="button" className="sidebar-backdrop" aria-label="메뉴 닫기" onClick={() => setMobileMenuOpen(false)} />}
     <main className="main-area">
       <header className="topbar">
-        <button type="button" className="mobile-menu-toggle" onClick={() => setMobileMenuOpen((open) => !open)} aria-label={mobileMenuOpen ? '메뉴 닫기' : '메뉴 열기'} aria-expanded={mobileMenuOpen}>{mobileMenuOpen ? <X size={21} /> : <Menu size={21} />}</button>
+        <button type="button" className="mobile-menu-toggle" onClick={() => setMobileMenuOpen((open) => !open)} aria-label={mobileMenuOpen ? '메뉴 닫기' : '메뉴 열기'} aria-expanded={mobileMenuOpen} aria-controls="app-sidebar">{mobileMenuOpen ? <X size={21} /> : <Menu size={21} />}</button>
         <div className="mobile-brand"><span className="brand-mark">저울</span><span>다니엘의 저울</span></div>
         <div className="topbar-title">{title}</div>
         <div className="topbar-actions"><span className="topbar-date">{new Intl.DateTimeFormat('ko-KR', { dateStyle: 'full', timeZone: 'Asia/Seoul' }).format(new Date())}</span><ThemeToggle dark={dark} toggle={toggle} /><span className="pill pill-positive" data-testid="status-health"><Gauge size={12} /> 운영 중</span></div>
@@ -845,7 +870,7 @@ function ReflectionsPage() {
     <PageHeader
       eyebrow="반성문 관리"
       title="반성문 대상자"
-      copy="주간 상벌NET이 음수일 때만 반성문 대상입니다. 초등은 다음 등교일 08:20, 중고등은 기본 17시·필요 시 다음날 17시 연장(주말 발생은 월요일) 기준으로 제출 상태를 확인합니다."
+      copy="벌점 부과 시 NET이 음수인 건이 대상입니다. 당일 상점으로 기한 내 NET이 0 이상이 되면 면제됩니다. 초등 마감은 다음 등교일 08:20, 중고등 기본 마감은 당일 17시입니다."
     />
 
     <div className="card card-pad" style={{ marginTop: 30 }}>
@@ -1055,20 +1080,28 @@ function ReportsPage() {
             return <section className="print-group" key={className}>
               <h2>{className}</h2>
               <table className="print-table">
-                <thead><tr><th style={{ width: '14%' }}>학생</th><th>벌점 사유</th><th style={{ width: '13%' }}>발생일</th><th style={{ width: '8%' }}>벌점</th><th style={{ width: '10%' }}>주간 NET</th><th style={{ width: '18%' }}>처분</th><th style={{ width: '20%' }}>마감</th></tr></thead>
-                <tbody>{rows.map((row) => <tr key={row.pointRecordId}>
-                  <td><strong>{row.studentName}</strong></td>
-                  <td>{row.item}</td>
-                  <td style={{ whiteSpace: 'nowrap' }}>{dateLabel(row.recordedAt)}</td>
-                  <td className="print-number">−{row.points}</td>
-                  <td className="print-number">{row.weeklyNet > 0 ? `+${row.weeklyNet}` : row.weeklyNet}</td>
-                  <td>
-                    <span className={'print-reflection-status ' + (row.status === 'DOUBLE' ? 'print-reflection-status-double' : 'print-reflection-status-missing')}>
-                      {row.status === 'DOUBLE' ? '2배 제출 대상' : '반성문 미제출'}
-                    </span>
-                  </td>
-                  <td>{row.actionDueAt ? dateTimeLabel(row.actionDueAt) : '—'}</td>
-                </tr>)}</tbody>
+                <thead><tr>
+                  <th style={{ width: '13%' }}>이름</th>
+                  <th style={{ width: '13%' }}>처분</th>
+                  <th>사유</th>
+                  <th style={{ width: '10%' }}>발생일</th>
+                  <th style={{ width: '15%' }}>반성문 페이지 수</th>
+                  <th style={{ width: '23%' }}>기한</th>
+                </tr></thead>
+                <tbody>{rows.map((row) => {
+                  const double = row.status === 'DOUBLE';
+                  const pages = row.reflectionPages === null ? '—' : row.reflectionPages * (double ? 2 : 1);
+                  return <tr key={row.pointRecordId}>
+                    <td><strong>{row.studentName}</strong></td>
+                    <td><span className={'print-reflection-status ' + (double ? 'print-reflection-status-double' : 'print-reflection-status-missing')}>
+                      {double ? '2배제출' : '반성문'}
+                    </span></td>
+                    <td>{double ? '반성문 미제출' : row.item}</td>
+                    <td className="print-date">{row.recordedAt.slice(5).split('-').map(Number).join('/')}</td>
+                    <td className="print-pages">{pages}</td>
+                    <td>{dateTimeLabel(row.actionDueAt)}</td>
+                  </tr>;
+                })}</tbody>
               </table>
             </section>;
           })}
