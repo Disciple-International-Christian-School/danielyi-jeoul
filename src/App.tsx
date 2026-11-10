@@ -470,6 +470,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
   const [groupGrade, setGroupGrade] = useState('');
   const [groupRoom, setGroupRoom] = useState('');
   const [itemId, setItemId] = useState('');
+  const [itemSearch, setItemSearch] = useState('');
   const [customItem, setCustomItem] = useState('');
   const [points, setPoints] = useState('');
   const [recordedAt, setRecordedAt] = useState(today());
@@ -499,6 +500,17 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
   const groupReady = groupIds.length > 0 && groupIds.length === groupStudents.length;
   const elementaryPenalty = negative && (bulk ? Boolean(groupGrade) && Number(groupGrade) <= 6 : Boolean(selectedStudent && selectedStudent.grade <= 6));
   const entryPoints = elementaryPenalty ? '1' : points;
+  const normalizeItem = (value: string) => value.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
+  const itemNeedle = normalizeItem(itemSearch);
+  const activeItems = (items.data ?? []).filter((item) => item.type === type);
+  const matchingItems = activeItems.filter((item) => normalizeItem(item.name).includes(itemNeedle));
+  const visibleItems = activeItems.filter((item) => item.id === selectedItem?.id || matchingItems.includes(item))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  const itemGroups = elementaryPenalty ? [['1점', visibleItems] as const] : [
+    ['고정 점수', visibleItems.filter((item) => item.fixedPoints != null)] as const,
+    ['점수 직접 입력', visibleItems.filter((item) => item.fixedPoints == null)] as const,
+  ];
+
   const saving = create.isPending || createGroup.isPending;
 
 
@@ -693,6 +705,13 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 
           <div className="field full">
             <label htmlFor="entry-item">점수 항목</label>
+            {activeItems.length > 8 && <div className="search-box">
+              <Search size={15} aria-hidden="true" />
+              <input className="input" aria-label="점수 항목 검색" placeholder="항목명으로 검색"
+                lang="ko" autoComplete="off" value={itemSearch}
+                onChange={(event) => setItemSearch(event.target.value)}
+                onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) event.preventDefault(); }} />
+            </div>}
             <select
               id="entry-item"
               className="select"
@@ -705,10 +724,13 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
               data-testid="select-point-item"
             >
               <option value="">사유 직접 입력</option>
-              {(items.data ?? []).filter((item) => item.type === type).map((item) => <option key={item.id} value={item.id}>
-                {item.name + (elementaryPenalty ? ' · 1점' : item.fixedPoints != null ? ' · ' + item.fixedPoints + '점' : '')}
-              </option>)}
+              {itemGroups.map(([label, group]) => group.length > 0 && <optgroup key={label} label={label}>
+                {group.map((item) => <option key={item.id} value={item.id}>
+                  {item.name + (elementaryPenalty ? ' · 1점' : item.fixedPoints != null ? ' · ' + item.fixedPoints + '점' : '')}
+                </option>)}
+              </optgroup>)}
             </select>
+            {itemNeedle && <span className="record-meta" role="status">{matchingItems.length ? `검색 결과 ${matchingItems.length}개` : '일치하는 항목이 없습니다.'}</span>}
           </div>
 
           {!itemId && <div className="field full">
