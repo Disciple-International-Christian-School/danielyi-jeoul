@@ -62,7 +62,7 @@ export function DashboardView({ students, reflections, calendar, scope, isLead, 
   const personCount = (predicate: (reflection: Reflection) => boolean) => new Set(reflections.filter(predicate).map(row => row.coreStudentId)).size;
   const missing = personCount(row => row.isCurrentStudent && row.status !== 'SUBMITTED');
   const metrics = [
-    { label: '반성문 대상자', value: personCount(row => reflectionIsOnNotice(row, calendar.date, calendar.date)), note: '오늘 미제출 + 이월 2배', icon: BookOpenCheck, href: '/reflections?view=TODAY', tone: 'normal' },
+    { label: '반성문 대상자', value: personCount(row => reflectionIsOnNotice(row, calendar.date, calendar.date)), note: '오늘 발생·마감 + 이월 2배', icon: BookOpenCheck, href: '/reflections?view=TODAY', tone: 'normal' },
     { label: '반성문 미제출자', value: missing, note: '이전 날짜 포함 · 미제출 전체', icon: FileClock, href: '/reflections?view=MISSING', tone: 'watch' },
     { label: '2배 제출 대상자', value: personCount(row => row.isCurrentStudent && row.status === 'DOUBLE'), note: '미제출자 중 마감 경과', icon: Clock3, href: '/reflections?view=DOUBLE', tone: 'urgent' },
     { label: '체력훈련 대상자', value: students.filter(row => row.physicalTrainingRequired).length, note: '벌점 3회 / NET -8 / 2배 미제출', icon: Dumbbell, target: 'PHYSICAL' as Target, tone: 'training' },
