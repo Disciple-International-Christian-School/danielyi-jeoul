@@ -1182,7 +1182,8 @@ export function useListPointItems(params?: { type?: PointType; includeInactive?:
 export function reflectionIsOnNotice(reflection: Reflection, date: string, today: string) {
   return reflection.isCurrentStudent && reflection.status !== 'SUBMITTED'
     && (reflection.recordedAt === date
-      || (date === today && reflection.recordedAt < date && reflection.status === 'DOUBLE'));
+      || (date === today && reflection.recordedAt < date
+        && (reflection.status === 'DOUBLE' || reflection.submissionDeadline === date)));
 }
 
 export function useListReflections(enabled = true) {
@@ -1635,6 +1636,27 @@ export function useCreatePointRecord() {
   });
 }
 
+export function useCreateGroupPenalty() {
+  return useMutation({
+    mutationFn: async (data: {
+      grade: number; homeroom: string | null; studentIds: string[];
+      item: string; points: number; recordedAt: string; requestId: string;
+    }) => {
+      const { data: count, error } = await supabase.rpc('create_group_penalty_once', {
+        p_grade: data.grade,
+        p_homeroom: data.homeroom,
+        p_student_ids: data.studentIds,
+        p_item: data.item,
+        p_points: data.points,
+        p_recorded_at: data.recordedAt,
+        p_request_id: data.requestId,
+      });
+      if (error) throw new Error(error.message);
+      return count as number;
+    },
+  });
+}
+
 export function useUpdatePointRecord() {
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: PointRecordUpdateInput }) => {
@@ -1683,7 +1705,9 @@ export function useUpdateReflection() {
       const { error } = await supabase
         .from('reflection_records')
         .update({ submitted: data.submitted, submitted_at: data.submitted ? new Date().toISOString() : null })
-        .eq('id', id);
+        .eq('id', id)
+        .select('id')
+        .single();
       if (error) throw new Error(error.message);
     },
   });
@@ -1761,7 +1785,7 @@ export function useDeletePointItem() {
 
 export function useImportPointItems() {
   return useMutation({
-    mutationFn: async ({ data }: { data: { items: PointItemImportRow[] } }) => {
+    mutationFn: async ({ data }: { data: { items: PointItemImportRow[]; sourceSheet?: boolean } }) => {
       // CSV import is for penalty items (spec §20): type NEGATIVE, a row with a
       // score becomes a fixed-point item, one without stays manual-entry.
       const rows = data.items.map((item) => ({
@@ -1771,7 +1795,9 @@ export function useImportPointItems() {
         is_fixed: item.fixedPoints != null,
         is_active: true,
       }));
-      const { error } = await supabase.from('point_items').insert(rows);
+      const { error } = data.sourceSheet
+        ? await supabase.rpc('sync_penalty_items_from_sheet', { p_items: rows })
+        : await supabase.from('point_items').insert(rows);
       if (error) throw new Error(error.message);
     },
   });

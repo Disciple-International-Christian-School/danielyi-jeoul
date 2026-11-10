@@ -457,6 +457,12 @@
       "name": "classify_term_admissions",
       "status": "TRACKED",
       "file": "supabase/migrations/20261105180322_classify_term_admissions.sql"
+    },
+    {
+      "version": "20261110145143",
+      "name": "group_penalties_and_elementary_deadlines",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261110145143_group_penalties_and_elementary_deadlines.sql"
     }
   ]
 }

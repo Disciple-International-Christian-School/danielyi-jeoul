@@ -70,6 +70,7 @@ import {
   useCreateDepartmentWithMeritRule,
   useCreatePointItem,
   useCreatePointRecord,
+  useCreateGroupPenalty,
   useCreatePunishment,
   useDeletePointItem,
   useDeletePointRecord,
@@ -458,13 +459,18 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
   const students = useListStudents();
   const items = useListPointItems({ type, includeInactive: false });
   const create = useCreatePointRecord();
+  const createGroup = useCreateGroupPenalty();
   const undo = useDeletePointRecord();
   const requestRef = useRef<{ fingerprint: string; id: string } | null>(null);
   const savingRef = useRef(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const [studentId, setStudentId] = useState('');
+  const [groupMode, setGroupMode] = useState(false);
+  const [groupGrade, setGroupGrade] = useState('');
+  const [groupRoom, setGroupRoom] = useState('');
   const [itemId, setItemId] = useState('');
+  const [itemSearch, setItemSearch] = useState('');
   const [customItem, setCustomItem] = useState('');
   const [points, setPoints] = useState('');
   const [recordedAt, setRecordedAt] = useState(today());
@@ -484,6 +490,29 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 
   const selectedStudent = (students.data ?? []).find((student) => String(student.id) === studentId);
   const selectedItem = (items.data ?? []).find((item) => String(item.id) === itemId);
+  const bulk = negative && groupMode;
+  const scopedStudents = (students.data ?? []).filter((student) => matchesDisciplineScope(student.grade, admin?.disciplineScope));
+  const groupGrades = [...new Set(scopedStudents.map((student) => student.grade))].sort((a, b) => a - b);
+  const gradeStudents = scopedStudents.filter((student) => student.grade === Number(groupGrade));
+  const groupRooms = [...new Set(gradeStudents.flatMap((student) => student.homeroom ? [student.homeroom] : []))].sort();
+  const groupStudents = gradeStudents.filter((student) => !groupRoom || student.homeroom === groupRoom);
+  const groupIds = groupStudents.flatMap((student) => student.coreStudentId ? [student.coreStudentId] : []).sort();
+  const groupReady = groupIds.length > 0 && groupIds.length === groupStudents.length;
+  const elementaryPenalty = negative && (bulk ? Boolean(groupGrade) && Number(groupGrade) <= 6 : Boolean(selectedStudent && selectedStudent.grade <= 6));
+  const entryPoints = elementaryPenalty ? '1' : points;
+  const normalizeItem = (value: string) => value.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
+  const itemNeedle = normalizeItem(itemSearch);
+  const activeItems = (items.data ?? []).filter((item) => item.type === type);
+  const matchingItems = activeItems.filter((item) => normalizeItem(item.name).includes(itemNeedle));
+  const visibleItems = activeItems.filter((item) => item.id === selectedItem?.id || matchingItems.includes(item))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  const itemGroups = elementaryPenalty ? [['1점', visibleItems] as const] : [
+    ['고정 점수', visibleItems.filter((item) => item.fixedPoints != null)] as const,
+    ['점수 직접 입력', visibleItems.filter((item) => item.fixedPoints == null)] as const,
+  ];
+
+  const saving = create.isPending || createGroup.isPending;
+
 
   const resetForNextStudent = () => {
     setStudentId('');
@@ -494,8 +523,8 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!studentId || !points || !admin || savingRef.current) return;
-    if (!selectedStudent?.coreStudentId) {
+    if (!entryPoints || !admin || savingRef.current || (bulk && !groupReady)) return;
+    if (!bulk && !selectedStudent?.coreStudentId) {
       notify('이 학생의 Core Identity 연결을 확인해주세요.', 'error');
       return;
     }
@@ -505,7 +534,33 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
       notify('점수 항목을 선택하거나 사유를 입력해주세요.', 'error');
       return;
     }
-    const pointValue = Number(points);
+    const pointValue = Number(entryPoints);
+    if (bulk) {
+      const groupLabel = groupRoom || `G${groupGrade} 전체`;
+      const fingerprint = JSON.stringify([groupGrade, groupRoom, groupIds, itemName, pointValue, recordedAt]);
+      if (requestRef.current?.fingerprint !== fingerprint) {
+        if (!window.confirm(`${groupLabel} ${groupIds.length}명에게 ‘${itemName}’ 벌점 ${pointValue}점을 기록할까요?`)) return;
+        requestRef.current = { fingerprint, id: crypto.randomUUID() };
+      }
+      savingRef.current = true;
+      createGroup.mutate({
+        grade: Number(groupGrade), homeroom: groupRoom || null, studentIds: groupIds,
+        item: itemName, points: pointValue, recordedAt, requestId: requestRef.current.id,
+      }, {
+        onSuccess: (count) => {
+          requestRef.current = null;
+          queryClient.invalidateQueries();
+          setGroupGrade('');
+          setGroupRoom('');
+          if (!continuousMode) { setItemId(''); setCustomItem(''); setPoints(''); }
+          notify(`${groupLabel} · ${count}명 벌점 기록 완료`);
+        },
+        onError: (error) => notify(errText(error), 'error'),
+        onSettled: () => { savingRef.current = false; },
+      });
+      return;
+    }
+    if (!selectedStudent?.coreStudentId) return;
     const studentName = selectedStudent.name;
 
     const fingerprint = JSON.stringify([selectedStudent.coreStudentId,type,itemName,pointValue,recordedAt,reflectionSubmitted]);
@@ -581,7 +636,36 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
         </div>
 
         <div className="form-grid" style={{ marginTop: 25 }}>
-          <div className="field full">
+          {negative && <label className="check-row field full">
+            <input type="checkbox" checked={groupMode} disabled={saving} onChange={(event) => {
+              setGroupMode(event.target.checked);
+              setReflectionSubmitted(false);
+            }} /> 단체 벌점
+          </label>}
+          {bulk ? <>
+            <div className="field">
+              <label htmlFor="entry-group-grade">학년</label>
+              <select id="entry-group-grade" className="select" required value={groupGrade} onChange={(event) => {
+                setGroupGrade(event.target.value);
+                setGroupRoom('');
+              }}>
+                <option value="">학년 선택</option>
+                {groupGrades.map((grade) => <option key={grade} value={grade}>G{grade}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="entry-group-room">반</label>
+              <select id="entry-group-room" className="select" value={groupRoom} disabled={!groupGrade} onChange={(event) => setGroupRoom(event.target.value)}>
+                <option value="">학년 전체</option>
+                {groupRooms.map((room) => <option key={room} value={room}>{room}</option>)}
+              </select>
+            </div>
+            {groupGrade && <div className="field full side-note">
+              <strong>대상 {groupStudents.length}명</strong>
+              <div className="record-meta">{groupStudents.map((student) => student.name).join(' · ')}</div>
+              {!groupReady && <div className="record-meta">대상 학생의 Core 연결과 명부를 확인해주세요.</div>}
+            </div>}
+          </> : <div className="field full">
             <label htmlFor="entry-student">학생 검색</label>
             <div className="search-box">
               <Search size={15} />
@@ -617,10 +701,17 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
               </option>)}
             </select>
             {needle && filteredStudents.length === 1 && !studentId && <div className="record-meta">Enter를 누르면 {filteredStudents[0].name} 학생을 바로 선택합니다.</div>}
-          </div>
+          </div>}
 
           <div className="field full">
             <label htmlFor="entry-item">점수 항목</label>
+            {activeItems.length > 8 && <div className="search-box">
+              <Search size={15} aria-hidden="true" />
+              <input className="input" aria-label="점수 항목 검색" placeholder="항목명으로 검색"
+                lang="ko" autoComplete="off" value={itemSearch}
+                onChange={(event) => setItemSearch(event.target.value)}
+                onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) event.preventDefault(); }} />
+            </div>}
             <select
               id="entry-item"
               className="select"
@@ -633,10 +724,13 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
               data-testid="select-point-item"
             >
               <option value="">사유 직접 입력</option>
-              {(items.data ?? []).filter((item) => item.type === type).map((item) => <option key={item.id} value={item.id}>
-                {item.name + (item.fixedPoints != null ? ' · ' + item.fixedPoints + '점' : '')}
-              </option>)}
+              {itemGroups.map(([label, group]) => group.length > 0 && <optgroup key={label} label={label}>
+                {group.map((item) => <option key={item.id} value={item.id}>
+                  {item.name + (elementaryPenalty ? ' · 1점' : item.fixedPoints != null ? ' · ' + item.fixedPoints + '점' : '')}
+                </option>)}
+              </optgroup>)}
             </select>
+            {itemNeedle && <span className="record-meta" role="status">{matchingItems.length ? `검색 결과 ${matchingItems.length}개` : '일치하는 항목이 없습니다.'}</span>}
           </div>
 
           {!itemId && <div className="field full">
@@ -646,7 +740,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 
           <div className="field">
             <label htmlFor="entry-points">점수</label>
-            <input id="entry-points" className="input" type="number" min="1" max="100" required value={points} onChange={(event) => setPoints(event.target.value)} data-testid="input-point-value" />
+            <input id="entry-points" className="input" type="number" min="1" max="100" required readOnly={elementaryPenalty} value={entryPoints} onChange={(event) => setPoints(event.target.value)} data-testid="input-point-value" />
           </div>
 
           <div className="field">
@@ -668,15 +762,15 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
             연속 입력 모드 — 저장 후 항목·점수·날짜를 유지
           </label>
 
-          {negative && <label className="check-row field full">
+          {negative && !bulk && <label className="check-row field full">
             <input type="checkbox" checked={recordedAt <= today() && reflectionSubmitted} disabled={recordedAt > today()} onChange={(event) => setReflectionSubmitted(event.target.checked)} data-testid="checkbox-reflection-submitted" />
             같은 날 반성문 제출 완료
           </label>}
         </div>
 
         <div className="modal-actions">
-          <button className="btn btn-primary" disabled={create.isPending || !studentId || !points || (!selectedItem && !customItem.trim()) || !selectedStudent?.coreStudentId} data-testid="button-submit-point">
-            {create.isPending ? '저장 중' : (negative ? '벌점' : '상점') + ' 기록 + 다음 학생'}
+          <button className="btn btn-primary" disabled={saving || !entryPoints || (!selectedItem && !customItem.trim()) || (bulk ? !groupReady : !selectedStudent?.coreStudentId)} data-testid="button-submit-point">
+            {saving ? '저장 중' : bulk ? '단체 벌점 기록' : (negative ? '벌점' : '상점') + ' 기록 + 다음 학생'}
           </button>
         </div>
       </form>
@@ -741,7 +835,7 @@ function ReflectionsPage() {
 
   const rows = (reflections.data ?? []).filter((reflection) =>
     (filter === 'ALL' || (filter === 'TODAY'
-      ? !reflection.submitted && (reflection.recordedAt.slice(0, 10) === today() || reflection.status === 'DOUBLE')
+      ? reflectionIsOnNotice(reflection, today(), today())
       : filter === 'MISSING' ? reflection.status !== 'SUBMITTED' : reflection.status === filter))
     && matchesDisciplineScope(reflection.grade, admin?.disciplineScope)
     && (scopeFilter === 'ALL' || reflection.assignedScope === scopeFilter)
@@ -751,7 +845,7 @@ function ReflectionsPage() {
     <PageHeader
       eyebrow="반성문 관리"
       title="반성문 대상자"
-      copy="주간 상벌NET이 음수일 때만 반성문 대상입니다. 초등은 익일 등교, 중고등은 기본 17시·필요 시 다음날 17시 연장(주말 발생은 월요일) 기준으로 제출 상태를 확인합니다."
+      copy="주간 상벌NET이 음수일 때만 반성문 대상입니다. 초등은 다음 등교일 08:20, 중고등은 기본 17시·필요 시 다음날 17시 연장(주말 발생은 월요일) 기준으로 제출 상태를 확인합니다."
     />
 
     <div className="card card-pad" style={{ marginTop: 30 }}>
@@ -791,20 +885,25 @@ function ReflectionsPage() {
             <td className="muted"><div>{dateTimeLabel(reflection.dueAt)}</div>{reflection.deadlineChangeReason && <div className="record-meta">연장 사유: {reflection.deadlineChangeReason}</div>}</td>
             <td><span className={'pill ' + (reflection.status === 'SUBMITTED' ? 'pill-positive' : reflection.status === 'DOUBLE' ? 'pill-negative' : 'pill-warning')}>{reflection.status === 'SUBMITTED' ? '제출 완료' : reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}</span>{reflection.submittedAt && <div className="record-meta">제출 {dateTimeLabel(reflection.submittedAt)}</div>}</td>
             <td><div className="toolbar-right">
-              <button className="btn btn-outline" onClick={() => {
+              <button className="btn btn-outline" disabled={update.isPending} onClick={() => {
                 update.mutate({ id: reflection.id, data: { submitted: !reflection.submitted } }, {
                   onSuccess: () => {
                     queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() });
                     queryClient.invalidateQueries({ queryKey: ['reports', 'daily-notice'] });
                     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                     queryClient.invalidateQueries({ queryKey: ['students'] });
-                    notify('반성문 상태를 변경했습니다.');
+                    notify(reflection.status === 'DOUBLE' ? '2배 대상을 해제하고 제출 완료로 처리했습니다.' : '반성문 상태를 변경했습니다.');
                   },
                   onError: (error) => notify(errText(error), 'error'),
                 });
-              }} data-testid={'button-toggle-reflection-' + reflection.id}>{reflection.submitted ? '미제출로' : '제출 완료'}</button>
+              }} data-testid={'button-toggle-reflection-' + reflection.id}>{reflection.submitted ? '미제출로' : reflection.status === 'DOUBLE' ? '2배 해제 후 제출 완료' : '제출 완료'}</button>
               {!reflection.submitted && reflection.grade >= 7 && <button className="btn btn-outline" onClick={() => {
-                const reason = window.prompt('발생일 다음날 17시까지 연장합니다. 주말 발생은 월요일 17시입니다. 연장 사유를 입력하세요.', '오후 벌점 발생');
+                const date = new Date(reflection.recordedAt + 'T00:00:00Z');
+                date.setUTCDate(date.getUTCDate() + (date.getUTCDay() === 6 ? 2 : 1));
+                const target = new Intl.DateTimeFormat('ko-KR', {
+                  month: 'numeric', day: 'numeric', weekday: 'short', timeZone: 'UTC',
+                }).format(date);
+                const reason = window.prompt(`${target} 17시까지 연장합니다. 연장 사유를 입력하세요.`, '오후 벌점 발생');
                 if (reason == null) return;
                 extend.mutate({ id: reflection.id, reason }, {
                   onSuccess: (deadline) => {
@@ -903,7 +1002,7 @@ function ReportsPage() {
       <PageHeader
         eyebrow="통지 · 보고"
         title="공지·출력"
-        copy="오늘 반성문 미제출 대상과 이전 날짜에서 이월된 2배 제출 대상을 함께 공지합니다. 제출 완료 건은 자동 제외됩니다."
+        copy="오늘 발생하거나 마감되는 반성문과 이전 날짜에서 이월된 2배 제출 대상을 공지합니다. 제출 완료 건은 자동 제외됩니다."
         action={<button className="btn btn-primary" onClick={() => window.print()} data-testid="button-print-report"><Printer size={15} /> 인쇄</button>}
       />
 
@@ -946,7 +1045,7 @@ function ReportsPage() {
       {noticeText.trim() && <p className="print-notice-text" style={{ whiteSpace: 'pre-wrap' }}>{noticeText}</p>}
       {mode === 'DAILY' ? <>
         <div className="print-summary">
-          <span>오늘 반성문 미제출 <strong>{filteredDaily.filter((row) => row.recordedAt === noticeDate && row.status === 'MISSING').length}</strong>건</span>
+          <span>오늘 반성문 미제출 <strong>{filteredDaily.filter((row) => row.status === 'MISSING').length}</strong>건</span>
           <span>2배 제출 대상 <strong>{filteredDaily.filter((row) => row.status === 'DOUBLE').length}</strong>건</span>
           <span>총 제출 필요 <strong>{filteredDaily.length}</strong>건</span>
         </div>
@@ -956,12 +1055,13 @@ function ReportsPage() {
             return <section className="print-group" key={className}>
               <h2>{className}</h2>
               <table className="print-table">
-                <thead><tr><th style={{ width: '14%' }}>학생</th><th>벌점 사유</th><th style={{ width: '13%' }}>발생일</th><th style={{ width: '9%' }}>벌점</th><th style={{ width: '18%' }}>처분</th><th style={{ width: '20%' }}>마감</th></tr></thead>
+                <thead><tr><th style={{ width: '14%' }}>학생</th><th>벌점 사유</th><th style={{ width: '13%' }}>발생일</th><th style={{ width: '8%' }}>벌점</th><th style={{ width: '10%' }}>주간 NET</th><th style={{ width: '18%' }}>처분</th><th style={{ width: '20%' }}>마감</th></tr></thead>
                 <tbody>{rows.map((row) => <tr key={row.pointRecordId}>
                   <td><strong>{row.studentName}</strong></td>
                   <td>{row.item}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>{dateLabel(row.recordedAt)}</td>
                   <td className="print-number">−{row.points}</td>
+                  <td className="print-number">{row.weeklyNet > 0 ? `+${row.weeklyNet}` : row.weeklyNet}</td>
                   <td>
                     <span className={'print-reflection-status ' + (row.status === 'DOUBLE' ? 'print-reflection-status-double' : 'print-reflection-status-missing')}>
                       {row.status === 'DOUBLE' ? '2배 제출 대상' : '반성문 미제출'}
@@ -2062,17 +2162,49 @@ function PointItemsPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
   const importer = useImportPointItems();
   const [editing, setEditing] = useState<PointItem | null | undefined>(undefined);
   const [importText, setImportText] = useState('');
+  const [sheetItems, setSheetItems] = useState<Array<{ name: string; fixedPoints: number | null }> | null>(null);
+  const [readingImport, setReadingImport] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [form, setForm] = useState({ name: '', type, fixedPoints: '', isFixed: false, isActive: true });
-  const list = useMemo(() => importText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => { const [name, score] = line.split(',').map((cell) => cell.trim()); return { name, fixedPoints: score ? Number(score) : null }; }), [importText]);
+  const list = useMemo(() => sheetItems ?? importText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => { const [name, score] = line.split(',').map((cell) => cell.trim()); return { name, fixedPoints: score ? Number(score) : null }; }), [importText, sheetItems]);
   const refresh = () => queryClient.invalidateQueries({ queryKey: getListPointItemsQueryKey({ type, includeInactive: true }) });
   const openNew = () => { setForm({ name: '', type, fixedPoints: '', isFixed: false, isActive: true }); setEditing(null); };
   const openEdit = (item: PointItem) => { setForm({ name: item.name, type: item.type, fixedPoints: item.fixedPoints == null ? '' : String(item.fixedPoints), isFixed: item.isFixed, isActive: item.isActive }); setEditing(item); };
   const save = (event: FormEvent) => { event.preventDefault(); const data = { name: form.name.trim(), type, fixedPoints: form.fixedPoints ? Number(form.fixedPoints) : null, isFixed: form.isFixed, isActive: form.isActive }; const done = { onSuccess: () => { refresh(); setEditing(undefined); }, onError: (error: unknown) => notify(errText(error), 'error') }; if (editing) update.mutate({ id: editing.id, data }, done); else create.mutate({ data }, done); };
-  const importItems = () => { importer.mutate({ data: { items: list } }, { onSuccess: () => { refresh(); setShowImport(false); setImportText(''); }, onError: (error) => notify(errText(error), 'error') }); };
+  const importItems = () => { importer.mutate({ data: { items: list, sourceSheet: sheetItems !== null } }, { onSuccess: () => { refresh(); setShowImport(false); setImportText(''); setSheetItems(null); }, onError: (error) => notify(errText(error), 'error') }); };
+  const importIsValid = list.length > 0
+    && new Set(list.map((item) => item.name)).size === list.length
+    && list.every((item) => item.name && item.name.length <= 80
+      && (item.fixedPoints == null || (Number.isInteger(item.fixedPoints) && item.fixedPoints >= 1 && item.fixedPoints <= 100)));
+  const readPointItems = async (file?: File) => {
+    if (!file) return;
+    setReadingImport(true);
+    setSheetItems(null);
+    setImportText('');
+    try {
+      if (!file.name.toLowerCase().endsWith('.xlsx')) {
+        setImportText(await file.text());
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) throw new Error('10MB 이하의 엑셀 파일을 선택해주세요.');
+      const { default: readExcel } = await import('read-excel-file/browser');
+      const sheet = (await readExcel(file)).find((entry) => entry.sheet === '벌점 항목 관리');
+      const header = sheet?.data.findIndex((row) => row[1] === '벌점 항목' && row[2] === '점수') ?? -1;
+      if (!sheet || header < 0) throw new Error('벌점 항목 관리 탭의 B열(벌점 항목)과 C열(점수)을 확인해주세요.');
+      setSheetItems(sheet.data.slice(header + 1).flatMap((row) => {
+        const name = typeof row[1] === 'string' ? row[1].trim() : '';
+        if (!name && row[2] == null) return [];
+        return [{ name, fixedPoints: row[2] == null ? null : typeof row[2] === 'number' ? Math.abs(row[2]) : NaN }];
+      }));
+    } catch (error) {
+      notify(errText(error), 'error');
+    } finally {
+      setReadingImport(false);
+    }
+  };
   if (items.isLoading) return <LoadingState />;
   if (items.isError) return <ErrorState error={items.error} retry={() => items.refetch()} />;
-  return <div><PageHeader eyebrow="기준 관리" title={type === 'NEGATIVE' ? '벌점항목관리' : '상점항목관리'} copy={(type === 'NEGATIVE' ? '벌점' : '상점') + ' 입력에 쓰이는 항목과 고정 점수를 관리합니다.'} action={<>{type === 'NEGATIVE' && <button className="btn btn-outline" onClick={() => setShowImport(true)} data-testid="button-open-import"><FileSpreadsheet size={15} /> 엑셀 가져오기</button>}<button className="btn btn-primary" onClick={openNew} data-testid="button-add-point-item"><Plus size={15} /> 항목 추가</button></>} /><div className="card card-pad" style={{ marginTop: 30 }}><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">활성 및 비활성 항목</h2><p className="section-copy">비활성화된 항목은 입력 화면에서 선택되지 않습니다.</p></div></div><div className="table-wrap"><table className="data-table"><thead><tr><th>항목명</th><th>구분</th><th>고정 점수</th><th>상태</th><th>관리</th></tr></thead><tbody>{(items.data ?? []).map((item) => <tr key={item.id} data-testid={`row-point-item-${item.id}`}><td>{item.name}</td><td><span className={`pill ${item.type === 'NEGATIVE' ? 'pill-negative' : 'pill-positive'}`}>{item.type === 'NEGATIVE' ? '벌점' : '상점'}</span></td><td>{item.isFixed ? `${item.fixedPoints ?? 0}점` : '수기 입력'}</td><td><span className={`pill ${item.isActive ? 'pill-positive' : 'pill-neutral'}`}>{item.isActive ? '활성' : '비활성'}</span></td><td><div className="toolbar-right"><button className="btn btn-icon btn-outline" onClick={() => openEdit(item)} aria-label={`${item.name} 수정`} data-testid={`button-edit-point-item-${item.id}`}><Pencil size={14} /></button><button className="btn btn-icon btn-danger" onClick={() => { if (window.confirm(`${item.name} 항목을 비활성화할까요?`)) remove.mutate({ id: item.id }, { onSuccess: refresh, onError: (error) => notify(errText(error), 'error') }); }} aria-label={`${item.name} 삭제`} data-testid={`button-delete-point-item-${item.id}`}><Trash2 size={14} /></button></div></td></tr>)}</tbody></table></div>{items.data?.length === 0 && <EmptyState title="항목이 없습니다" copy="항목을 추가하면 기록 입력 화면에서 선택할 수 있습니다." />}</div>{editing !== undefined && <div className="modal-backdrop"><form className="modal" onSubmit={save}><div className="modal-header"><div><div className="eyebrow">기준 항목</div><h2 className="modal-title">{editing ? '항목 수정' : '새 항목'}</h2></div><button type="button" className="btn btn-icon btn-outline" onClick={() => setEditing(undefined)} aria-label="닫기" data-testid="button-close-point-item"><X size={16} /></button></div><div className="form-grid"><div className="field full"><label htmlFor="item-name">항목명</label><input id="item-name" className="input" required maxLength={80} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} data-testid="input-point-item-name" /></div><div className="field"><label>구분</label><span className={'pill ' + (type === 'NEGATIVE' ? 'pill-negative' : 'pill-positive')}>{type === 'NEGATIVE' ? '벌점' : '상점'}</span></div><div className="field"><label htmlFor="item-score">고정 점수</label><input id="item-score" className="input" type="number" min="0" max="100" value={form.fixedPoints} onChange={(event) => setForm({ ...form, fixedPoints: event.target.value })} placeholder="비워두면 수기 입력" data-testid="input-point-item-score" /></div><label className="check-row field full"><input type="checkbox" checked={form.isFixed} onChange={(event) => setForm({ ...form, isFixed: event.target.checked })} data-testid="checkbox-point-item-fixed" /> 고정 점수 항목으로 사용</label><label className="check-row field full"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} data-testid="checkbox-point-item-active" /> 입력 화면에 활성화</label></div><div className="modal-actions"><button type="button" className="btn btn-outline" onClick={() => setEditing(undefined)} data-testid="button-cancel-point-item">취소</button><button className="btn btn-primary" disabled={create.isPending || update.isPending} data-testid="button-submit-point-item">저장하기</button></div></form></div>}{showImport && <div className="modal-backdrop"><div className="modal modal-wide"><div className="modal-header"><div><div className="eyebrow">대량 등록</div><h2 className="modal-title">엑셀 미리보기</h2></div><button className="btn btn-icon btn-outline" onClick={() => setShowImport(false)} aria-label="닫기" data-testid="button-close-import"><X size={16} /></button></div><div className="csv-hint"><span>첫 번째 열은 항목명, 두 번째 열은 고정 점수입니다.</span><label className="btn btn-outline" htmlFor="csv-file"><FileSpreadsheet size={14} /> 파일 선택</label><input id="csv-file" type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={(event) => { const file = event.target.files?.[0]; if (file) file.text().then(setImportText); }} data-testid="input-import-file" /></div><textarea className="input" style={{ marginTop: 15, width: '100%', minHeight: 100, resize: 'vertical' }} placeholder={'생활 태도, 2\n기숙사 정리, 1'} value={importText} onChange={(event) => setImportText(event.target.value)} data-testid="textarea-import-data" /><div className="import-preview" style={{ marginTop: 15 }}><table className="data-table"><thead><tr><th>항목명</th><th>고정 점수</th><th>검증</th></tr></thead><tbody>{list.map((item, index) => <tr key={`${item.name}-${index}`}><td>{item.name || '이름 없음'}</td><td>{Number.isFinite(item.fixedPoints) ? item.fixedPoints : '수기 입력'}</td><td>{item.name && (!item.fixedPoints || (item.fixedPoints >= 0 && item.fixedPoints <= 100)) ? <span className="success-text">유효</span> : <span className="danger-text">확인 필요</span>}</td></tr>)}</tbody></table></div><div className="modal-actions"><button className="btn btn-outline" onClick={() => setShowImport(false)} data-testid="button-cancel-import">취소</button><button className="btn btn-primary" disabled={importer.isPending || list.length === 0} onClick={importItems} data-testid="button-submit-import">{importer.isPending ? '가져오는 중' : `${list.length}개 가져오기`}</button></div></div></div>}</div>;
+  return <div><PageHeader eyebrow="기준 관리" title={type === 'NEGATIVE' ? '벌점항목관리' : '상점항목관리'} copy={(type === 'NEGATIVE' ? '벌점' : '상점') + ' 입력에 쓰이는 항목과 고정 점수를 관리합니다.'} action={<>{type === 'NEGATIVE' && <button className="btn btn-outline" onClick={() => setShowImport(true)} data-testid="button-open-import"><FileSpreadsheet size={15} /> 엑셀 가져오기</button>}<button className="btn btn-primary" onClick={openNew} data-testid="button-add-point-item"><Plus size={15} /> 항목 추가</button></>} /><div className="card card-pad" style={{ marginTop: 30 }}><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">활성 및 비활성 항목</h2><p className="section-copy">비활성화된 항목은 입력 화면에서 선택되지 않습니다.</p></div></div><div className="table-wrap"><table className="data-table"><thead><tr><th>항목명</th><th>구분</th><th>고정 점수</th><th>상태</th><th>관리</th></tr></thead><tbody>{(items.data ?? []).map((item) => <tr key={item.id} data-testid={`row-point-item-${item.id}`}><td>{item.name}</td><td><span className={`pill ${item.type === 'NEGATIVE' ? 'pill-negative' : 'pill-positive'}`}>{item.type === 'NEGATIVE' ? '벌점' : '상점'}</span></td><td>{item.isFixed ? `${item.fixedPoints ?? 0}점` : '수기 입력'}</td><td><span className={`pill ${item.isActive ? 'pill-positive' : 'pill-neutral'}`}>{item.isActive ? '활성' : '비활성'}</span></td><td><div className="toolbar-right"><button className="btn btn-icon btn-outline" onClick={() => openEdit(item)} aria-label={`${item.name} 수정`} data-testid={`button-edit-point-item-${item.id}`}><Pencil size={14} /></button><button className="btn btn-icon btn-danger" onClick={() => { if (window.confirm(`${item.name} 항목을 비활성화할까요?`)) remove.mutate({ id: item.id }, { onSuccess: refresh, onError: (error) => notify(errText(error), 'error') }); }} aria-label={`${item.name} 삭제`} data-testid={`button-delete-point-item-${item.id}`}><Trash2 size={14} /></button></div></td></tr>)}</tbody></table></div>{items.data?.length === 0 && <EmptyState title="항목이 없습니다" copy="항목을 추가하면 기록 입력 화면에서 선택할 수 있습니다." />}</div>{editing !== undefined && <div className="modal-backdrop"><form className="modal" onSubmit={save}><div className="modal-header"><div><div className="eyebrow">기준 항목</div><h2 className="modal-title">{editing ? '항목 수정' : '새 항목'}</h2></div><button type="button" className="btn btn-icon btn-outline" onClick={() => setEditing(undefined)} aria-label="닫기" data-testid="button-close-point-item"><X size={16} /></button></div><div className="form-grid"><div className="field full"><label htmlFor="item-name">항목명</label><input id="item-name" className="input" required maxLength={80} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} data-testid="input-point-item-name" /></div><div className="field"><label>구분</label><span className={'pill ' + (type === 'NEGATIVE' ? 'pill-negative' : 'pill-positive')}>{type === 'NEGATIVE' ? '벌점' : '상점'}</span></div><div className="field"><label htmlFor="item-score">고정 점수</label><input id="item-score" className="input" type="number" min="0" max="100" value={form.fixedPoints} onChange={(event) => setForm({ ...form, fixedPoints: event.target.value })} placeholder="비워두면 수기 입력" data-testid="input-point-item-score" /></div><label className="check-row field full"><input type="checkbox" checked={form.isFixed} onChange={(event) => setForm({ ...form, isFixed: event.target.checked })} data-testid="checkbox-point-item-fixed" /> 고정 점수 항목으로 사용</label><label className="check-row field full"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} data-testid="checkbox-point-item-active" /> 입력 화면에 활성화</label></div><div className="modal-actions"><button type="button" className="btn btn-outline" onClick={() => setEditing(undefined)} data-testid="button-cancel-point-item">취소</button><button className="btn btn-primary" disabled={create.isPending || update.isPending} data-testid="button-submit-point-item">저장하기</button></div></form></div>}{showImport && <div className="modal-backdrop"><div className="modal modal-wide"><div className="modal-header"><div><div className="eyebrow">대량 등록</div><h2 className="modal-title">엑셀 미리보기</h2></div><button className="btn btn-icon btn-outline" onClick={() => setShowImport(false)} aria-label="닫기" data-testid="button-close-import"><X size={16} /></button></div><div className="csv-hint"><span>원본 엑셀의 ‘벌점 항목 관리’ 탭 또는 항목명·점수 두 열의 CSV를 선택하세요.</span><label className="btn btn-outline" htmlFor="csv-file"><FileSpreadsheet size={14} /> 파일 선택</label><input id="csv-file" type="file" accept=".xlsx,.csv,.txt" disabled={readingImport} style={{ display: 'none' }} onChange={(event) => { void readPointItems(event.target.files?.[0]); }} data-testid="input-import-file" /></div><textarea className="input" style={{ marginTop: 15, width: '100%', minHeight: 100, resize: 'vertical' }} placeholder={'생활 태도, 2\n기숙사 정리, 1'} value={importText} onChange={(event) => { setSheetItems(null); setImportText(event.target.value); }} data-testid="textarea-import-data" /><div className="import-preview" style={{ marginTop: 15 }}><table className="data-table"><thead><tr><th>항목명</th><th>고정 점수</th><th>검증</th></tr></thead><tbody>{list.map((item, index) => <tr key={`${item.name}-${index}`}><td>{item.name || '이름 없음'}</td><td>{Number.isFinite(item.fixedPoints) ? item.fixedPoints : '수기 입력'}</td><td>{item.name && (item.fixedPoints == null || (Number.isInteger(item.fixedPoints) && item.fixedPoints >= 1 && item.fixedPoints <= 100)) ? <span className="success-text">유효</span> : <span className="danger-text">확인 필요</span>}</td></tr>)}</tbody></table></div><div className="modal-actions"><button className="btn btn-outline" onClick={() => setShowImport(false)} data-testid="button-cancel-import">취소</button><button className="btn btn-primary" disabled={readingImport || importer.isPending || !importIsValid} onClick={importItems} data-testid="button-submit-import">{importer.isPending ? '가져오는 중' : `${list.length}개 ${sheetItems ? '원본 기준으로 반영' : '가져오기'}`}</button></div></div></div>}</div>;
 }
 
 function PublicHome() {
