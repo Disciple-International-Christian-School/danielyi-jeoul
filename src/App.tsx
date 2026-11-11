@@ -1096,7 +1096,7 @@ function ReportsPage() {
                     <td><span className={'print-reflection-status ' + (double ? 'print-reflection-status-double' : 'print-reflection-status-missing')}>
                       {double ? '2배제출' : '반성문'}
                     </span></td>
-                    <td>{double ? '반성문 미제출' : row.item}</td>
+                    <td>{row.item}</td>
                     <td className="print-date">{row.recordedAt.slice(5).split('-').map(Number).join('/')}</td>
                     <td className="print-pages">{pages}</td>
                     <td>{dateTimeLabel(row.actionDueAt)}</td>
