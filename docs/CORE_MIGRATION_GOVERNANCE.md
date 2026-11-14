@@ -4,6 +4,8 @@
 
 > Interim governance for a shared Supabase database used by multiple DICS applications.
 
+> **Superseded on 2026-11-15.** The dedicated repository this document anticipates exists as `dics-core`. The complete list of migrations applied to the shared database, 99 on that date, is the [migration ledger](https://github.com/Disciple-International-Christian-School/dics-core/blob/main/docs/architecture/MIGRATION_LEDGER.md), and the current rules are in the [CORE contract](https://github.com/Disciple-International-Christian-School/dics-core/blob/main/docs/architecture/CORE_CONTRACT.md). `supabase/migration-ledger.json` here remains the record for this repository's own migrations only. The sections below are kept as the September 2026 design record.
+
 ## Why this exists
 
 DICS Core is no longer touched by only one application.

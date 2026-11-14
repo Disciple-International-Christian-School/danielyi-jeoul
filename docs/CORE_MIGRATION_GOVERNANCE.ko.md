@@ -2,6 +2,8 @@
 
 **Language / 언어:** [English](CORE_MIGRATION_GOVERNANCE.md) | [한국어](CORE_MIGRATION_GOVERNANCE.ko.md)
 
+> **2026-11-15부로 대체됨.** 이 문서가 예정했던 전용 저장소는 `dics-core`로 존재한다. 공유 DB에 적용된 전체 마이그레이션 목록(해당 일자 기준 99개)은 [마이그레이션 원장](https://github.com/Disciple-International-Christian-School/dics-core/blob/main/docs/architecture/MIGRATION_LEDGER.md)이고, 현재 규칙은 [CORE 계약](https://github.com/Disciple-International-Christian-School/dics-core/blob/main/docs/architecture/CORE_CONTRACT.md)에 있다. 이 저장소의 `supabase/migration-ledger.json`은 이 저장소 자체 마이그레이션의 기록으로만 남는다. 아래 내용은 2026년 9월의 설계 기록으로 보존한다.
+
 여러 학교 앱이 공유하는 Supabase DB의 임시 관리 규칙이다. core·discipline·study_planner·computer_lab 및 향후 assessment가 같은 프로젝트를 사용한다. 병렬 작업에서 운영 DB가 Git보다 먼저 바뀐 사례가 있어 책임자와 인수인계 규약이 필요해졌다.
 
 ## 1. 임시 기준 저장소
