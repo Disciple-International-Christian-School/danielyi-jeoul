@@ -6,6 +6,10 @@
       "ko": "README.ko.md"
     },
     {
+      "en": "AGENTS.md",
+      "ko": "AGENTS.ko.md"
+    },
+    {
       "en": "docs/ADMIN_ACCOUNT_OPERATIONS.md",
       "ko": "docs/ADMIN_ACCOUNT_OPERATIONS.ko.md"
     },
@@ -121,7 +125,8 @@
   "aliases": [
     "README.en.md",
     "docs/README.en.md",
-    "docs/KEY_ISSUES.en.md"
+    "docs/KEY_ISSUES.en.md",
+    "CLAUDE.md"
   ],
   "archives": [
     "docs/archive/supabase-capacity-source.ko.html",
