@@ -1,24 +1,29 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowDownRight, ArrowRight, ArrowUpRight, BookOpenCheck, CalendarDays, Check, ChevronRight, CircleCheck, Clock3, Dumbbell, FileClock, Printer, Search, ShieldAlert, Users, X } from 'lucide-react';
 import { Link } from 'wouter';
-import { reflectionIsOnNotice, type DepartmentMeritStatus, type DisciplineScope, type Reflection, type StudentSummary } from '@/lib/api';
+import { reflectionIsOnNotice, type DepartmentMeritStatus, type DisciplineScope, type Reflection, type StudentSummary, type SeondoNotice } from '@/lib/api';
 import './dashboard.css';
 import { PointHistory } from './point-history';
+import { DashboardOperations, dashboardTime, settlementCaption, type SettlementState } from './dashboard-operations';
+import { TestProfileResults, findTestProfiles } from './test-profiles';
 
 type ReadState<T> = { data: T | undefined; loading: boolean; error: boolean };
-type Target = 'ALL' | 'PHYSICAL' | 'COMMITTEE';
+type Target = 'ALL' | 'MISSING' | 'DOUBLE' | 'PHYSICAL' | 'COMMITTEE';
 type Props = {
   students: StudentSummary[];
   reflections: Reflection[];
   calendar: { date: string; label: string; weekLabel: string };
   scope?: DisciplineScope | null;
   isLead: boolean;
-  seondoActive: boolean;
+  notice: SeondoNotice;
+  weekly: SettlementState;
+  monthly: SettlementState;
+  retrySettlements: () => void;
   departments: ReadState<DepartmentMeritStatus[]>;
 };
 
 const scopeLabels = { ALL: '전체 학년', ELEMENTARY: '초등', MIDDLE: '중등', HIGH: '고등' };
-const targetLabels: Array<[Target, string]> = [['ALL', '전체 학생'], ['PHYSICAL', '체력훈련 대상자'], ['COMMITTEE', '징계위원회 대상자']];
+const targetLabels: Array<[Target, string]> = [['ALL', '전체 학생'], ['MISSING', '반성문 미제출'], ['DOUBLE', '2배 제출'], ['PHYSICAL', '체력훈련 대상자'], ['COMMITTEE', '징계위원회 대상자']];
 const shortDate = (date: string) => new Intl.DateTimeFormat('ko-KR', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Seoul' }).format(new Date(date + 'T12:00:00+09:00'));
 
 function ActionRow({ href, icon, title, copy, badge }: { href: string; icon: ReactNode; title: string; copy: string; badge?: string }) {
@@ -30,7 +35,17 @@ function ActionRow({ href, icon, title, copy, badge }: { href: string; icon: Rea
   </Link>;
 }
 
-export function DashboardView({ students, reflections, calendar, scope, isLead, seondoActive, departments }: Props) {
+export function DashboardView({ students, reflections, calendar, scope, isLead, notice, weekly, monthly, retrySettlements, departments }: Props) {
+  const seondoActive = notice.active;
+  const pendingByStudent = useMemo(() => {
+    const grouped = new Map<string, Reflection[]>();
+    for (const row of reflections) {
+      if (!row.isCurrentStudent || row.status === 'SUBMITTED') continue;
+      grouped.set(row.coreStudentId, [...(grouped.get(row.coreStudentId) ?? []), row]);
+    }
+    for (const entries of grouped.values()) entries.sort((a, b) => Date.parse(a.actionDueAt) - Date.parse(b.actionDueAt));
+    return grouped;
+  }, [reflections]);
   const [historyDate, setHistoryDate] = useState(calendar.date);
   const [historyVersion, setHistoryVersion] = useState(0);
   const historyPanel = useRef<HTMLDivElement>(null);
@@ -46,28 +61,24 @@ export function DashboardView({ students, reflections, calendar, scope, isLead, 
   const rows = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return students.filter(student =>
-      (target === 'ALL' || (target === 'PHYSICAL' ? student.physicalTrainingRequired : student.committeeRequired))
+      (target === 'ALL' || (target === 'PHYSICAL' ? student.physicalTrainingRequired : target === 'COMMITTEE' ? student.committeeRequired :
+        (pendingByStudent.get(student.coreStudentId ?? '') ?? []).some(row => target === 'MISSING' || row.status === 'DOUBLE')))
       && (!needle || [student.name, student.studentNo, student.homeroom].some(value => value?.toLowerCase().includes(needle)))
     ).sort((a, b) => {
-      // Gross components keep merit-only and fully offset records above empty rows.
-      const hasPoints = (student: StudentSummary) =>
-        student.positivePoints > 0 || student.negativePoints > 0 || student.weeklyRecordCount > 0;
-      const recordedFirst = Number(hasPoints(b)) - Number(hasPoints(a));
-      if (recordedFirst) return recordedFirst;
       return (sort === 'name' ? a.name.localeCompare(b.name, 'ko') : sort === 'grade'
         ? a.grade - b.grade || (a.homeroom ?? '').localeCompare(b.homeroom ?? '', 'ko')
         : b.weeklyNetPenaltyPoints - a.weeklyNetPenaltyPoints)
         || a.name.localeCompare(b.name, 'ko');
     });
-  }, [students, search, sort, target]);
+  }, [students, search, sort, target, pendingByStudent]);
   const personCount = (predicate: (reflection: Reflection) => boolean) => new Set(reflections.filter(predicate).map(row => row.coreStudentId)).size;
   const missing = personCount(row => row.isCurrentStudent && row.status !== 'SUBMITTED');
   const metrics = [
-    { label: '반성문 대상자', value: personCount(row => reflectionIsOnNotice(row, calendar.date, calendar.date, seondoActive)), note: seondoActive ? '오늘 게시한 명단' : '오늘 발생·마감 + 이월 2배', icon: BookOpenCheck, href: '/reflections?view=TODAY', tone: 'normal' },
+    { label: seondoActive ? '오늘 공지 미제출자' : '반성문 대상자', value: seondoActive && !notice.batch?.published_at ? null : personCount(row => reflectionIsOnNotice(row, calendar.date, calendar.date, seondoActive)), note: seondoActive ? (notice.batch?.published_at ? '오늘 게시 명단 중 미제출' : '오늘 공지 게시 전') : '오늘 발생·마감 + 이월 2배', icon: BookOpenCheck, href: '/reflections?view=TODAY', tone: 'normal' },
     { label: '반성문 미제출자', value: missing, note: '이전 날짜 포함 · 미제출 전체', icon: FileClock, href: '/reflections?view=MISSING', tone: 'watch' },
     { label: '2배 제출 대상자', value: personCount(row => row.isCurrentStudent && row.status === 'DOUBLE'), note: '미제출자 중 마감 경과', icon: Clock3, href: '/reflections?view=DOUBLE', tone: 'urgent' },
-    { label: '체력훈련 대상자', value: students.filter(row => row.physicalTrainingRequired).length, note: seondoActive ? '최근 주간 결산' : '벌점 3회 / NET -8 / 2배 미제출', icon: Dumbbell, target: 'PHYSICAL' as Target, tone: 'training' },
-    { label: '징계위원회 대상자', value: students.filter(row => row.committeeRequired).length, note: seondoActive ? '최근 월간 결산 · 체력훈련 3회 이상' : '이번 학기 체력훈련 대상 3주 연속', icon: ShieldAlert, target: 'COMMITTEE' as Target, tone: 'normal' },
+    { label: seondoActive ? '체력훈련 확정 대상' : '체력훈련 대상자', value: seondoActive && isLead && (!weekly.data || weekly.error) ? null : students.filter(row => row.physicalTrainingRequired).length, note: seondoActive ? (isLead ? settlementCaption(weekly, '주간') : '최근 확정 주간 결산 기준') : '벌점 3회 / NET -8 / 2배 미제출', icon: Dumbbell, target: 'PHYSICAL' as Target, tone: 'training' },
+    { label: '징계위원회 대상자', value: seondoActive && isLead && (!monthly.data || monthly.error) ? null : students.filter(row => row.committeeRequired).length, note: seondoActive ? (isLead ? settlementCaption(monthly, '월간') : '최근 확정 월간 결산 기준') : '이번 학기 체력훈련 대상 3주 연속', icon: ShieldAlert, target: 'COMMITTEE' as Target, tone: 'normal' },
   ];
   const openTarget = (value: Target) => {
     setTarget(value);
@@ -96,16 +107,19 @@ export function DashboardView({ students, reflections, calendar, scope, isLead, 
       <div className="desk-header-actions"><Link href="/points/positive" className="btn btn-primary" data-testid="link-quick-positive"><ArrowUpRight />상점 입력</Link><Link href="/points/negative" className="btn btn-outline"><ArrowDownRight />벌점 입력</Link></div>
     </header>
 
+    <DashboardOperations notice={notice} reflections={reflections} date={calendar.date} isLead={isLead} scope={scope} weekly={weekly} monthly={monthly} retry={retrySettlements} />
+
     <section className="desk-overview" aria-label="생활지도 대상자 현황">
       {metrics.map(({ label, value, note, icon: Icon, href, target: metricTarget, tone }, index) => {
-        const content = <><span className="desk-metric-top"><span>{label}</span><Icon size={19} aria-hidden="true" /></span><span className="desk-metric-number">{value}<small>명</small></span><span className="desk-metric-note">{note}</span><span className="desk-metric-bottom">명단 확인<ArrowRight size={15} aria-hidden="true" /></span></>;
-        const className = 'desk-metric ' + (value > 0 ? 'desk-metric-' + tone : '');
+        const content = <><span className="desk-metric-top"><span>{label}</span><Icon size={19} aria-hidden="true" /></span><span className="desk-metric-number">{value ?? '—'}{value !== null && <small>명</small>}</span><span className="desk-metric-note">{note}</span><span className="desk-metric-bottom">명단 확인<ArrowRight size={15} aria-hidden="true" /></span></>;
+        const className = 'desk-metric ' + (value !== null && value > 0 ? 'desk-metric-' + tone : '');
         return href ? <Link href={href} key={label} className={className} data-testid={'card-metric-' + index}>{content}</Link>
           : <button key={label} type="button" className={className} onClick={() => openTarget(metricTarget!)} data-testid={'card-metric-' + index}>{content}</button>;
       })}
     </section>
-    <p className="desk-count-note">대상자 수는 학생 기준이며, 항목 간 중복될 수 있습니다.</p>
+    <p className="desk-count-note">대상자 수는 학생 기준이며, 항목 간 중복될 수 있습니다.{seondoActive && ' · —는 게시·결산 미확정 또는 확인이 필요한 상태입니다.'}</p>
 
+    <details className="desk-secondary-work"><summary>주간 일정 · 부서상점 · 업무 바로가기</summary>
     <div className="desk-work-grid">
       <section className="desk-week" aria-labelledby="desk-week-title">
         <div className="desk-panel-heading"><div><span className="desk-panel-kicker">주간 업무</span><h2 id="desk-week-title">이번 주의 흐름</h2></div><span className="desk-week-range">{shortDate(days[0].date)} – {shortDate(days[6].date)}</span></div>
@@ -122,19 +136,25 @@ export function DashboardView({ students, reflections, calendar, scope, isLead, 
       </section>
     </div>
 
+    </details>
+
     <section className="desk-students" aria-labelledby="dashboard-students">
-      <div className="desk-students-heading"><div><h2 id="dashboard-students" ref={listHeading} tabIndex={-1}>학생 생활점수<span className="desk-row-count" aria-live="polite">{rows.length}명</span></h2><p>주간 점수와 생활지도 상태를 확인합니다.</p></div><span className="desk-net-legend">주간 상벌NET = 상점 − 벌점</span></div>
+      <div className="desk-students-heading"><div><h2 id="dashboard-students" ref={listHeading} tabIndex={-1}>학생 생활점수<span className="desk-row-count" aria-live="polite">{rows.length}명</span></h2><p>{seondoActive ? '점수는 이번 주 실시간 합계, 처분은 최근 확정 결산 기준입니다.' : '주간 점수와 생활지도 상태를 확인합니다.'}</p></div><span className="desk-net-legend">주간 상벌NET = 상점 − 벌점</span></div>
       <div className="desk-filter-bar"><div className="desk-filter-tabs" role="group" aria-label="대상자 필터">{targetLabels.map(([value, label]) => <button key={value} type="button" aria-pressed={target === value} className={target === value ? 'is-active' : ''} onClick={() => setTarget(value)}>{label}</button>)}</div>
         <div className="desk-search-tools"><div className="search-box"><Search size={17} aria-hidden="true" /><input className="input" value={search} onChange={event => setSearch(event.target.value)} placeholder="이름 · 학번 · 반" aria-label="학생 검색" data-testid="input-dashboard-search" />{search && <button type="button" className="desk-clear-search" aria-label="검색어 지우기" onClick={() => setSearch('')}><X size={15} /></button>}</div><select className="select" value={sort} onChange={event => setSort(event.target.value as typeof sort)} aria-label="학생 정렬" data-testid="select-dashboard-sort"><option value="net">주간 상벌NET 낮은 순</option><option value="grade">학년/반 순</option><option value="name">이름 순</option></select></div>
       </div>
-      <div className="table-wrap"><table className="data-table desk-student-table"><caption className="desk-sr-only">학생별 주간 상점, 벌점, 상벌NET 및 생활지도 상태</caption><thead><tr><th scope="col">학생</th><th scope="col">학년 / 반</th><th scope="col" className="desk-number">주간 상점</th><th scope="col" className="desk-number">주간 벌점</th><th scope="col" className="desk-number desk-net-cell">주간 상벌NET</th><th scope="col">상태</th></tr></thead><tbody>{rows.map(student => <tr key={student.id} data-testid={'row-dashboard-student-' + student.id}>
-        <td><Link className="desk-student-identity" href={'/students/' + (student.coreStudentId ?? student.id)} data-testid={'link-dashboard-student-' + student.id}><span className="desk-student-avatar" aria-hidden="true">{student.name.slice(0, 1)}</span><span><strong>{student.name}</strong><small>{student.studentNo ?? '학번 미등록'}</small></span></Link></td><td>{student.homeroom ?? student.grade + '학년'}</td><td className="desk-number success-text">+{student.weeklyPositivePoints}</td><td className="desk-number">−{student.weeklyPenaltyPoints}</td><td className={'desk-number desk-net-cell' + (student.weeklyNetPenaltyPoints >= 8 ? ' danger-text' : '')}>{student.weeklyPositivePoints - student.weeklyPenaltyPoints}</td><td><div className="status-list">{student.statuses.length > 0 ? student.statuses.map(status => status === '체력훈련 대상'
+      <div className="table-wrap"><table className="data-table desk-student-table"><caption className="desk-sr-only">학생별 이번 주 점수, 반성문 제출 기한 및 생활지도 상태</caption><thead><tr><th scope="col">학생</th><th scope="col">학년 / 반</th><th scope="col" className="desk-number">주간 상점</th><th scope="col" className="desk-number">주간 벌점</th><th scope="col" className="desk-number desk-net-cell">주간 상벌NET</th><th scope="col">반성문 제출 기한</th>{seondoActive && <th scope="col" className="desk-number">이번 달 훈련</th>}<th scope="col">상태</th></tr></thead><tbody>{rows.map(student => <tr key={student.id} data-testid={'row-dashboard-student-' + student.id}>
+        <td><Link className="desk-student-identity" href={'/students/' + (student.coreStudentId ?? student.id)} data-testid={'link-dashboard-student-' + student.id}><span className="desk-student-avatar" aria-hidden="true">{student.name.slice(0, 1)}</span><span><strong>{student.name}</strong><small>{student.studentNo ?? '학번 미등록'}</small></span></Link></td><td>{student.homeroom ?? student.grade + '학년'}</td><td className="desk-number success-text">+{student.weeklyPositivePoints}</td><td className="desk-number danger-text">−{student.weeklyPenaltyPoints}</td><td className={'desk-number desk-net-cell' + (student.weeklyNetPenaltyPoints >= 8 ? ' danger-text' : '')}>{student.weeklyPositivePoints > student.weeklyPenaltyPoints ? '+' : ''}{student.weeklyPositivePoints - student.weeklyPenaltyPoints}</td><td className="desk-reflection-deadline">{(() => {
+          const pending = pendingByStudent.get(student.coreStudentId ?? '') ?? [];
+          return pending.length ? <Link href="/reflections?view=MISSING"><strong>{dashboardTime(pending[0].actionDueAt)}</strong><small>{pending[0].status === 'DOUBLE' ? '2배 제출 · ' : ''}{pending.length}건 미제출</small></Link> : <span className="muted">미제출 없음</span>;
+        })()}</td>{seondoActive && <td className="desk-number">{student.physicalTrainingWeeks}<small>회 확정</small></td>}<td><div className="status-list">{student.statuses.length > 0 ? student.statuses.map(status => status === '체력훈련 대상'
           ? <span className="desk-training-status" key={status}><span className="pill pill-training">{status}</span>
             {student.physicalTrainingReasons.length > 0 && <small className="desk-training-reasons">사유: {student.physicalTrainingReasons.join(' · ')}</small>}
             </span>
-          : <span className={'pill ' + (status === '반성문 2배 제출 대상' ? 'pill-negative' : 'pill-warning')} key={status}>{status}</span>) : <span className="desk-status-clear"><Check size={14} />양호</span>}</div></td>
+          : <span className={'pill ' + (status === '반성문 2배 제출 대상' ? 'pill-negative' : 'pill-warning')} key={status}>{status}</span>) : <span className="desk-status-clear"><Check size={14} />{seondoActive ? '확정 처분 없음' : '양호'}</span>}</div></td>
       </tr>)}</tbody></table></div>
-      {rows.length === 0 && <div className="desk-empty"><Users size={28} aria-hidden="true" /><strong>{search ? '검색 결과가 없습니다' : '해당 대상자가 없습니다'}</strong><p>{search ? '이름·학번·반 또는 선택한 필터를 확인해 주세요.' : '현재 선택한 조건에 해당하는 학생이 없습니다.'}</p>{(search || target !== 'ALL') && <button className="btn btn-outline" type="button" onClick={() => { setSearch(''); setTarget('ALL'); }}>전체 학생 보기</button>}</div>}
+      {search.trim() && <TestProfileResults search={search} />}
+      {rows.length === 0 && (!search.trim() || findTestProfiles(search).length === 0) && <div className="desk-empty"><Users size={28} aria-hidden="true" /><strong>{search ? '검색 결과가 없습니다' : '해당 대상자가 없습니다'}</strong><p>{search ? '이름·학번·반 또는 선택한 필터를 확인해 주세요.' : '현재 선택한 조건에 해당하는 학생이 없습니다.'}</p>{(search || target !== 'ALL') && <button className="btn btn-outline" type="button" onClick={() => { setSearch(''); setTarget('ALL'); }}>전체 학생 보기</button>}</div>}
       <div className="desk-table-footer"><span>{targetLabels.find(([value]) => value === target)?.[1]} · {rows.length}명</span><span>학생 이름을 누르면 상세 기록으로 이동합니다.</span></div>
     </section>
     {isLead && <Link className="btn btn-outline" href="/history/import">주간 원장 · 이관 이력</Link>}

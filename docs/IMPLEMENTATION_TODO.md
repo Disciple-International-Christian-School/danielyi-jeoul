@@ -2,6 +2,14 @@
 
 **Language / 언어:** [English](IMPLEMENTATION_TODO.md) | [한국어](IMPLEMENTATION_TODO.ko.md)
 
+## Dashboard-first UI audit — November 16, 2026
+
+- P0 implemented: policy state, notice cutoff/publication steps, current deadlines, monthly finalized training counts, closure basis, settlement query errors, pending/double filters, correct sorting, and fictional search links.
+- P1: surface unspent merit amounts and validity/consumption history. The current student-summary API does not expose these fields; do not derive them from weekly NET.
+- P1: provide a dated historical closure context on student detail, rather than just the latest status and current-month count.
+- P1: authorized policy activation, holiday calendar maintenance, and committee-recipient administration have no UI. Agree the effective date and recipients before activation; this dashboard change does not activate the policy.
+- Separate test scope: the two fictional profiles remain search/profile fixtures; score writes and full discipline simulation are not connected.
+
 Historical checklist for the October 26 cut-over: final secondary-school weekly balances through October 25 replace old events in official aggregation; daily events/automatic merits accumulate from October 26. Elementary data and original audit events are preserved. Later [reset](OPERATIONS_2026-10-27.md), [merit](DEPARTMENT_MERITS.md), and [rule](DISCIPLINE_RULES.md) decisions supersede the relevant initial state.
 
 - [x] Preserve eight weeks/898 original rows, 873 linked balances, and 22 unlinked rows separately.

@@ -358,13 +358,18 @@ function DashboardPage() {
   const reflections = useListReflections();
   const departmentStatus = useDepartmentMeritStatus();
   const { admin } = useAuth();
+  const weeklySettlement = useSeondoSettlement('WEEKLY', null, Boolean(notice.data?.active && admin?.isLead));
+  const monthlySettlement = useSeondoSettlement('MONTHLY', null, Boolean(notice.data?.active && admin?.isLead));
   if (dashboard.isLoading || reflections.isLoading || notice.isLoading) return <LoadingState />;
   if (dashboard.isError || reflections.isError || notice.isError || !dashboard.data) return <ErrorState error={dashboard.error ?? reflections.error ?? notice.error} retry={() => { dashboard.refetch(); reflections.refetch(); notice.refetch(); }} />;
   return <DashboardView
     students={dashboard.data.students.filter(student => matchesDisciplineScope(student.grade, admin?.disciplineScope))}
     reflections={(reflections.data ?? []).filter(reflection => matchesDisciplineScope(reflection.grade, admin?.disciplineScope))}
     calendar={dashboardCalendar()}
-    seondoActive={Boolean(notice.data?.active)}
+    notice={notice.data!}
+    weekly={{ data: weeklySettlement.data, loading: weeklySettlement.isLoading, error: weeklySettlement.isError }}
+    monthly={{ data: monthlySettlement.data, loading: monthlySettlement.isLoading, error: monthlySettlement.isError }}
+    retrySettlements={() => { weeklySettlement.refetch(); monthlySettlement.refetch(); }}
     scope={admin?.disciplineScope}
     isLead={Boolean(admin?.isLead)}
     departments={{ data: departmentStatus.data, loading: departmentStatus.isLoading, error: departmentStatus.isError }}
@@ -963,13 +968,19 @@ function ReflectionsPage() {
 function ReportsPage() {
   const { admin } = useAuth();
   const notify = useContext(NoticeContext);
-  const [mode, setMode] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY'>('DAILY');
+  const [mode, setMode] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY'>(() => {
+    const requested = new URLSearchParams(window.location.search).get('view');
+    return admin?.isLead && (requested === 'WEEKLY' || requested === 'MONTHLY') ? requested : 'DAILY';
+  });
   const [noticeDate, setNoticeDate] = useState(today());
   const [noticeText, setNoticeText] = useState('');
   const [classFilter, setClassFilter] = useState('ALL');
   const [settlementPeriod, setSettlementPeriod] = useState('');
   const notice = useSeondoNotice(mode === 'DAILY' ? noticeDate : today());
   const noticeAction = useSeondoNoticeAction();
+  useEffect(() => {
+    if (notice.isSuccess && !notice.data.active && mode === 'MONTHLY') setMode('WEEKLY');
+  }, [notice.isSuccess, notice.data?.active, mode]);
   const managedDate = Boolean(notice.data?.managed_date);
   const finalizedReport = mode !== 'DAILY' && Boolean(notice.data?.active);
   const settlement = useSeondoSettlement(mode === 'MONTHLY' ? 'MONTHLY' : 'WEEKLY',
