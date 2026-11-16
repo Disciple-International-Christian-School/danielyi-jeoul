@@ -2,6 +2,12 @@
 
 **Language / 언어:** [English](CHANGELOG.md) | [한국어](CHANGELOG.ko.md)
 
+## 2026-11-16 — Dashboard P0 policy and workflow visibility
+
+The dashboard now distinguishes the active legacy policy from the pending revision, shows notice cutoff/publication progress, and exposes pending reflection deadlines in KST. Lead-only settlement metadata distinguishes unavailable/unfinalized results from zero targets and labels the closure date; weekly live scores remain separate from finalized decisions. Active-policy rows show the current month's finalized training count. Added missing/double filters and fictional-profile search; name/grade sorting now honors the requested order regardless of historical records. Secondary weekly/department utilities collapse to prioritize daily decisions.
+
+Read-only production verification found the policy inactive, no weekly/monthly closures, and no configured committee recipients. No policy, identity, permission, or database changes were made. Validation covers TypeScript/build/docs and isolated browser scenarios for legacy, draft, published, unfinalized, finalized, query errors, non-lead visibility, KST date boundaries, deduplicated counts, sorting/filtering, and mobile dark layout. Authenticated production interaction is not part of that isolated test. Deployment is checked separately after merge.
+
 ## 2026-11-16 — Daniel-only fictional search profiles
 
 Added two explicitly fictional profiles for elementary (G0) and secondary (G13) testing, searchable from the student roster and point-entry search. Dedicated authenticated profile routes do not call student APIs. These fixtures are not CORE identities and never enter official roster counts, reporting, or mutations. No database changes. This delivery supports search/profile verification only; score writes and rule-engine simulation remain unimplemented.
