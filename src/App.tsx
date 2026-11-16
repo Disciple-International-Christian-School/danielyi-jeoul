@@ -1,3 +1,4 @@
+import { TestProfilePage, TestProfileResults, findTestProfiles } from '@/components/test-profiles';
 import { TeacherPortal } from '@/components/teacher-portal';
 import { SeondoSettlementRows } from '@/components/seondo-settlement';
 import { StudentHistory } from '@/components/point-history';
@@ -438,7 +439,8 @@ function StudentsPage() {
         </section>;
       })}
     </div>
-    {rows.length === 0 && <EmptyState title="학생이 없습니다" copy="검색어 또는 DICS Core 명부를 확인하세요." />}
+    <TestProfileResults search={search} />
+    {rows.length === 0 && findTestProfiles(search).length === 0 && <EmptyState title="학생이 없습니다" copy="검색어 또는 DICS Core 명부를 확인하세요." />}
 
     <div className="side-note" style={{ marginTop: 18 }}>
       <strong>명부 관리 원칙</strong><br />
@@ -731,6 +733,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
                 {student.name + ' · ' + (student.homeroom ?? (student.grade + '학년')) + (student.studentNo ? ' · ' + student.studentNo : '')}
               </option>)}
             </select>
+            {needle && <TestProfileResults search={search} />}
             {needle && filteredStudents.length === 1 && !studentId && <div className="record-meta">Enter를 누르면 {filteredStudents[0].name} 학생을 바로 선택합니다.</div>}
           </div>}
 
@@ -2429,6 +2432,7 @@ function ProtectedRoutes() {
   if (admin.mustChangePassword) return <ChangePasswordPage />;
   return <AppShell role={admin.role}><Switch>
     <Route path="/dashboard" component={admin.role === 'SASAENG' ? SasaengDashboardPage : DashboardPage} />
+    <Route path="/test-profiles/:slug" component={() => <RoleGate role="SEONDO"><TestProfilePage /></RoleGate>} />
     <Route path="/students/:id" component={StudentDetailPage} />
     <Route path="/students" component={() => <RoleGate role="SEONDO"><StudentsPage /></RoleGate>} />
     <Route path="/points/positive/departments" component={() => <LeadGate><DepartmentMeritAdminPage /></LeadGate>} />

@@ -2,6 +2,12 @@
 
 **Language / 언어:** [English](CHANGELOG.md) | [한국어](CHANGELOG.ko.md)
 
+## 2026-11-16 — Daniel-only fictional search profiles
+
+Added two explicitly fictional profiles for elementary (G0) and secondary (G13) testing, searchable from the student roster and point-entry search. Dedicated authenticated profile routes do not call student APIs. These fixtures are not CORE identities and never enter official roster counts, reporting, or mutations. No database changes. This delivery supports search/profile verification only; score writes and rule-engine simulation remain unimplemented.
+
+Validation: TypeScript, production build, documentation checks, and isolated browser search/profile checks. Production deployment is verified separately after merge.
+
 > Active record since September 21, 2026. This English edition reflows the historical narrative and retains implementation milestones, measured evidence, and unresolved states. Original requirements remain in [spec.md](spec.md); initial-build history is frozen in [LEGACY_INITIAL_BUILD.md](LEGACY_INITIAL_BUILD.md). Record meaningful product changes here regardless of whether they came through GPT, Cursor, another tool, or manual infrastructure work.
 
 ## Purpose and original accountability proposal
