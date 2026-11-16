@@ -2,9 +2,10 @@
 // orval-generated client (@workspace/api-client-react) so page components
 // changed minimally during the port. Reads go to views, writes to tables/RPCs;
 // all business rules live in Postgres.
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { supabase } from './supabase';
+import { useAuth } from './auth';
 import type { WeeklySourceRow } from './weekly-import';
 
 export interface HistoryBalance {
@@ -128,6 +129,8 @@ export interface Reflection {
   weekStart: string;
   weeklyNet: number;
   reflectionPages: number | null;
+  seondoManaged: boolean;
+  seondoNoticeDay: string | null;
   isCurrentStudent: boolean;
   item: string;
   points: number;
@@ -450,6 +453,7 @@ interface ReflectionRow {
   id: number; point_record_id: number; student_id: number; core_student_id: string; student_name: string;
   homeroom: string | null; week_start: string; weekly_net: number; double_submit_deadline: string; is_current_student: boolean;
   grade: number; item: string; points: number; recorded_at: string; reflection_pages?: number;
+  seondo_managed?: boolean; seondo_notice_day?: string | null;
   submitted: boolean; submission_deadline: string; due_at: string;
   deadline_change_reason: string | null; submitted_at: string | null;
   status: ReflectionStatus;
@@ -719,6 +723,8 @@ function mapReflection(row: ReflectionRow): Reflection {
     weekStart: row.week_start,
     weeklyNet: row.weekly_net,
     reflectionPages: row.reflection_pages ?? null,
+    seondoManaged: row.seondo_managed ?? false,
+    seondoNoticeDay: row.seondo_notice_day ?? null,
     isCurrentStudent: row.is_current_student,
     item: row.item,
     points: row.points,
@@ -1181,11 +1187,89 @@ export function useListPointItems(params?: { type?: PointType; includeInactive?:
   });
 }
 
-export function reflectionIsOnNotice(reflection: Reflection, date: string, today: string) {
-  return reflection.isCurrentStudent && reflection.status !== 'SUBMITTED'
-    && (reflection.recordedAt === date
-      || (date === today && reflection.recordedAt < date
-        && (reflection.status === 'DOUBLE' || reflection.submissionDeadline === date)));
+export function reflectionIsOnNotice(reflection: Reflection, date: string, today: string, managed = false) {
+  if (!reflection.isCurrentStudent || reflection.status === 'SUBMITTED') return false;
+  if (managed) return reflection.seondoNoticeDay === date;
+  return reflection.recordedAt === date
+    || (date === today && reflection.recordedAt < date
+      && (reflection.status === 'DOUBLE' || reflection.submissionDeadline === date));
+}
+
+export interface SeondoNotice {
+  active: boolean;
+  managed_date: boolean;
+  batch: { day: string; cutoff_at: string; published_at: string | null } | null;
+  entries: {
+    reflection_id: number; student_name: string; grade: number; homeroom: string | null;
+    item: string; occurred_on: string; pages: number; is_double: boolean; due_at: string;
+  }[];
+}
+
+export function useSeondoNotice(day: string) {
+  const { session } = useAuth();
+  return useQuery({
+    queryKey: ['seondo-notice', session?.user.id, day],
+    enabled: Boolean(day && session),
+    refetchInterval: 60_000,
+    queryFn: async (): Promise<SeondoNotice> => {
+      const { data, error } = await supabase.rpc('get_seondo_notice', { p_day: day });
+      if (error) throw new Error(error.message);
+      return data as SeondoNotice;
+    },
+  });
+}
+
+export function useSeondoNoticeAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (publish: boolean) => {
+      const { error } = await supabase.rpc('seondo_notice_action', { p_publish: publish });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['seondo-notice'] }),
+        queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: ['homeroom-portal'] }),
+      ]);
+    },
+  });
+}
+
+export interface SeondoSettlement {
+  period_start: string;
+  closes_at: string;
+  delivered_at: string | null;
+  students: { name: string; grade: number; homeroom: string | null; net?: number; reasons?: string[]; count?: number }[];
+}
+
+export function useSeondoSettlement(kind: 'WEEKLY' | 'MONTHLY', period: string | null, enabled: boolean) {
+  const { session } = useAuth();
+  return useQuery({
+    queryKey: ['seondo-settlement', session?.user.id, kind, period],
+    enabled: Boolean(session && enabled),
+    refetchInterval: 60_000,
+    queryFn: async (): Promise<SeondoSettlement | null> => {
+      const { data, error } = await supabase.rpc('get_seondo_settlements', { p_kind: kind, p_period: period });
+      if (error) throw new Error(error.message);
+      return data as SeondoSettlement | null;
+    },
+  });
+}
+
+export function useSeondoCommitteeAccess() {
+  const { session } = useAuth();
+  return useQuery({
+    queryKey: ['seondo-committee-access', session?.user.id],
+    enabled: Boolean(session),
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('can_read_seondo_committee');
+      if (error) throw new Error(error.message);
+      return data === true;
+    },
+  });
 }
 
 export function useListReflections(enabled = true) {

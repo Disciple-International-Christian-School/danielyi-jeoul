@@ -469,6 +469,12 @@
       "name": "reflection_notice_pages",
       "status": "TRACKED",
       "file": "supabase/migrations/20261110155543_reflection_notice_pages.sql"
+    },
+    {
+      "version": "20261116124919",
+      "name": "seondo_notice_and_settlements",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261116124919_seondo_notice_and_settlements.sql"
     }
   ]
 }

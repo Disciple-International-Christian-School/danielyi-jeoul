@@ -1,4 +1,5 @@
 import { TeacherPortal } from '@/components/teacher-portal';
+import { SeondoSettlementRows } from '@/components/seondo-settlement';
 import { StudentHistory } from '@/components/point-history';
 import { WeeklyImportPage } from '@/components/weekly-import';
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
@@ -38,7 +39,6 @@ import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, use
 import {
   PUNISHMENT_TYPES,
   reflectionIsOnNotice,
-  type Reflection,
   getAdminAccountsQueryKey,
   getGetDashboardQueryKey,
   getGetStudentQueryKey,
@@ -60,6 +60,9 @@ import {
   getDepartmentMembersQueryKey,
   getGrade9AssignmentsQueryKey,
   useWeeklyDisciplineReport,
+  useSeondoNotice,
+  useSeondoNoticeAction,
+  useSeondoSettlement,
   useAdminAccounts,
   useAssignCurrentGrade9Section,
   useCoreMigrationReadiness,
@@ -349,16 +352,18 @@ function LeadGate({ children }: { children: ReactNode }) {
 }
 
 function DashboardPage() {
+  const notice = useSeondoNotice(today());
   const dashboard = useGetDashboard();
   const reflections = useListReflections();
   const departmentStatus = useDepartmentMeritStatus();
   const { admin } = useAuth();
-  if (dashboard.isLoading || reflections.isLoading) return <LoadingState />;
-  if (dashboard.isError || reflections.isError || !dashboard.data) return <ErrorState error={dashboard.error ?? reflections.error} retry={() => { dashboard.refetch(); reflections.refetch(); }} />;
+  if (dashboard.isLoading || reflections.isLoading || notice.isLoading) return <LoadingState />;
+  if (dashboard.isError || reflections.isError || notice.isError || !dashboard.data) return <ErrorState error={dashboard.error ?? reflections.error ?? notice.error} retry={() => { dashboard.refetch(); reflections.refetch(); notice.refetch(); }} />;
   return <DashboardView
     students={dashboard.data.students.filter(student => matchesDisciplineScope(student.grade, admin?.disciplineScope))}
     reflections={(reflections.data ?? []).filter(reflection => matchesDisciplineScope(reflection.grade, admin?.disciplineScope))}
     calendar={dashboardCalendar()}
+    seondoActive={Boolean(notice.data?.active)}
     scope={admin?.disciplineScope}
     isLead={Boolean(admin?.isLead)}
     departments={{ data: departmentStatus.data, loading: departmentStatus.isLoading, error: departmentStatus.isError }}
@@ -443,6 +448,7 @@ function StudentsPage() {
 }
 
 function StudentDetailPage() {
+  const notice = useSeondoNotice(today());
   const params = useParams<{ id: string }>();
   const studentRef = params.id;
   useLayoutEffect(() => {
@@ -474,7 +480,7 @@ function StudentDetailPage() {
     updateRecord.mutate({ id: record.id, data: { points: Number(nextPoints), item: record.item, recordedAt: record.recordedAt, enteredByName: record.enteredByName, reflectionSubmitted: record.reflection?.submitted ?? null } }, { onSuccess: () => { refreshDetail(); notify('점수 기록을 수정했습니다.'); }, onError: (error) => notify(errText(error), 'error') });
   };
   const toggleViolated = (punishment: Punishment) => setViolation.mutate({ id: punishment.id, violated: !punishment.violated }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetStudentQueryKey(studentRef) }), onError: (error) => notify(errText(error), 'error') });
-  return <div><Link href="/students" className="btn btn-outline" data-testid="link-back-students"><ChevronLeft size={15} /> 학생 목록</Link><div style={{ marginTop: 25 }} className="detail-hero"><div><div className="eyebrow">학생 상세 기록</div><h1 className="heading">{student.name}</h1><p className="subheading">{student.homeroom ?? (student.grade + '학년')}{student.studentNo ? ' · ' + student.studentNo : ''}</p><div className="status-list">{student.statuses.length ? student.statuses.map((status) => <span className="pill pill-warning" key={status}>{status}</span>) : <span className="pill pill-positive"><Check size={11} /> 현재 양호</span>}</div></div><div className="detail-avatar">{student.name.slice(0, 1)}</div></div>{student.isActive !== false && <div className="metric-grid student-detail-metrics"><div className="card metric-card"><div className="metric-label">주간 상점</div><div className="metric-value success-text">+{student.weeklyPositivePoints}</div></div><div className="card metric-card"><div className="metric-label">주간 벌점</div><div className="metric-value danger-text">−{student.weeklyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">주간 상벌NET</div><div className="metric-value">{student.weeklyPositivePoints - student.weeklyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">최장 연속 체력훈련 주차</div><div className="metric-value">{student.physicalTrainingWeeks}</div></div><div className="card metric-card"><div className="metric-label">기숙사 처분</div><div className="metric-value" style={{ fontSize: 14 }}>{student.punishment ?? '없음'}</div></div></div>}<div style={{ marginTop: 18 }}>{student.coreStudentId && <StudentHistory studentId={student.coreStudentId} />}</div><div className="detail-grid" style={{ marginTop: 18 }}><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">일별 점수 이력</h2></div></div>{records.isLoading ? <div className="skeleton" style={{ height: 90, marginTop: 18 }} /> : records.isError ? <ErrorState error={records.error} retry={() => records.refetch()} /> : <div className="record-list">{(records.data ?? []).map((record) => <div className="record-row" key={record.id} data-testid={`row-record-${record.id}`}><div className="record-date">{dateLabel(record.recordedAt)}</div><div className="record-main"><div className="record-item">{record.item}</div><div className="record-meta">{record.enteredByName}{record.recordedAt > today() ? ' · 예정' : ''}{record.reflection ? ` · 반성문 ${record.reflection.status === 'SUBMITTED' ? '제출' : record.reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}` : ''}</div></div><div className={`record-points ${record.type === 'NEGATIVE' ? 'negative' : 'positive'}`}>{record.type === 'NEGATIVE' ? '-' : '+'}{record.points}<button className="btn btn-icon btn-outline" style={{ marginLeft: 8 }} onClick={() => editRecord(record)} aria-label="점수 기록 수정" data-testid={`button-edit-record-${record.id}`}><Pencil size={13} /></button><button className="btn btn-icon btn-danger" style={{ marginLeft: 6 }} onClick={() => removeRecord(record)} aria-label="점수 기록 삭제" data-testid={`button-delete-record-${record.id}`}><Trash2 size={13} /></button></div></div>)}{(records.data ?? []).length === 0 && <EmptyState title="점수 이력이 없습니다" copy="아직 등록된 생활점수가 없습니다." />}</div>}</section><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">기숙사 처분</h2><p className="section-copy">사생회가 기록한 처분입니다.</p></div></div>{student.punishments.length === 0 ? <EmptyState title="처분 이력 없음" copy="등록된 기숙사 처분이 없습니다." /> : <div className="activity-list">{student.punishments.map((punishment) => <div className="activity-row" key={punishment.id} data-testid={`row-punishment-${punishment.id}`}><div className="activity-mark"><BedDouble size={15} /></div><div><div className="activity-label">{punishment.types.join(' · ')}</div><div className="record-meta">{dateLabel(punishment.startDate)} — {dateLabel(punishment.endDate)}</div></div><button className={`pill ${punishment.violated ? 'pill-negative' : 'pill-neutral'}`} onClick={() => toggleViolated(punishment)} data-testid={`button-toggle-violation-${punishment.id}`}>{punishment.violated ? '위반 기록됨' : '위반 없음'}</button></div>)}</div>}</section></div></div>;
+  return <div><Link href="/students" className="btn btn-outline" data-testid="link-back-students"><ChevronLeft size={15} /> 학생 목록</Link><div style={{ marginTop: 25 }} className="detail-hero"><div><div className="eyebrow">학생 상세 기록</div><h1 className="heading">{student.name}</h1><p className="subheading">{student.homeroom ?? (student.grade + '학년')}{student.studentNo ? ' · ' + student.studentNo : ''}</p><div className="status-list">{student.statuses.length ? student.statuses.map((status) => <span className="pill pill-warning" key={status}>{status}</span>) : <span className="pill pill-positive"><Check size={11} /> 현재 양호</span>}</div></div><div className="detail-avatar">{student.name.slice(0, 1)}</div></div>{student.isActive !== false && <div className="metric-grid student-detail-metrics"><div className="card metric-card"><div className="metric-label">주간 상점</div><div className="metric-value success-text">+{student.weeklyPositivePoints}</div></div><div className="card metric-card"><div className="metric-label">주간 벌점</div><div className="metric-value danger-text">−{student.weeklyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">주간 상벌NET</div><div className="metric-value">{student.weeklyPositivePoints - student.weeklyPenaltyPoints}</div></div><div className="card metric-card"><div className="metric-label">{notice.data?.active ? '이번 달 체력훈련 확정 횟수' : '최장 연속 체력훈련 주차'}</div><div className="metric-value">{student.physicalTrainingWeeks}</div></div><div className="card metric-card"><div className="metric-label">기숙사 처분</div><div className="metric-value" style={{ fontSize: 14 }}>{student.punishment ?? '없음'}</div></div></div>}<div style={{ marginTop: 18 }}>{student.coreStudentId && <StudentHistory studentId={student.coreStudentId} />}</div><div className="detail-grid" style={{ marginTop: 18 }}><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">일별 점수 이력</h2></div></div>{records.isLoading ? <div className="skeleton" style={{ height: 90, marginTop: 18 }} /> : records.isError ? <ErrorState error={records.error} retry={() => records.refetch()} /> : <div className="record-list">{(records.data ?? []).map((record) => <div className="record-row" key={record.id} data-testid={`row-record-${record.id}`}><div className="record-date">{dateLabel(record.recordedAt)}</div><div className="record-main"><div className="record-item">{record.item}</div><div className="record-meta">{record.enteredByName}{record.recordedAt > today() ? ' · 예정' : ''}{record.reflection ? ` · 반성문 ${record.reflection.status === 'SUBMITTED' ? '제출' : record.reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}` : ''}</div></div><div className={`record-points ${record.type === 'NEGATIVE' ? 'negative' : 'positive'}`}>{record.type === 'NEGATIVE' ? '-' : '+'}{record.points}<button className="btn btn-icon btn-outline" style={{ marginLeft: 8 }} onClick={() => editRecord(record)} aria-label="점수 기록 수정" data-testid={`button-edit-record-${record.id}`}><Pencil size={13} /></button><button className="btn btn-icon btn-danger" style={{ marginLeft: 6 }} onClick={() => removeRecord(record)} aria-label="점수 기록 삭제" data-testid={`button-delete-record-${record.id}`}><Trash2 size={13} /></button></div></div>)}{(records.data ?? []).length === 0 && <EmptyState title="점수 이력이 없습니다" copy="아직 등록된 생활점수가 없습니다." />}</div>}</section><section className="card card-pad"><div className="section-row" style={{ margin: 0 }}><div><h2 className="section-title">기숙사 처분</h2><p className="section-copy">사생회가 기록한 처분입니다.</p></div></div>{student.punishments.length === 0 ? <EmptyState title="처분 이력 없음" copy="등록된 기숙사 처분이 없습니다." /> : <div className="activity-list">{student.punishments.map((punishment) => <div className="activity-row" key={punishment.id} data-testid={`row-punishment-${punishment.id}`}><div className="activity-mark"><BedDouble size={15} /></div><div><div className="activity-label">{punishment.types.join(' · ')}</div><div className="record-meta">{dateLabel(punishment.startDate)} — {dateLabel(punishment.endDate)}</div></div><button className={`pill ${punishment.violated ? 'pill-negative' : 'pill-neutral'}`} onClick={() => toggleViolated(punishment)} data-testid={`button-toggle-violation-${punishment.id}`}>{punishment.violated ? '위반 기록됨' : '위반 없음'}</button></div>)}</div>}</section></div></div>;
 }
 
 function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
@@ -832,6 +838,7 @@ function PointEntryPage({ type }: { type: 'NEGATIVE' | 'POSITIVE' }) {
 }
 
 function ReflectionsPage() {
+  const notice = useSeondoNotice(today());
   const queryClient = useQueryClient();
   const notify = useContext(NoticeContext);
   const { admin } = useAuth();
@@ -844,8 +851,8 @@ function ReflectionsPage() {
   const update = useUpdateReflection();
   const extend = useExtendReflectionToNextDay();
 
-  if (reflections.isLoading) return <LoadingState />;
-  if (reflections.isError) return <ErrorState error={reflections.error} retry={() => reflections.refetch()} />;
+  if (reflections.isLoading || notice.isLoading) return <LoadingState />;
+  if (reflections.isError || notice.isError) return <ErrorState error={reflections.error ?? notice.error} retry={() => { reflections.refetch(); notice.refetch(); }} />;
 
   const filterLabels = [['ALL', '전체'], ['TODAY', '오늘 대상'], ['MISSING', '미제출 전체'], ['DOUBLE', '2배 제출 대상'], ['SUBMITTED', '제출 완료']] as const;
   const scopeLabels: Array<[DisciplineScope, string]> = [
@@ -860,7 +867,7 @@ function ReflectionsPage() {
 
   const rows = (reflections.data ?? []).filter((reflection) =>
     (filter === 'ALL' || (filter === 'TODAY'
-      ? reflectionIsOnNotice(reflection, today(), today())
+      ? reflectionIsOnNotice(reflection, today(), today(), notice.data?.active)
       : filter === 'MISSING' ? reflection.status !== 'SUBMITTED' : reflection.status === filter))
     && matchesDisciplineScope(reflection.grade, admin?.disciplineScope)
     && (scopeFilter === 'ALL' || reflection.assignedScope === scopeFilter)
@@ -870,7 +877,9 @@ function ReflectionsPage() {
     <PageHeader
       eyebrow="반성문 관리"
       title="반성문 대상자"
-      copy="벌점 부과 시 NET이 음수인 건이 대상입니다. 당일 상점으로 기한 내 NET이 0 이상이 되면 면제됩니다. 초등 마감은 다음 등교일 08:20, 중고등 기본 마감은 당일 17시입니다."
+      copy={notice.data?.active
+        ? '유효한 상점은 벌점이 낮은 항목부터 차감합니다. 게시한 날 중고등 17시, 게시 후 다음 등교일 초등 08:20까지 제출합니다.'
+        : '벌점 부과 시 NET이 음수인 건이 대상입니다. 당일 상점으로 기한 내 NET이 0 이상이 되면 면제됩니다. 초등 마감은 다음 등교일 08:20, 중고등 기본 마감은 당일 17시입니다.'}
     />
 
     <div className="card card-pad" style={{ marginTop: 30 }}>
@@ -900,14 +909,15 @@ function ReflectionsPage() {
 
       {rows.length === 0 ? <EmptyState title="해당 반성문이 없습니다" copy="선택한 담당 범위와 상태에 맞는 반성문이 없습니다." /> : <div className="table-wrap">
         <table className="data-table">
-          <thead><tr><th>학생</th><th>담당</th><th>벌점 항목</th><th>벌점</th><th>입력일</th><th>제출기한</th><th>상태</th><th>조치</th></tr></thead>
+          <thead><tr><th>학생</th><th>담당</th><th>벌점 항목</th><th>벌점</th><th>제출 페이지</th><th>발생일</th><th>제출기한</th><th>상태</th><th>조치</th></tr></thead>
           <tbody>{rows.map((reflection) => <tr key={reflection.id} data-testid={'row-reflection-' + reflection.id}>
             <td><Link className="table-link" href={'/students/' + reflection.coreStudentId} data-testid={'link-reflection-student-' + reflection.id}>{reflection.studentName}</Link> <span className="muted">{reflection.grade}학년</span></td>
             <td className="muted">{reflection.assignedScope === 'ELEMENTARY' ? '초등' : reflection.assignedScope === 'MIDDLE' ? '중등' : '고등'}</td>
             <td>{reflection.item}</td>
             <td className="weight-number danger-text">{reflection.points}</td>
+            <td>{reflection.reflectionPages === null ? '—' : reflection.reflectionPages * (reflection.status === 'DOUBLE' ? 2 : 1)}</td>
             <td className="muted">{dateLabel(reflection.recordedAt)}</td>
-            <td className="muted"><div>{dateTimeLabel(reflection.dueAt)}</div>{reflection.deadlineChangeReason && <div className="record-meta">연장 사유: {reflection.deadlineChangeReason}</div>}</td>
+            <td className="muted"><div>{dateTimeLabel(reflection.actionDueAt)}</div>{reflection.deadlineChangeReason && <div className="record-meta">연장 사유: {reflection.deadlineChangeReason}</div>}</td>
             <td><span className={'pill ' + (reflection.status === 'SUBMITTED' ? 'pill-positive' : reflection.status === 'DOUBLE' ? 'pill-negative' : 'pill-warning')}>{reflection.status === 'SUBMITTED' ? '제출 완료' : reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}</span>{reflection.submittedAt && <div className="record-meta">제출 {dateTimeLabel(reflection.submittedAt)}</div>}</td>
             <td><div className="toolbar-right">
               <button className="btn btn-outline" disabled={update.isPending} onClick={() => {
@@ -928,7 +938,7 @@ function ReflectionsPage() {
                 const target = new Intl.DateTimeFormat('ko-KR', {
                   month: 'numeric', day: 'numeric', weekday: 'short', timeZone: 'UTC',
                 }).format(date);
-                const reason = window.prompt(`${target} 17시까지 연장합니다. 연장 사유를 입력하세요.`, '오후 벌점 발생');
+                const reason = window.prompt(reflection.seondoManaged ? '게시 후 다음 등교일 17시까지 연장합니다. 연장 사유를 입력하세요.' : `${target} 17시까지 연장합니다. 연장 사유를 입력하세요.`, '오후 벌점 발생');
                 if (reason == null) return;
                 extend.mutate({ id: reflection.id, reason }, {
                   onSuccess: (deadline) => {
@@ -949,17 +959,29 @@ function ReflectionsPage() {
 
 function ReportsPage() {
   const { admin } = useAuth();
-  const [mode, setMode] = useState<'DAILY' | 'WEEKLY'>('DAILY');
+  const notify = useContext(NoticeContext);
+  const [mode, setMode] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY'>('DAILY');
   const [noticeDate, setNoticeDate] = useState(today());
   const [noticeText, setNoticeText] = useState('');
   const [classFilter, setClassFilter] = useState('ALL');
+  const [settlementPeriod, setSettlementPeriod] = useState('');
+  const notice = useSeondoNotice(mode === 'DAILY' ? noticeDate : today());
+  const noticeAction = useSeondoNoticeAction();
+  const managedDate = Boolean(notice.data?.managed_date);
+  const finalizedReport = mode !== 'DAILY' && Boolean(notice.data?.active);
+  const settlement = useSeondoSettlement(mode === 'MONTHLY' ? 'MONTHLY' : 'WEEKLY',
+    settlementPeriod ? (mode === 'MONTHLY' ? settlementPeriod + '-01' : settlementPeriod) : null,
+    finalizedReport && Boolean(admin?.isLead));
+  const batch = notice.data?.batch;
+  const actionTitle = batch ? '게시 확정' : '출력 마감 확정';
+  const todayNotice = mode === 'DAILY' && noticeDate === today();
 
-  const daily = useListReflections(mode === 'DAILY');
-  const weekly = useWeeklyDisciplineReport(mode === 'WEEKLY' && Boolean(admin?.isLead));
+  const daily = useListReflections(mode === 'DAILY' && notice.isSuccess && !managedDate);
+  const weekly = useWeeklyDisciplineReport(mode === 'WEEKLY' && notice.isSuccess && !finalizedReport && Boolean(admin?.isLead));
 
-  const loading = mode === 'DAILY' ? daily.isLoading : weekly.isLoading;
-  const error = mode === 'DAILY' ? daily.error : weekly.error;
-  const isError = mode === 'DAILY' ? daily.isError : weekly.isError;
+  const reportQuery = mode === 'DAILY' ? (managedDate ? notice : daily) : finalizedReport ? settlement : weekly;
+  const loading = notice.isLoading || reportQuery.isLoading;
+  const error = notice.error ?? reportQuery.error;
 
   const scopeMatchesGrade = (grade: number) =>
     admin?.disciplineScope == null
@@ -968,15 +990,25 @@ function ReportsPage() {
     || (admin.disciplineScope === 'MIDDLE' && grade >= 7 && grade <= 8)
     || (admin.disciplineScope === 'HIGH' && grade >= 9 && grade <= 12);
 
-  const dailyRows = (daily.data ?? []).filter((row) => scopeMatchesGrade(row.grade) && reflectionIsOnNotice(row, noticeDate, today()));
+  const dailyRows = (managedDate
+    ? (notice.data?.entries ?? []).map(row => ({
+      id: row.reflection_id, studentName: row.student_name, grade: row.grade, homeroom: row.homeroom,
+      item: row.item, recordedAt: row.occurred_on, pages: row.pages, double: row.is_double, dueAt: row.due_at,
+    }))
+    : (daily.data ?? []).filter(row => reflectionIsOnNotice(row, noticeDate, today())).map(row => ({
+      id: row.id, studentName: row.studentName, grade: row.grade, homeroom: row.homeroom,
+      item: row.item, recordedAt: row.recordedAt,
+      pages: row.reflectionPages === null ? null : row.reflectionPages * (row.status === 'DOUBLE' ? 2 : 1),
+      double: row.status === 'DOUBLE', dueAt: row.actionDueAt,
+    }))).filter(row => scopeMatchesGrade(row.grade));
   const weeklyRows = admin?.isLead ? (weekly.data ?? []) : [];
 
   const classOptions = useMemo(() => {
     const labels = new Set<string>();
-    const source = mode === 'DAILY' ? dailyRows : weeklyRows;
+    const source = mode === 'DAILY' ? dailyRows : finalizedReport ? settlement.data?.students ?? [] : weeklyRows;
     source.forEach((row) => labels.add(row.homeroom ?? ('G' + row.grade)));
     return Array.from(labels).sort((a, b) => a.localeCompare(b, 'ko', { numeric: true }));
-  }, [mode, dailyRows, weeklyRows]);
+  }, [mode, dailyRows, weeklyRows, finalizedReport, settlement.data]);
 
   const filteredDaily = useMemo(() => dailyRows.filter((row) => {
     const label = row.homeroom ?? ('G' + row.grade);
@@ -990,7 +1022,7 @@ function ReportsPage() {
   }), [weeklyRows, classFilter]);
 
   const dailyGroups = useMemo(() => {
-    const grouped = new Map<string, Reflection[]>();
+    const grouped = new Map<string, typeof dailyRows>();
     filteredDaily.forEach((row) => {
       const key = row.homeroom ?? ('G' + row.grade);
       const list = grouped.get(key) ?? [];
@@ -1011,13 +1043,14 @@ function ReportsPage() {
     return Array.from(grouped.entries()).sort(([a], [b]) => a.localeCompare(b, 'ko', { numeric: true }));
   }, [weeklyTargets]);
 
-  const resetClassIfMissing = (nextMode: 'DAILY' | 'WEEKLY') => {
+  const resetClassIfMissing = (nextMode: typeof mode) => {
     setMode(nextMode);
     setClassFilter('ALL');
+    setSettlementPeriod('');
   };
 
   if (loading) return <LoadingState />;
-  if (isError) return <ErrorState error={error} retry={() => { daily.refetch(); weekly.refetch(); }} />;
+  if (error) return <ErrorState error={error} retry={() => { notice.refetch(); reportQuery.refetch(); }} />;
 
   const weekStart = weeklyRows[0]?.weekStart ?? null;
   const settlementLabel = weeklyRows.find((row) => row.settlementPeriodLabel)?.settlementPeriodLabel ?? '열린 정산기간 없음';
@@ -1027,20 +1060,26 @@ function ReportsPage() {
       <PageHeader
         eyebrow="통지 · 보고"
         title="공지·출력"
-        copy="오늘 발생하거나 마감되는 반성문과 이전 날짜에서 이월된 2배 제출 대상을 공지합니다. 제출 완료 건은 자동 제외됩니다."
-        action={<button className="btn btn-primary" onClick={() => window.print()} data-testid="button-print-report"><Printer size={15} /> 인쇄</button>}
+        copy={notice.data?.active ? '일일 반성문 공지와 확정된 주간·월간 결산을 조회합니다.' : '오늘 발생하거나 마감되는 반성문과 이전 날짜에서 이월된 2배 제출 대상을 공지합니다.'}
+        action={<button className="btn btn-primary" disabled={mode === 'DAILY' && managedDate && !batch} onClick={() => window.print()} data-testid="button-print-report"><Printer size={15} /> 인쇄</button>}
       />
 
       <div className="card card-pad report-controls" style={{ marginTop: 28 }}>
         <div className="tab-row">
           <button className={'tab ' + (mode === 'DAILY' ? 'active' : '')} onClick={() => resetClassIfMissing('DAILY')} data-testid="button-report-daily">일일 반별 공지</button>
           {admin?.isLead && <button className={'tab ' + (mode === 'WEEKLY' ? 'active' : '')} onClick={() => resetClassIfMissing('WEEKLY')} data-testid="button-report-weekly">주간 정산 보고</button>}
+          {admin?.isLead && notice.data?.active && <button className={'tab ' + (mode === 'MONTHLY' ? 'active' : '')} onClick={() => resetClassIfMissing('MONTHLY')}>월간 징계 결산</button>}
         </div>
 
         <div className="filter-bar" style={{ marginTop: 18 }}>
           {mode === 'DAILY' && <div className="field">
             <label htmlFor="notice-date">공지 날짜</label>
-            <input id="notice-date" className="input" type="date" value={noticeDate} onChange={(event) => setNoticeDate(event.target.value)} data-testid="input-notice-date" />
+            <input id="notice-date" className="input" type="date" value={noticeDate} onChange={(event) => { setNoticeDate(event.target.value); setClassFilter('ALL'); }} data-testid="input-notice-date" />
+          </div>}
+          {finalizedReport && <div className="field">
+            <label htmlFor="settlement-period">{mode === 'MONTHLY' ? '결산 월' : '결산 주의 날짜'}</label>
+            <input id="settlement-period" className="input" type={mode === 'MONTHLY' ? 'month' : 'date'}
+              value={settlementPeriod} onChange={event => { setSettlementPeriod(event.target.value); setClassFilter('ALL'); }} />
           </div>}
           <div className="field">
             <label htmlFor="report-class">학년 / 반</label>
@@ -1050,6 +1089,22 @@ function ReportsPage() {
             </select>
           </div>
         </div>
+        {mode === 'DAILY' && managedDate && <div className="section-row">
+          <div>
+            {batch ? <p className="muted">출력 마감 {dateTimeLabel(batch.cutoff_at)}
+              {batch.published_at ? ' · 게시 ' + dateTimeLabel(batch.published_at) : ' · 게시 대기'}
+            </p> : <p className="muted">출력 마감이 확정되면 명단이 표시됩니다.</p>}
+            {todayNotice && batch && !batch.published_at && <p className="muted">명단을 인쇄해 게시한 뒤 게시를 확정해 주세요.</p>}
+          </div>
+          {todayNotice && admin?.isLead && !batch?.published_at &&
+            <button className="btn btn-outline" disabled={noticeAction.isPending} onClick={() => {
+              if (batch && !window.confirm('게시판에 이 명단을 게시했나요?')) return;
+              noticeAction.mutate(Boolean(batch), {
+                onSuccess: () => notify(batch ? '공지 게시를 확정했습니다.' : '출력 마감 시각을 확정했습니다.'),
+                onError: error => notify(errText(error), 'error'),
+              });
+            }}>{actionTitle}</button>}
+        </div>}
       </div>
     </div>
 
@@ -1058,11 +1113,12 @@ function ReportsPage() {
       <header className="print-header">
         <div>
           <div className="print-kicker">DISCIPLE INTERNATIONAL CHRISTIAN SCHOOL</div>
-          <h1>{mode === 'DAILY' ? '생활지도 일일 공지' : '주간 생활지도 정산 보고'}</h1>
+          <h1>{mode === 'DAILY' ? '생활지도 일일 공지' : mode === 'MONTHLY' ? '월간 징계 결산' : '주간 생활지도 정산 보고'}</h1>
         </div>
         <div className="print-meta">
           {mode === 'DAILY'
             ? <><strong>{noticeDate}</strong><span>{classFilter === 'ALL' ? '전체 반' : classFilter}</span></>
+            : finalizedReport ? <strong>{settlement.data?.period_start ?? ''}</strong>
             : <><strong>{weekStart ? dateLabel(weekStart) + ' 시작 주간' : '이번 주'}</strong><span>{settlementLabel}</span></>}
         </div>
       </header>
@@ -1070,8 +1126,8 @@ function ReportsPage() {
       {noticeText.trim() && <p className="print-notice-text" style={{ whiteSpace: 'pre-wrap' }}>{noticeText}</p>}
       {mode === 'DAILY' ? <>
         <div className="print-summary">
-          <span>오늘 반성문 미제출 <strong>{filteredDaily.filter((row) => row.status === 'MISSING').length}</strong>건</span>
-          <span>2배 제출 대상 <strong>{filteredDaily.filter((row) => row.status === 'DOUBLE').length}</strong>건</span>
+          <span>오늘 반성문 미제출 <strong>{filteredDaily.filter((row) => !row.double).length}</strong>건</span>
+          <span>2배 제출 대상 <strong>{filteredDaily.filter((row) => row.double).length}</strong>건</span>
           <span>총 제출 필요 <strong>{filteredDaily.length}</strong>건</span>
         </div>
 
@@ -1089,23 +1145,22 @@ function ReportsPage() {
                   <th style={{ width: '23%' }}>기한</th>
                 </tr></thead>
                 <tbody>{rows.map((row) => {
-                  const double = row.status === 'DOUBLE';
-                  const pages = row.reflectionPages === null ? '—' : row.reflectionPages * (double ? 2 : 1);
-                  return <tr key={row.pointRecordId}>
+                  const { double, pages } = row;
+                  return <tr key={row.id}>
                     <td><strong>{row.studentName}</strong></td>
                     <td><span className={'print-reflection-status ' + (double ? 'print-reflection-status-double' : 'print-reflection-status-missing')}>
                       {double ? '2배제출' : '반성문'}
                     </span></td>
                     <td>{row.item}</td>
                     <td className="print-date">{row.recordedAt.slice(5).split('-').map(Number).join('/')}</td>
-                    <td className="print-pages">{pages}</td>
-                    <td>{dateTimeLabel(row.actionDueAt)}</td>
+                    <td className="print-pages">{pages ?? '—'}</td>
+                    <td>{dateTimeLabel(row.dueAt)}</td>
                   </tr>;
                 })}</tbody>
               </table>
             </section>;
           })}
-      </> : <>
+      </> : finalizedReport ? <SeondoSettlementRows report={settlement.data} weekly={mode === 'WEEKLY'} homeroom={classFilter} /> : <>
         <div className="print-summary">
           <span>체력훈련 대상 <strong>{weeklyTargets.filter((row) => row.physicalTrainingRequired).length}</strong>명</span>
           <span>징계위원회 대상 <strong>{weeklyTargets.filter((row) => row.committeeRequired).length}</strong>명</span>
