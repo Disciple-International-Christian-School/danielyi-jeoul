@@ -53,3 +53,45 @@ If the original submission deadline is before 17:00, use that day's 17:00 for th
 - On November 2, restored only the 873 rows in the previously approved import batch to `is_current=true`. No point event, reflection, training rule or settlement-period computation was changed; `is_current` is consumed by the term-history RPC.
 - Authenticated supervisor query now returns 873 weekly rows plus 160 post-October-26 daily weekly aggregates for the current reporting range, a total of 1,033 student-week rows. The term cumulative NET in the history panel is merits minus penalties across these effective rows; `누적NET` on the main dashboard remains the separate current-settlement-period net.
 - Twenty-two source rows remain unlinked to CORE IDs and are intentionally excluded from student totals pending identity review. They represent five distinct source names, including inactive or renamed students. No speculative links were created.
+
+## Publication and calendar settlements — November 2026 revision
+
+Operations activates the policy by setting a cutover timestamp in the Daniel-owned
+discipline schema. Record the effective time at the start of a Monday for a complete
+first weekly period. The migration leaves the timestamp unset. Earlier incidents
+retain their original eligibility and deadlines. For the new policy, existing
+pre-cutover merit balances are excluded because previous allocations were not recorded.
+
+- In **Reports → Daily notice**, the discipline lead fixes the print cutoff, prints the
+  draft, posts it, and confirms publication. Only receipt times before the cutoff are
+  included. Printing again does not make another batch. The published notice records
+  its rows and their original offense reasons for reprints.
+- The effective receipt date is the later of the record entry and the scheduled offense
+  or merit date. At the cutoff, unspent merits are valid for five weekdays from their
+  effective date. Public holidays count toward merit validity. The oldest available
+  merits are spent against the smallest penalties first. Pages are fixed at the print
+  cutoff. The same merit balance cannot be spent again in a later batch.
+- The posting date sets G7–G12's first deadline at 17:00. The second deadline is 17:00
+  on the next school day. G1–G6 use 08:20 on the first and second school days. School
+  days exclude weekends and recorded holidays. The included calendar covers the
+  remainder of 2026 and the 2027 Korean public holidays. Add later calendars to
+  `discipline.seondo_holidays` before they are needed.
+- Outstanding double submissions reappear at subsequent cutoffs until submitted.
+  Missing the second deadline is recorded for the week of that deadline, even when
+  the student submits afterward. The weekly NET uses that week's merit and penalty
+  totals. The merit carryover allocation is used for reflection pages.
+- Weekly and monthly decisions finalize at 23:59 KST on Sunday and on each month's
+  last day, respectively. Weekly training counts once per student regardless of the
+  number of matching reasons. A week belongs to the month of its closing Sunday.
+  Three finalized training weeks in the same month qualify G7–G12 for review.
+- Approved school and committee accounts registered in
+  `discipline.seondo_committee_recipients` receive the finalized report in the existing
+  teacher portal. A recipient account receives one copy per month. No email or
+  external chat is needed for this delivery.
+
+Deploy the database migration before the app bundle. Verify the published notice,
+one weekly and one monthly synthetic closure with the rollback test in
+`supabase/tests/seondo_notice_and_settlements.sql`. The test runs with the
+`supabase/tests/fixtures/seondo.sql` fixture and the two reflection notice migrations
+in a disposable PostgreSQL environment. Confirm the rollout date and registered
+recipients before activating the policy in production.
