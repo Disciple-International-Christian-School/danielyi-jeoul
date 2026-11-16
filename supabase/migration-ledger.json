@@ -481,6 +481,12 @@
       "name": "remove_three_incident_and_schoolday_merits",
       "status": "TRACKED",
       "file": "supabase/migrations/20261116163154_remove_three_incident_and_schoolday_merits.sql"
+    },
+    {
+      "version": "20261116163730",
+      "name": "remove_legacy_three_incident_committee_streak",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261116163730_remove_legacy_three_incident_committee_streak.sql"
     }
   ]
 }
