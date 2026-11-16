@@ -38,7 +38,11 @@ from (values
   (1012, 3, timestamp '2027-01-20 07:01', 2, 'NEGATIVE', 'Two of three'),
   (1013, 3, timestamp '2027-01-20 07:02', 3, 'NEGATIVE', 'Three of three'),
   (1014, 4, timestamp '2027-01-25 07:00', 9, 'NEGATIVE', 'Weekly balance check'),
-  (1015, 4, timestamp '2027-01-25 07:00', 2, 'POSITIVE', 'Weekly balance check')
+  (1015, 4, timestamp '2027-01-25 07:00', 2, 'POSITIVE', 'Weekly balance check'),
+  (1016, 4, timestamp '2026-12-24 06:30', 3, 'POSITIVE', 'Merit after offense'),
+  (1017, 4, timestamp '2026-12-24 06:00', 3, 'NEGATIVE', 'Offense before merit'),
+  (1018, 3, timestamp '2026-12-23 06:00', 5, 'POSITIVE', 'Merit before holiday'),
+  (1019, 3, timestamp '2026-12-30 06:00', 5, 'NEGATIVE', 'Last valid school day')
 ) x(id, student_id, local_time, points, type, item)
 join public.students s on s.id = x.student_id;
 
@@ -55,10 +59,24 @@ insert into public.reflection_records (id, point_record_id, due_at, submission_d
 select p.id, p.id, (p.recorded_at + time '17:00') at time zone 'Asia/Seoul', p.recorded_at
 from public.point_records p where p.type = 'NEGATIVE' and p.id < 1100;
 
-do $$
+-- Registered discretionary school closures must not consume merit-validity days.
+insert into discipline.seondo_holidays(day,label)
+values ('2027-01-06','DICS discretionary school closure');
+
+do $
+begin
+  if private.seondo_merit_valid('2027-01-04','2027-01-11') is not true
+    or private.seondo_merit_valid('2027-01-04','2027-01-12') is not false then
+    raise exception 'School closure must extend merit validity to five attendance days';
+  end if;
+end;
+$;
+
+do $
 begin
   if private.seondo_merit_valid('2026-12-23', '2026-12-29') is not true
-    or private.seondo_merit_valid('2026-12-23', '2026-12-30') is not false
+    or private.seondo_merit_valid('2026-12-23', '2026-12-30') is not true
+    or private.seondo_merit_valid('2026-12-23', '2026-12-31') is not false
     or private.seondo_merit_valid('2027-01-04', '2027-01-09') is not false
     or private.seondo_deadline('2026-12-24', 6, false) <> timestamptz '2026-12-28 08:20+09'
     or private.seondo_deadline('2026-12-24', 6, true) <> timestamptz '2026-12-29 08:20+09'
@@ -78,7 +96,9 @@ do $$
 begin
   if (select pages from discipline.seondo_notice_entries where reflection_id = 1003) is distinct from 4
     or (select pages from discipline.seondo_notice_entries where reflection_id = 1004) is distinct from 0
-    or exists (select from discipline.seondo_notice_entries where reflection_id in (1006,1007)) then
+    or (select pages from discipline.seondo_notice_entries where reflection_id = 1017) is distinct from 3
+    or exists (select from discipline.seondo_merit_allocations where reflection_id = 1017)
+    or exists (select from discipline.seondo_notice_entries where reflection_id in (1006,1007,1019)) then
     raise exception 'Cutoff and smallest-first allocation failed';
   end if;
   if exists (select from public.v_reflections where id = 1003) then
@@ -106,7 +126,9 @@ begin
       join discipline.seondo_notice_batches b on b.id = e.batch_id
       where b.notice_day = '2026-12-29' and e.reflection_id = 1005 and e.is_double and e.pages = 2
         and e.due_at = timestamptz '2026-12-29 08:20+09')
-    or (select sum(points) from discipline.seondo_merit_allocations where merit_id = 1002) <> 5 then
+    or (select sum(points) from discipline.seondo_merit_allocations where merit_id = 1002) <> 5
+    or (select pages from discipline.seondo_notice_entries where reflection_id = 1019) is distinct from 0
+    or (select sum(points) from discipline.seondo_merit_allocations where merit_id = 1018) is distinct from 5 then
     raise exception 'Posting, carryover, or merit reuse failed';
   end if;
   if (public.get_seondo_notice('2026-12-24')->'entries'->0->>'pages') is null then
