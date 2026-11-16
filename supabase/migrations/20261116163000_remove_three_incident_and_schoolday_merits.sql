@@ -31,10 +31,10 @@ $$;
 
 -- T through T+4 = five SCHOOL days, including the effective merit day.
 -- On a non-school-day receipt, T begins on the next school day.
-create or replace function private.seondo_merit_valid(p_entered_on date, p_penalty_on date)
+create or replace function private.seondo_merit_valid(p_entered_on date, p_cutoff_on date)
 returns boolean language sql stable set search_path = '' as $$
-  select p_penalty_on >= t.starts_on
-    and p_penalty_on <= private.seondo_following_school_day(t.starts_on, 4)
+  select p_cutoff_on >= t.starts_on
+    and p_cutoff_on <= private.seondo_following_school_day(t.starts_on, 4)
   from (
     select case when private.seondo_is_school_day(p_entered_on)
       then p_entered_on
