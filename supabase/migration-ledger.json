@@ -475,6 +475,12 @@
       "name": "seondo_notice_and_settlements",
       "status": "TRACKED",
       "file": "supabase/migrations/20261116124919_seondo_notice_and_settlements.sql"
+    },
+    {
+      "version": "20261116163154",
+      "name": "remove_three_incident_and_schoolday_merits",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261116163154_remove_three_incident_and_schoolday_merits.sql"
     }
   ]
 }

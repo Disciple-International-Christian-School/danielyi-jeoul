@@ -7,7 +7,7 @@ Updated November 6, 2026. These recorded operational decisions supersede earlier
 ## Scores and committee referral
 
 - Weekly NET = weekly merits minus weekly penalties. Term totals are available in point history.
-- Weekly training initially uses NET <= -8 OR at least three penalty occurrence records in the Monday–Sunday week. Merits offset points, not occurrence counts. NET -8 qualifies; -7 alone does not. The additional overdue-reflection criterion is defined below.
+- **Superseded historical rule:** Three penalty incidents used to qualify for training. The November revision **removes incident count as an eligibility condition**. Only weekly NET <= -8 or an overdue doubled reflection may qualify; counts remain informational.
 - Committee eligibility requires three consecutive calendar weeks qualifying for training within the current academic term, independent of settlement start and cumulative NET. A gap breaks the run. The former 20-point and three nonconsecutive-week alternatives are removed.
 - `physical_training_weeks` exposes the longest consecutive qualifying run in the current academic term; UI wording means longest consecutive training-week run.
 - Imported weekly rows never invent unknown occurrence counts. Archived/deleted events are excluded. Historical reset balances remain non-current. Automatic merits, initially paused, were subsequently resumed as recorded in [department merits](DEPARTMENT_MERITS.md).
@@ -33,7 +33,7 @@ Today's print notice combines today's unsubmitted eligible reflections with all 
 
 The dashboard Today count, default reflection worklist and daily notice use the same actionable set. The worklist offers all pending obligations and week-based history. Both screens show the signed NET of the incident week and the applicable submission deadline. The settlement management page is retired. Committee eligibility uses the current academic term directly. DOUBLE uses the existing red negative pill; training uses dark navy. Weekly printed/dashboard merits use +0, penalties use −0, and NET remains signed merit minus penalty.
 
-## Additional training reason — October 28
+## Additional training reason — October 28 (historical, superseded by November revision)
 
 A student qualifies through any of three independent reasons: at least three weekly penalty incidents; weekly NET <= -8; or an unsubmitted double-reflection obligation after its 17:00 check deadline, effective from the following day. Display all applicable reasons on dashboard and notice/report outputs.
 
@@ -67,14 +67,11 @@ pre-cutover merit balances are excluded because previous allocations were not re
   included. Printing again does not make another batch. The published notice records
   its rows and their original offense reasons for reprints.
 - The effective receipt date is the later of the record entry and the scheduled offense
-  or merit date. At the cutoff, unspent merits are valid for five weekdays from their
-  effective date. Public holidays count toward merit validity. The oldest available
-  merits are spent against the smallest penalties first. Pages are fixed at the print
-  cutoff. The same merit balance cannot be spent again in a later batch.
+  or merit date. A merit may offset **only offenses occurring after the merit's effective receipt time**. Its eligibility is T through T+4, five **school days** across week boundaries; weekends, public holidays, and recorded DICS discretionary closures do not count. When received on a non-school day, T is the next school day. Spend unallocated eligible merits against the smallest subsequent penalties first. Reflection pages become final on publication; merits earned after publication never reduce an already posted notice. A merit cannot be spent twice.
 - The posting date sets G7–G12's first deadline at 17:00. The second deadline is 17:00
   on the next school day. G1–G6 use 08:20 on the first and second school days. School
   days exclude weekends and recorded holidays. The included calendar covers the
-  remainder of 2026 and the 2027 Korean public holidays. Add later calendars to
+  remainder of 2026 and the 2027 Korean public holidays. Add later public holidays and DICS school closures to
   `discipline.seondo_holidays` before they are needed.
 - Outstanding double submissions reappear at subsequent cutoffs until submitted.
   Missing the second deadline is recorded for the week of that deadline, even when
@@ -94,4 +91,4 @@ one weekly and one monthly synthetic closure with the rollback test in
 `supabase/tests/seondo_notice_and_settlements.sql`. The test runs with the
 `supabase/tests/fixtures/seondo.sql` fixture and the two reflection notice migrations
 in a disposable PostgreSQL environment. Confirm the rollout date and registered
-recipients before activating the policy in production.
+recipients before activating the policy in production. Whether the new policy applies retrospectively to existing outstanding reflections remains a student-committee decision; do not change historical outstanding records by default.
