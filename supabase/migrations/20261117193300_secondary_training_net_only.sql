@@ -94,7 +94,7 @@ begin
   where c.kind = 'MONTHLY' and c.period_start >= date_trunc('month', p_now at time zone 'Asia/Seoul')::date - interval '1 month'
   on conflict do nothing;
 end;
-$function$
+$function$;
 
 CREATE OR REPLACE VIEW public.v_training_weekly_eligibility WITH (security_invoker = true) AS
 WITH overdue_weeks AS (
