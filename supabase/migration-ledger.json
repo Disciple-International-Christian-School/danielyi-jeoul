@@ -493,6 +493,12 @@
       "name": "november_hybrid_transition_candidates",
       "status": "TRACKED",
       "file": "supabase/migrations/20261117103821_november_hybrid_transition_candidates.sql"
+    },
+    {
+      "version": "20261117105328",
+      "name": "secondary_training_net_only",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261117105328_secondary_training_net_only.sql"
     }
   ]
 }
