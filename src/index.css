@@ -140,6 +140,25 @@
 .data-table th { color: hsl(var(--muted-foreground)); font: 10px var(--app-font-mono); letter-spacing: .08em; text-align: left; padding: 13px 12px; border-bottom: 1px solid hsl(var(--border)); }
 .data-table td { padding: 17px 12px; font-size: 13px; border-bottom: 1px solid hsl(var(--border)); }
 .data-table tr:last-child td { border-bottom: 0; }
+
+/* Reflection list: keep its nine columns readable without changing other tables. */
+.reflection-table { table-layout: fixed; min-width: 1120px; }
+.reflection-table th,
+.reflection-table td { padding-left: 8px; padding-right: 8px; vertical-align: middle; }
+.reflection-table th { white-space: nowrap; letter-spacing: 0; }
+.reflection-table td:nth-child(1),
+.reflection-table td:nth-child(2),
+.reflection-table td:nth-child(4),
+.reflection-table td:nth-child(5),
+.reflection-table td:nth-child(6) { white-space: nowrap; }
+.reflection-table td:nth-child(2),
+.reflection-table td:nth-child(4),
+.reflection-table td:nth-child(5) { text-align: center; }
+.reflection-table td:nth-child(3) { overflow-wrap: anywhere; word-break: keep-all; }
+.reflection-table td:nth-child(7),
+.reflection-table td:nth-child(8) { overflow-wrap: anywhere; word-break: keep-all; }
+.reflection-table .toolbar-right { gap: 6px; align-items: stretch; }
+.reflection-table .toolbar-right .btn { padding: 8px 9px; white-space: normal; line-height: 1.35; }
 .weight-number { font: 15px var(--app-font-mono); }
 .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .input, .select { border: 1px solid hsl(var(--input)); background: hsl(var(--card)); color: hsl(var(--foreground)); border-radius: 10px; padding: 10px 12px; min-height: 40px; font-size: 12px; outline: none; }
