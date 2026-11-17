@@ -1,5 +1,7 @@
 # November 2026 Seondo transition — historical training review
 
+**Language / 언어:** [English](SEONDO_NOVEMBER_TRANSITION_REVIEW.md) | [한국어](SEONDO_NOVEMBER_TRANSITION_REVIEW.ko.md)
+
 ## Fixed policy
 - Monday 2026-11-16 is the **new physical-training calculation start**.
 - The previously issued reflection obligations **retain their existing pages, status, and deadlines**; no retrospective reflection reissue.
