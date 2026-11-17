@@ -487,6 +487,12 @@
       "name": "remove_legacy_three_incident_committee_streak",
       "status": "TRACKED",
       "file": "supabase/migrations/20261116163730_remove_legacy_three_incident_committee_streak.sql"
+    },
+    {
+      "version": "20261117103821",
+      "name": "november_hybrid_transition_candidates",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261117103821_november_hybrid_transition_candidates.sql"
     }
   ]
 }

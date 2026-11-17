@@ -91,4 +91,14 @@ one weekly and one monthly synthetic closure with the rollback test in
 `supabase/tests/seondo_notice_and_settlements.sql`. The test runs with the
 `supabase/tests/fixtures/seondo.sql` fixture and the two reflection notice migrations
 in a disposable PostgreSQL environment. Confirm the rollout date and registered
-recipients before activating the policy in production. Whether the new policy applies retrospectively to existing outstanding reflections remains a student-committee decision; do not change historical outstanding records by default.
+recipients before activating the policy in production. Existing reflection eligibility, frozen page counts, and due dates **must not be recalculated retrospectively**.
+
+## November 16, 2026 transition (approved)
+
+- **G1–G12 weekly training**: weekly NET <= -8 or a missed doubled-reflection deadline; one count per student-week even if both reasons apply. The three-incident trigger is abolished for weeks beginning November 16.
+- **Reflection notices**: previously issued obligations remain under their historical rules, with no retroactive revisions. A newly posted notice freezes its page count.
+- **November committee**: count approved old-policy qualifying weeks closing November 1, 8 and 15 together with new-policy weekly outcomes closing November 22 and 29. Refer G7–G12 with **at least 3 total weekly counts**, whether consecutive or not.
+- **December committee**: count **only** the new-policy weekly outcomes whose Sundays are in December; refer G7–G12 with at least 3 counts. November counts do not carry over.
+- **Elementary**: may qualify for physical training but is always excluded from monthly committee referral.
+- **School calendar**: through December 23, 2026, there are no statutory or discretionary school closures beyond Saturdays and Sundays in the regular term.
+- **Pre-transition history review**: authoritative historical training closures were never stored. Derived candidates are staged in `discipline.seondo_legacy_weekly_candidates` but are **not confirmed counts**; November month-end committee closure is gated until the school approves the snapshot. Training-week accrual for the new rule begins at 00:00 KST on November 16 independently from the non-retroactive reflection notice cutover.
