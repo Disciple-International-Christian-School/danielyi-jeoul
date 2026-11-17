@@ -95,7 +95,8 @@ recipients before activating the policy in production. Existing reflection eligi
 
 ## November 16, 2026 transition (approved)
 
-- **G1–G12 weekly training**: weekly NET <= -8 or a missed doubled-reflection deadline; one count per student-week even if both reasons apply. The three-incident trigger is abolished for weeks beginning November 16.
+- **G1–G6 weekly training**: weekly NET <= -8 **or** a missed second doubled-reflection deadline; once per student-week even if both apply.
+- **G7–G12 weekly training**: **weekly NET <= -8 only**. Missed reflection deadlines still require reflection submission but do not independently trigger physical training. The three-incident trigger is abolished for all grades from November 16.
 - **Reflection notices**: previously issued obligations remain under their historical rules, with no retroactive revisions. A newly posted notice freezes its page count.
 - **November committee**: count approved old-policy qualifying weeks closing November 1, 8 and 15 together with new-policy weekly outcomes closing November 22 and 29. Refer G7–G12 with **at least 3 total weekly counts**, whether consecutive or not.
 - **December committee**: count **only** the new-policy weekly outcomes whose Sundays are in December; refer G7–G12 with at least 3 counts. November counts do not carry over.
