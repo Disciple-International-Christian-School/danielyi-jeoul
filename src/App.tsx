@@ -911,7 +911,18 @@ function ReflectionsPage() {
       </div>
 
       {rows.length === 0 ? <EmptyState title="해당 반성문이 없습니다" copy="선택한 담당 범위와 상태에 맞는 반성문이 없습니다." /> : <div className="table-wrap">
-        <table className="data-table">
+        <table className="data-table reflection-table">
+          <colgroup>
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '7%' }} />
+            <col style={{ width: '27%' }} />
+            <col style={{ width: '5%' }} />
+            <col style={{ width: '7%' }} />
+            <col style={{ width: '7%' }} />
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '18%' }} />
+          </colgroup>
           <thead><tr><th>학생</th><th>담당</th><th>벌점 항목</th><th>벌점</th><th>제출 페이지</th><th>발생일</th><th>제출기한</th><th>상태</th><th>조치</th></tr></thead>
           <tbody>{rows.map((reflection) => <tr key={reflection.id} data-testid={'row-reflection-' + reflection.id}>
             <td><Link className="table-link" href={'/students/' + reflection.coreStudentId} data-testid={'link-reflection-student-' + reflection.id}>{reflection.studentName}</Link> <span className="muted">{reflection.grade}학년</span></td>
