@@ -85,7 +85,6 @@ import {
   useDepartmentMeritAdmin,
   useDepartmentMeritStatus,
   useEnsureWeeklyDepartmentMerits,
-  useGetDashboard,
   useGetStudent,
   useImportPointItems,
   useInitializeCurrentAcademicTerm,
@@ -355,14 +354,16 @@ function LeadGate({ children }: { children: ReactNode }) {
 
 function DashboardPage() {
   const notice = useSeondoNotice(today());
-  const dashboard = useGetDashboard();
+  // The dashboard computes its cards from student/reflection rows. Do not run
+  // v_dashboard_counts (which recomputes the costly student summary 3 times).
+  const students = useListStudents();
   const reflections = useListReflections();
   const departmentStatus = useDepartmentMeritStatus();
   const { admin } = useAuth();
-  if (dashboard.isLoading || reflections.isLoading || notice.isLoading) return <LoadingState />;
-  if (dashboard.isError || reflections.isError || notice.isError || !dashboard.data) return <ErrorState error={dashboard.error ?? reflections.error ?? notice.error} retry={() => { dashboard.refetch(); reflections.refetch(); notice.refetch(); }} />;
+  if (students.isLoading || reflections.isLoading || notice.isLoading) return <LoadingState />;
+  if (students.isError || reflections.isError || notice.isError || !students.data) return <ErrorState error={students.error ?? reflections.error ?? notice.error} retry={() => { students.refetch(); reflections.refetch(); notice.refetch(); }} />;
   return <DashboardView
-    students={dashboard.data.students.filter(student => matchesDisciplineScope(student.grade, admin?.disciplineScope))}
+    students={students.data.filter(student => matchesDisciplineScope(student.grade, admin?.disciplineScope))}
     reflections={(reflections.data ?? []).filter(reflection => matchesDisciplineScope(reflection.grade, admin?.disciplineScope))}
     calendar={dashboardCalendar()}
     seondoActive={Boolean(notice.data?.active)}
@@ -924,19 +925,19 @@ function ReflectionsPage() {
       </div>
       <p className="record-meta" style={{ marginTop: 10 }} data-testid="reflection-filter-explanation">{filterDescription[filter]}</p>
 
-      {rows.length === 0 ? <EmptyState title="해당 반성문이 없습니다" copy="선택한 담당 범위와 상태에 맞는 반성문이 없습니다." /> : <div className="table-wrap">
-        <table className="data-table">
-          <thead><tr><th>학생</th><th>담당</th><th>벌점 항목</th><th>벌점</th><th>제출 페이지</th><th>발생일</th><th>제출기한</th><th>상태</th><th>조치</th></tr></thead>
+      {rows.length === 0 ? <EmptyState title="해당 반성문이 없습니다" copy="선택한 담당 범위와 상태에 맞는 반성문이 없습니다." /> : <div className="table-wrap reflections-table-wrap">
+        <table className="data-table reflections-table">
+          <colgroup><col className="reflection-col-student" /><col className="reflection-col-reason" /><col className="reflection-col-points" /><col className="reflection-col-pages" /><col className="reflection-col-date" /><col className="reflection-col-deadline" /><col className="reflection-col-status" /><col className="reflection-col-action" /></colgroup>
+          <thead><tr><th>학생 · 담당</th><th>벌점 항목</th><th>벌점</th><th>페이지</th><th>발생일</th><th>제출기한</th><th>상태</th><th>조치</th></tr></thead>
           <tbody>{rows.map((reflection) => <tr key={reflection.id} data-testid={'row-reflection-' + reflection.id}>
-            <td><Link className="table-link" href={'/students/' + reflection.coreStudentId} data-testid={'link-reflection-student-' + reflection.id}>{reflection.studentName}</Link> <span className="muted">{reflection.grade}학년</span></td>
-            <td className="muted">{reflection.assignedScope === 'ELEMENTARY' ? '초등' : reflection.assignedScope === 'MIDDLE' ? '중등' : '고등'}</td>
-            <td>{reflection.item}</td>
-            <td className="weight-number danger-text">{reflection.points}</td>
-            <td>{reflection.reflectionPages === null ? '—' : reflection.reflectionPages * (isDoubleReflection(reflection) ? 2 : 1)}</td>
-            <td className="muted">{dateLabel(reflection.recordedAt)}</td>
-            <td className="muted"><div>{dateTimeLabel(reflection.actionDueAt)}</div>{reflection.deadlineChangeReason && <div className="record-meta">연장 사유: {reflection.deadlineChangeReason}</div>}</td>
-            <td><span className={'pill ' + (reflection.status === 'SUBMITTED' ? 'pill-positive' : reflection.status === 'DOUBLE' ? 'pill-negative' : 'pill-warning')}>{reflection.status === 'SUBMITTED' ? (isDoubleReflection(reflection) ? '2배 제출 완료' : '제출 완료') : reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}</span>{reflection.submittedAt && <div className="record-meta">제출 {dateTimeLabel(reflection.submittedAt)}</div>}</td>
-            <td><div className="toolbar-right">
+            <td><div className="reflection-identity"><Link className="table-link" href={'/students/' + reflection.coreStudentId} data-testid={'link-reflection-student-' + reflection.id}>{reflection.studentName}</Link><span className="reflection-grade">G{reflection.grade} · {reflection.assignedScope === 'ELEMENTARY' ? '초등' : reflection.assignedScope === 'MIDDLE' ? '중등' : '고등'}</span></div></td>
+            <td><span className="reflection-reason" title={reflection.item}>{reflection.item}</span></td>
+            <td className="weight-number danger-text reflection-numeric">{reflection.points}</td>
+            <td className="reflection-numeric">{reflection.reflectionPages === null ? '—' : reflection.reflectionPages * (isDoubleReflection(reflection) ? 2 : 1)}</td>
+            <td className="muted reflection-nowrap">{dateLabel(reflection.recordedAt)}</td>
+            <td className="muted reflection-nowrap" title={reflection.deadlineChangeReason ? '연장 사유: ' + reflection.deadlineChangeReason : undefined}>{dateTimeLabel(reflection.actionDueAt)}</td>
+            <td className="reflection-nowrap"><span title={reflection.submittedAt ? '제출 ' + dateTimeLabel(reflection.submittedAt) : undefined} className={'pill ' + (reflection.status === 'SUBMITTED' ? 'pill-positive' : reflection.status === 'DOUBLE' ? 'pill-negative' : 'pill-warning')}>{reflection.status === 'SUBMITTED' ? (isDoubleReflection(reflection) ? '2배 제출 완료' : '제출 완료') : reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}</span></td>
+            <td><div className="reflection-action">
               <button className="btn btn-outline" disabled={update.isPending} onClick={() => {
                 update.mutate({ id: reflection.id, data: { submitted: !reflection.submitted } }, {
                   onSuccess: () => {
@@ -950,7 +951,6 @@ function ReflectionsPage() {
                   onError: (error) => notify(errText(error), 'error'),
                 });
               }} data-testid={'button-toggle-reflection-' + reflection.id}>{reflection.submitted ? '미제출로' : reflection.status === 'DOUBLE' ? '2배 제출 완료' : '제출 완료'}</button>
-
             </div></td>
           </tr>)}</tbody>
         </table>
