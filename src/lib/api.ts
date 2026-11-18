@@ -1300,6 +1300,8 @@ function mergeCurrentSeondoReflections(reflections: Reflection[], notice: Seondo
     const previous = rows.get(entry.reflection_id);
     const pages = entry.is_double ? entry.pages / 2 : entry.pages;
     if (previous) {
+      // A submitted reflection must never be revived by an older notice snapshot.
+      if (previous.submitted) continue;
       rows.set(entry.reflection_id, {
         ...previous,
         reflectionPages: pages,
@@ -1312,6 +1314,8 @@ function mergeCurrentSeondoReflections(reflections: Reflection[], notice: Seondo
     const dueDay = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
     }).format(new Date(entry.due_at));
+    const eventDate = new Date(entry.occurred_on + 'T00:00:00Z');
+    eventDate.setUTCDate(eventDate.getUTCDate() - (eventDate.getUTCDay() + 6) % 7);
     const grade = entry.grade;
     const scope: Exclude<DisciplineScope, 'ALL'> =
       grade <= 6 ? 'ELEMENTARY' : grade <= 8 ? 'MIDDLE' : 'HIGH';
@@ -1323,7 +1327,7 @@ function mergeCurrentSeondoReflections(reflections: Reflection[], notice: Seondo
       studentName: entry.student_name,
       grade,
       homeroom: entry.homeroom,
-      weekStart: entry.occurred_on,
+      weekStart: eventDate.toISOString().slice(0, 10),
       weeklyNet: 0,
       reflectionPages: pages,
       seondoManaged: Boolean(notice.batch?.published_at),
