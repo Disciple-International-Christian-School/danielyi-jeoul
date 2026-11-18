@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowDownRight, ArrowRight, ArrowUpRight, BookOpenCheck, CalendarDays, Check, ChevronRight, CircleCheck, Clock3, Dumbbell, FileClock, Printer, Search, ShieldAlert, Users, X } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { ArrowDownRight, ArrowRight, ArrowUpRight, BookOpenCheck, CalendarDays, Check, CircleCheck, Clock3, Dumbbell, FileClock, Search, ShieldAlert, Users, X } from 'lucide-react';
 import { Link } from 'wouter';
-import { reflectionIsOnNotice, type DepartmentMeritStatus, type DisciplineScope, type Reflection, type StudentSummary } from '@/lib/api';
+import { reflectionIsOnNotice, usePointRecordArchive, type DepartmentMeritStatus, type DisciplineScope, type Reflection, type StudentSummary } from '@/lib/api';
 import './dashboard.css';
 import { PointHistory } from './point-history';
 
@@ -21,24 +21,26 @@ const scopeLabels = { ALL: '전체 학년', ELEMENTARY: '초등', MIDDLE: '중�
 const targetLabels: Array<[Target, string]> = [['ALL', '전체 학생'], ['PHYSICAL', '체력훈련 대상자'], ['COMMITTEE', '징계위원회 대상자']];
 const shortDate = (date: string) => new Intl.DateTimeFormat('ko-KR', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Seoul' }).format(new Date(date + 'T12:00:00+09:00'));
 
-function ActionRow({ href, icon, title, copy, badge }: { href: string; icon: ReactNode; title: string; copy: string; badge?: string }) {
-  return <Link className="desk-action-row" href={href}>
-    <span className="desk-action-icon" aria-hidden="true">{icon}</span>
-    <span className="desk-action-copy"><strong>{title}</strong><span>{copy}</span></span>
-    {badge && <span className="desk-action-badge">{badge}</span>}
-    <ChevronRight size={17} aria-hidden="true" />
-  </Link>;
-}
-
 export function DashboardView({ students, reflections, calendar, scope, isLead, seondoActive, departments }: Props) {
   const [historyDate, setHistoryDate] = useState(calendar.date);
-  const [historyVersion, setHistoryVersion] = useState(0);
-  const historyPanel = useRef<HTMLDivElement>(null);
+  const [hasSelectedDay, setHasSelectedDay] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyMode, setHistoryMode] = useState<'DAY' | 'WEEK' | 'TERM'>('DAY');
   const selectHistoryDate = (date: string) => {
     setHistoryDate(date);
-    setHistoryVersion(value => value + 1);
-    historyPanel.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+    setHasSelectedDay(true);
+    setHistoryMode('DAY');
   };
+  const openHistory = (mode: 'DAY' | 'WEEK' | 'TERM') => {
+    setHistoryMode(mode);
+    setHistoryOpen(true);
+  };
+  // Archive is lazy: do not fetch historical records while the dashboard loads.
+  const selectedArchive = usePointRecordArchive(historyDate, historyDate, undefined, hasSelectedDay);
+  const eligibleStudentIds = useMemo(() => new Set(students.map(row => row.coreStudentId)), [students]);
+  const selectedRecords = (selectedArchive.data ?? []).filter(row => eligibleStudentIds.has(row.coreStudentId));
+  const dayPositive = selectedRecords.filter(row => row.type === 'POSITIVE').reduce((sum, row) => sum + row.points, 0);
+  const dayNegative = selectedRecords.filter(row => row.type === 'NEGATIVE').reduce((sum, row) => sum + row.points, 0);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<'net' | 'grade' | 'name'>('net');
   const [target, setTarget] = useState<Target>('ALL');
@@ -106,18 +108,50 @@ export function DashboardView({ students, reflections, calendar, scope, isLead, 
     <div className="desk-work-grid">
       <section className="desk-week" aria-labelledby="desk-week-title">
         <div className="desk-panel-heading"><div><span className="desk-panel-kicker">주간 업무</span><h2 id="desk-week-title">이번 주의 흐름</h2></div><span className="desk-week-range">{shortDate(days[0].date)} – {shortDate(days[6].date)}</span></div>
-        <ol className="desk-week-days" aria-label="이번 주 달력">{days.map(day => <li key={day.date} className={day.date === calendar.date ? 'is-today' : ''} aria-current={day.date === calendar.date ? 'date' : undefined}><button type="button" disabled={day.date > calendar.date} aria-label={day.date + ' 기록 보기'} onClick={() => selectHistoryDate(day.date)}><span>{day.label}</span><strong>{day.day}</strong><span className="desk-day-marker">{day.date === calendar.date ? '오늘' : '\u00a0'}</span></button></li>)}</ol>
+        <ol className="desk-week-days" aria-label="이번 주 달력">{days.map(day => <li key={day.date} className={[day.date === calendar.date ? 'is-today' : '', hasSelectedDay && day.date === historyDate ? 'is-selected' : ''].filter(Boolean).join(' ')} aria-current={day.date === calendar.date ? 'date' : undefined}><button type="button" disabled={day.date > calendar.date} aria-pressed={hasSelectedDay && day.date === historyDate} aria-label={day.date + ' 기록 바로 보기'} onClick={() => selectHistoryDate(day.date)}><span>{day.label}</span><strong>{day.day}</strong><span className="desk-day-marker">{day.date === calendar.date ? '오늘' : hasSelectedDay && day.date === historyDate ? '선택' : '\u00a0'}</span></button></li>)}</ol>
         {isLead ? <div className="desk-merit">
           <div className="desk-merit-heading"><span>{!departments.loading && !departments.error && total > 0 && generated === total ? <CircleCheck size={18} /> : <CalendarDays size={18} />}부서상점 자동반영</span><Link href="/points/positive/departments">관리<ArrowRight size={15} /></Link></div>
           <div className="desk-merit-status"><strong>{meritLabel}</strong>{!departments.loading && !departments.error && total > 0 && <span>{generated} / {total}건</span>}</div>
           {!departments.loading && !departments.error && total > 0 ? <progress aria-label="이번 주 부서상점 반영" max={total} value={generated} /> : <p>{departments.error ? '관리 화면에서 반영 내역을 다시 확인해 주세요.' : departments.loading ? '이번 주 반영 내역을 불러오고 있습니다.' : '부서 규칙과 소속 학생을 등록하면 매주 자동 반영됩니다.'}</p>}
         </div> : <div className="desk-week-note"><CalendarDays size={18} /><p>주간 점수는 월요일부터 집계됩니다.<br />이번 주 대상자 현황을 확인해 주세요.</p></div>}
       </section>
-      <section className="desk-work" aria-labelledby="desk-work-title"><div className="desk-panel-heading"><div><span className="desk-panel-kicker">업무 바로가기</span><h2 id="desk-work-title">확인하고 이어가기</h2></div></div>
-        <ActionRow href="/reflections?view=MISSING" icon={<BookOpenCheck size={20} />} title="반성문 제출 확인" copy={missing > 0 ? '미제출 명단에서 제출 여부를 확인하세요.' : '현재 미제출 대상자가 없습니다.'} badge={missing > 0 ? missing + '명 미제출' : undefined} />
-        <ActionRow href="/reports" icon={<Printer size={20} />} title="공지·명단 출력" copy="생활지도 공지와 주간 명단을 준비하세요." />
+      <section className="desk-work desk-day-preview" aria-labelledby="desk-work-title">
+        <div className="desk-panel-heading">
+          <div><span className="desk-panel-kicker">날짜별 기록</span><h2 id="desk-work-title">{hasSelectedDay ? shortDate(historyDate) + ' 생활점수 기록' : '날짜를 선택해 기록 확인'}</h2></div>
+          <CalendarDays size={19} className="desk-preview-calendar" aria-hidden="true" />
+        </div>
+        {!hasSelectedDay ? <div className="desk-preview-empty">
+          <p>왼쪽 주간 달력의 날짜를 선택하면 해당일 상벌점과 입력 기록을 이곳에서 바로 볼 수 있습니다.</p>
+          <button type="button" className="btn btn-outline" onClick={() => selectHistoryDate(calendar.date)}>오늘 기록 확인 <ArrowRight size={15} /></button>
+        </div> : selectedArchive.isLoading ? <p className="desk-preview-loading" role="status">해당일 기록을 불러오는 중입니다.</p>
+          : selectedArchive.isError ? <div className="desk-preview-error" role="alert">기록 조회에 실패했습니다. 점수가 0이라는 뜻은 아닙니다. <button className="btn btn-outline" type="button" onClick={() => selectedArchive.refetch()}>다시 시도</button></div>
+          : <>
+            <div className="desk-preview-totals" aria-live="polite">
+              <div><span>상점</span><strong className="success-text">+{dayPositive}</strong></div>
+              <div><span>벌점</span><strong className="danger-text">−{dayNegative}</strong></div>
+              <div><span>상벌NET</span><strong>{dayPositive - dayNegative > 0 ? '+' : ''}{dayPositive - dayNegative}</strong></div>
+            </div>
+            <div className="desk-preview-meta">{selectedRecords.length > 0 ? '입력 기록 ' + selectedRecords.length + '건 · 최근 기록' : '해당일 입력 기록이 없습니다. 기록 없음은 0점 확정과 다릅니다.'}</div>
+            {selectedRecords.length > 0 && <ul className="desk-preview-list">
+              {selectedRecords.slice(0, 3).map(record => <li key={record.id}>
+                <span className="desk-preview-person">{record.studentName}</span>
+                <span className="desk-preview-item" title={record.item}>{record.item}</span>
+                <strong className={record.type === 'POSITIVE' ? 'success-text' : 'danger-text'}>{record.type === 'POSITIVE' ? '+' : '−'}{record.points}</strong>
+              </li>)}
+            </ul>}
+          </>}
+        <div className="desk-history-actions" role="group" aria-label="과거 기록 상세 조회">
+          <button type="button" className={'btn ' + (historyOpen && historyMode === 'DAY' ? 'btn-primary' : 'btn-outline')} onClick={() => { setHasSelectedDay(true); openHistory('DAY'); }}>일별 상세</button>
+          <button type="button" className={'btn ' + (historyOpen && historyMode === 'WEEK' ? 'btn-primary' : 'btn-outline')} onClick={() => openHistory('WEEK')}>주별 기록</button>
+          <button type="button" className={'btn ' + (historyOpen && historyMode === 'TERM' ? 'btn-primary' : 'btn-outline')} onClick={() => openHistory('TERM')}>학기 누계</button>
+          {historyOpen && <button type="button" className="desk-history-close" onClick={() => setHistoryOpen(false)} aria-label="상세 기록 접기"><X size={16} /></button>}
+        </div>
       </section>
     </div>
+
+    {historyOpen && <div className="desk-inline-history" data-testid="dashboard-inline-history">
+      <PointHistory key={historyMode} initialMode={historyMode} date={historyDate} today={calendar.date} onDateChange={selectHistoryDate} students={students} scope={scope} />
+    </div>}
 
     <section className="desk-students" aria-labelledby="dashboard-students">
       <div className="desk-students-heading"><div><h2 id="dashboard-students" ref={listHeading} tabIndex={-1}>학생 생활점수<span className="desk-row-count" aria-live="polite">{rows.length}명</span></h2><p>주간 점수와 생활지도 상태를 확인합니다.</p></div><span className="desk-net-legend">주간 상벌NET = 상점 − 벌점</span></div>
@@ -134,8 +168,7 @@ export function DashboardView({ students, reflections, calendar, scope, isLead, 
       {rows.length === 0 && <div className="desk-empty"><Users size={28} aria-hidden="true" /><strong>{search ? '검색 결과가 없습니다' : '해당 대상자가 없습니다'}</strong><p>{search ? '이름·학번·반 또는 선택한 필터를 확인해 주세요.' : '현재 선택한 조건에 해당하는 학생이 없습니다.'}</p>{(search || target !== 'ALL') && <button className="btn btn-outline" type="button" onClick={() => { setSearch(''); setTarget('ALL'); }}>전체 학생 보기</button>}</div>}
       <div className="desk-table-footer"><span>{targetLabels.find(([value]) => value === target)?.[1]} · {rows.length}명</span><span>학생 이름을 누르면 상세 기록으로 이동합니다.</span></div>
     </section>
-    {isLead && <Link className="btn btn-outline" href="/history/import">주간 원장 · 이관 이력</Link>}
-    <div ref={historyPanel}><PointHistory key={historyVersion} date={historyDate} today={calendar.date} onDateChange={setHistoryDate} students={students} scope={scope} /></div>
+    {isLead && <Link className="btn btn-outline desk-import-link" href="/history/import">주간 원장 · 이관 이력</Link>}
   </div>;
 }
 

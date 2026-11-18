@@ -4,11 +4,12 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCoreSetupStatus, useDisciplineHistory, usePointRecordArchive, type DisciplineScope, type StudentSummary } from '@/lib/api';
 import { operatingDays, shiftDate, weekStart } from '@/lib/history';
 
-export function PointHistory({ date, today, onDateChange, scope, studentId }: {
+export function PointHistory({ date, today, onDateChange, scope, studentId, initialMode }: {
   date: string; today: string; onDateChange: (date: string) => void;
   students?: StudentSummary[]; scope?: DisciplineScope | null; studentId?: string;
+  initialMode?: 'DAY' | 'WEEK' | 'TERM';
 }) {
-  const [mode, setMode] = useState<'DAY' | 'WEEK' | 'TERM'>(studentId ? 'TERM' : 'WEEK');
+  const [mode, setMode] = useState<'DAY' | 'WEEK' | 'TERM'>(initialMode ?? (studentId ? 'TERM' : 'WEEK'));
   const [search, setSearch] = useState('');
   const term = useCoreSetupStatus();
   const start = mode === 'TERM' ? term.data?.startsOn ?? '' : mode === 'WEEK' ? weekStart(date) : date;
