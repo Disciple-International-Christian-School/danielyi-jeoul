@@ -1203,6 +1203,12 @@ export interface SeondoNotice {
     reflection_id: number; student_name: string; grade: number; homeroom: string | null;
     item: string; occurred_on: string; pages: number; is_double: boolean; due_at: string;
   }[];
+  // Unfrozen read-only candidates, never considered a published notice.
+  // New penalties have unknown page counts until the cutoff consumes merits.
+  preview_entries?: {
+    reflection_id: number; student_name: string; grade: number; homeroom: string | null;
+    item: string; occurred_on: string; pages: number | null; is_double: boolean; due_at: string;
+  }[];
 }
 
 export function useSeondoNotice(day: string) {
