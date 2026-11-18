@@ -77,6 +77,9 @@ jobs:
       - name: History regression checks
         run: node scripts/test-history.mjs && node scripts/test-weekly-import.mjs
 
+      - name: Reflection queue regression checks
+        run: node scripts/test-reflection-queue.mjs
+
       - name: Typecheck
         run: npm run typecheck
 

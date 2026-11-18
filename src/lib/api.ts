@@ -6,6 +6,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { supabase } from './supabase';
 import { useAuth } from './auth';
+import { isDoubleReflection } from './reflection-queue';
+export { reflectionIsOnNotice } from './reflection-queue';
 import type { WeeklySourceRow } from './weekly-import';
 
 export interface HistoryBalance {
@@ -732,7 +734,7 @@ function mapReflection(row: ReflectionRow): Reflection {
     submitted: row.submitted,
     submissionDeadline: row.submission_deadline,
     dueAt: row.due_at,
-    actionDueAt: row.status === 'DOUBLE' ? row.double_submit_deadline : row.due_at,
+    actionDueAt: isDoubleReflection({ status: row.status, dueAt: row.due_at, submittedAt: row.submitted_at }) ? row.double_submit_deadline : row.due_at,
     deadlineChangeReason: row.deadline_change_reason,
     submittedAt: row.submitted_at,
     status: row.status,
@@ -1185,14 +1187,6 @@ export function useListPointItems(params?: { type?: PointType; includeInactive?:
       return rows.map(mapPointItem);
     },
   });
-}
-
-export function reflectionIsOnNotice(reflection: Reflection, date: string, today: string, managed = false) {
-  if (!reflection.isCurrentStudent || reflection.status === 'SUBMITTED') return false;
-  if (managed) return reflection.seondoNoticeDay === date;
-  return reflection.recordedAt === date
-    || (date === today && reflection.recordedAt < date
-      && (reflection.status === 'DOUBLE' || reflection.submissionDeadline === date));
 }
 
 export interface SeondoNoticeEntry {

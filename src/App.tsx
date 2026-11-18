@@ -87,7 +87,6 @@ import {
   useEnsureWeeklyDepartmentMerits,
   useGetDashboard,
   useGetStudent,
-  useExtendReflectionToNextDay,
   useImportPointItems,
   useInitializeCurrentAcademicTerm,
   useGrade9Assignments,
@@ -117,6 +116,7 @@ import { AuthProvider, useAuth } from '@/lib/auth';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
 import './index.css';
 import { DashboardView } from '@/components/dashboard';
+import { isDoubleReflection, reflectionMatchesFilter, type ReflectionListFilter } from '@/lib/reflection-queue';
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -846,19 +846,21 @@ function ReflectionsPage() {
   const queryClient = useQueryClient();
   const notify = useContext(NoticeContext);
   const { admin } = useAuth();
-  const [filter, setFilter] = useState<'ALL' | 'TODAY' | 'SUBMITTED' | 'MISSING' | 'DOUBLE'>(() => {
+  const [filter, setFilter] = useState<ReflectionListFilter>(() => {
     const view = new URLSearchParams(window.location.search).get('view');
-    return view === 'TODAY' || view === 'MISSING' || view === 'DOUBLE' ? view : 'ALL';
+    return view === 'TODAY' || view === 'MISSING' || view === 'DOUBLE' || view === 'SUBMITTED' ? view : 'ALL';
   });
   const [scopeFilter, setScopeFilter] = useState<DisciplineScope>(admin?.disciplineScope ?? 'ALL');
   const reflections = useListReflections();
   const update = useUpdateReflection();
-  const extend = useExtendReflectionToNextDay();
 
   if (reflections.isLoading || notice.isLoading) return <LoadingState />;
   if (reflections.isError || notice.isError) return <ErrorState error={reflections.error ?? notice.error} retry={() => { reflections.refetch(); notice.refetch(); }} />;
 
-  const filterLabels = [['ALL', '전체'], ['TODAY', '오늘 대상'], ['MISSING', '미제출 전체'], ['DOUBLE', '2배 제출 대상'], ['SUBMITTED', '제출 완료']] as const;
+  const filterLabels: Array<[ReflectionListFilter, string]> = [
+    ['ALL', '전체 기록'], ['TODAY', '오늘 대상'], ['MISSING', '미제출 전체'],
+    ['DOUBLE', '2배 제출 대상'], ['SUBMITTED', '제출 완료'],
+  ];
   const scopeLabels: Array<[DisciplineScope, string]> = [
     ['ALL', '전체 학년'],
     ['ELEMENTARY', '초등 G1–6'],
@@ -869,13 +871,23 @@ function ReflectionsPage() {
     ? scopeLabels
     : scopeLabels.filter(([value]) => value === admin?.disciplineScope);
 
-  const rows = (reflections.data ?? []).filter((reflection) =>
-    (filter === 'ALL' || (filter === 'TODAY'
-      ? reflectionIsOnNotice(reflection, today(), today(), notice.data?.active)
-      : filter === 'MISSING' ? reflection.status !== 'SUBMITTED' : reflection.status === filter))
-    && matchesDisciplineScope(reflection.grade, admin?.disciplineScope)
+  const scopedReflections = (reflections.data ?? []).filter((reflection) =>
+    matchesDisciplineScope(reflection.grade, admin?.disciplineScope)
     && (scopeFilter === 'ALL' || reflection.assignedScope === scopeFilter)
   );
+  const isManagedToday = Boolean(notice.data?.managed_date);
+  const queueCounts = Object.fromEntries(filterLabels.map(([value]) => [
+    value, scopedReflections.filter(row => reflectionMatchesFilter(row, value, today(), isManagedToday)).length,
+  ])) as Record<ReflectionListFilter, number>;
+  const rows = scopedReflections.filter(reflection =>
+    reflectionMatchesFilter(reflection, filter, today(), isManagedToday));
+  const filterDescription: Record<ReflectionListFilter, string> = {
+    ALL: '현재 재학생의 반성문 기록을 모두 표시합니다. 상점으로 면제된 0페이지 항목은 제외합니다.',
+    TODAY: '오늘 공지에 포함된 미제출 건입니다. 이전 공지에서 이월된 2배 대상도 포함됩니다.',
+    MISSING: '날짜와 무관하게 아직 제출하지 않은 모든 건입니다. 2배 제출 대상도 포함됩니다.',
+    DOUBLE: '첫 번째 제출 마감이 지나 2배 분량을 제출해야 하는 미완료 건입니다.',
+    SUBMITTED: '제출 완료 기록입니다. 마감 후 제출한 건은 2배 제출 완료로 표시합니다.',
+  };
 
   return <div>
     <PageHeader
@@ -908,8 +920,9 @@ function ReflectionsPage() {
           className={'tab ' + (filter === value ? 'active' : '')}
           onClick={() => setFilter(value)}
           data-testid={'button-reflection-filter-' + value.toLowerCase()}
-        >{label}</button>)}
+        >{label} <span className="muted">{queueCounts[value]}</span></button>)}
       </div>
+      <p className="record-meta" style={{ marginTop: 10 }} data-testid="reflection-filter-explanation">{filterDescription[filter]}</p>
 
       {rows.length === 0 ? <EmptyState title="해당 반성문이 없습니다" copy="선택한 담당 범위와 상태에 맞는 반성문이 없습니다." /> : <div className="table-wrap">
         <table className="data-table">
@@ -919,10 +932,10 @@ function ReflectionsPage() {
             <td className="muted">{reflection.assignedScope === 'ELEMENTARY' ? '초등' : reflection.assignedScope === 'MIDDLE' ? '중등' : '고등'}</td>
             <td>{reflection.item}</td>
             <td className="weight-number danger-text">{reflection.points}</td>
-            <td>{reflection.reflectionPages === null ? '—' : reflection.reflectionPages * (reflection.status === 'DOUBLE' ? 2 : 1)}</td>
+            <td>{reflection.reflectionPages === null ? '—' : reflection.reflectionPages * (isDoubleReflection(reflection) ? 2 : 1)}</td>
             <td className="muted">{dateLabel(reflection.recordedAt)}</td>
             <td className="muted"><div>{dateTimeLabel(reflection.actionDueAt)}</div>{reflection.deadlineChangeReason && <div className="record-meta">연장 사유: {reflection.deadlineChangeReason}</div>}</td>
-            <td><span className={'pill ' + (reflection.status === 'SUBMITTED' ? 'pill-positive' : reflection.status === 'DOUBLE' ? 'pill-negative' : 'pill-warning')}>{reflection.status === 'SUBMITTED' ? '제출 완료' : reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}</span>{reflection.submittedAt && <div className="record-meta">제출 {dateTimeLabel(reflection.submittedAt)}</div>}</td>
+            <td><span className={'pill ' + (reflection.status === 'SUBMITTED' ? 'pill-positive' : reflection.status === 'DOUBLE' ? 'pill-negative' : 'pill-warning')}>{reflection.status === 'SUBMITTED' ? (isDoubleReflection(reflection) ? '2배 제출 완료' : '제출 완료') : reflection.status === 'DOUBLE' ? '2배 대상' : '미제출'}</span>{reflection.submittedAt && <div className="record-meta">제출 {dateTimeLabel(reflection.submittedAt)}</div>}</td>
             <td><div className="toolbar-right">
               <button className="btn btn-outline" disabled={update.isPending} onClick={() => {
                 update.mutate({ id: reflection.id, data: { submitted: !reflection.submitted } }, {
@@ -932,27 +945,12 @@ function ReflectionsPage() {
                     queryClient.invalidateQueries({ queryKey: ['reports', 'daily-notice'] });
                     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                     queryClient.invalidateQueries({ queryKey: ['students'] });
-                    notify(reflection.status === 'DOUBLE' ? '2배 대상을 해제하고 제출 완료로 처리했습니다.' : '반성문 상태를 변경했습니다.');
+                    notify(reflection.status === 'DOUBLE' ? '2배 제출 완료로 처리했습니다.' : reflection.submitted ? '미제출 상태로 변경했습니다.' : '반성문 제출 완료로 처리했습니다.');
                   },
                   onError: (error) => notify(errText(error), 'error'),
                 });
-              }} data-testid={'button-toggle-reflection-' + reflection.id}>{reflection.submitted ? '미제출로' : reflection.status === 'DOUBLE' ? '2배 해제 후 제출 완료' : '제출 완료'}</button>
-              {!reflection.submitted && reflection.grade >= 7 && <button className="btn btn-outline" onClick={() => {
-                const date = new Date(reflection.recordedAt + 'T00:00:00Z');
-                date.setUTCDate(date.getUTCDate() + (date.getUTCDay() === 6 ? 2 : 1));
-                const target = new Intl.DateTimeFormat('ko-KR', {
-                  month: 'numeric', day: 'numeric', weekday: 'short', timeZone: 'UTC',
-                }).format(date);
-                const reason = window.prompt(reflection.seondoManaged ? '게시 후 다음 등교일 17시까지 연장합니다. 연장 사유를 입력하세요.' : `${target} 17시까지 연장합니다. 연장 사유를 입력하세요.`, '오후 벌점 발생');
-                if (reason == null) return;
-                extend.mutate({ id: reflection.id, reason }, {
-                  onSuccess: (deadline) => {
-                    queryClient.invalidateQueries();
-                    notify('반성문 마감: ' + dateTimeLabel(deadline));
-                  },
-                  onError: (error) => notify(errText(error), 'error'),
-                });
-              }} data-testid={'button-extend-reflection-' + reflection.id}>다음날 17시로 연장</button>}
+              }} data-testid={'button-toggle-reflection-' + reflection.id}>{reflection.submitted ? '미제출로' : reflection.status === 'DOUBLE' ? '2배 제출 완료' : '제출 완료'}</button>
+
             </div></td>
           </tr>)}</tbody>
         </table>
