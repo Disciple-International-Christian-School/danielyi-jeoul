@@ -2,6 +2,29 @@
 -- Preview never persists allocations, reflection pages, deadlines or notice rows.
 -- Cutoff uses the returned allocations to freeze the exact same calculation.
 
+-- Narrow definer helper: expose only the already-consumed quantity for a merit.
+-- Do not grant authenticated direct SELECT on the allocation ledger.
+create or replace function private.seondo_merit_allocated(p_merit_id integer)
+returns integer language plpgsql stable security definer set search_path = '' as $function$
+begin
+  if auth.uid() is null or not exists (
+    select 1 from public.admins a
+    where a.user_id = auth.uid() and a.is_active and a.role::text = 'SEONDO'
+  ) then
+    raise exception '선도부 계정 권한이 필요합니다.';
+  end if;
+  return coalesce((
+    select sum(a.points) from discipline.seondo_merit_allocations a
+    where a.merit_id = p_merit_id
+  ), 0)::integer;
+end;
+$function$;
+
+revoke all on function private.seondo_merit_allocated(integer)
+from public, anon, authenticated;
+grant execute on function private.seondo_merit_allocated(integer)
+to authenticated, service_role;
+
 create or replace function private.seondo_calculate_notice(p_start timestamptz, p_cutoff timestamptz)
 returns table(
   reflection_id integer, point_record_id integer, core_student_id uuid,
@@ -42,10 +65,7 @@ begin
     pages_left := penalty.points;
     result_allocations := '[]'::jsonb;
     for credit in
-      select m.id, m.points - coalesce((
-        select sum(a.points) from discipline.seondo_merit_allocations a
-        where a.merit_id = m.id
-      ), 0) as available
+      select m.id, m.points - private.seondo_merit_allocated(m.id) as available
       from public.point_records m
       where m.core_student_id = penalty.core_student_id and m.type = 'POSITIVE'
         and m.deleted_at is null and m.superseded_by_import_id is null
