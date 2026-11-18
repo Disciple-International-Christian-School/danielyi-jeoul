@@ -226,6 +226,7 @@ function WeeklyMeritBootstrap() {
           queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
           queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
           queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: ['seondo-notice'] });
           queryClient.invalidateQueries({ queryKey: getWeeklyDisciplineReportQueryKey() });
           notify(`이번 주 부서활동 상점 ${inserted}건을 자동 반영했습니다.`);
         }
@@ -927,6 +928,7 @@ function ReflectionsPage() {
                 update.mutate({ id: reflection.id, data: { submitted: !reflection.submitted } }, {
                   onSuccess: () => {
                     queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() });
+                    queryClient.invalidateQueries({ queryKey: ['seondo-notice'] });
                     queryClient.invalidateQueries({ queryKey: ['reports', 'daily-notice'] });
                     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                     queryClient.invalidateQueries({ queryKey: ['students'] });
@@ -1100,7 +1102,7 @@ function ReportsPage() {
             </p> : previewMode
               ? <p className="muted" data-testid="notice-preview-status">
                 실시간 미리보기 {dailyRows.length}건 · 출력 전 <strong>출력 마감 확정</strong> 필요.
-                신규 벌점은 마감할 때 상점 상쇄 후 반성문 페이지 수가 확정됩니다.
+                현재 상점 상쇄를 반영한 페이지 수입니다. 공지 게시 시 확정되며, 그전에는 입력에 따라 바뀔 수 있습니다.
               </p>
               : <p className="muted">해당 날짜의 확정된 공지가 없습니다.</p>}
             {todayNotice && batch && !batch.published_at && <p className="muted">명단을 인쇄해 게시한 뒤 게시를 확정해 주세요.</p>}
@@ -1135,7 +1137,7 @@ function ReportsPage() {
       {noticeText.trim() && <p className="print-notice-text" style={{ whiteSpace: 'pre-wrap' }}>{noticeText}</p>}
       {mode === 'DAILY' ? <>
         {previewMode && <p className="muted" data-testid="notice-preview-disclaimer">
-          마감 전 미리보기 · 상점 상쇄가 반영되지 않은 신규 벌점 후보입니다. 인쇄·게시 전 출력 마감을 확정해 주세요.
+          실시간 반성문 대상 명단 · 상점 상쇄 반영. 페이지 수는 게시 전까지 변경될 수 있으며 게시 이후에는 고정됩니다.
         </p>}
         <div className="print-summary">
           <span>오늘 반성문 미제출 <strong>{filteredDaily.filter((row) => !row.double).length}</strong>건</span>
@@ -1165,8 +1167,8 @@ function ReportsPage() {
                     </span></td>
                     <td>{row.item}</td>
                     <td className="print-date">{row.recordedAt.slice(5).split('-').map(Number).join('/')}</td>
-                    <td className="print-pages">{pages ?? (previewMode ? '마감 후 확정' : '—')}</td>
-                    <td>{previewMode && !double ? '게시 시 확정' : dateTimeLabel(row.dueAt)}</td>
+                    <td className="print-pages">{pages ?? '—'}</td>
+                    <td>{previewMode && !double ? '예정 · ' + dateTimeLabel(row.dueAt) : dateTimeLabel(row.dueAt)}</td>
                   </tr>;
                 })}</tbody>
               </table>

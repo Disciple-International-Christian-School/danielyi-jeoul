@@ -505,6 +505,12 @@
       "name": "seondo_live_notice_preview",
       "status": "TRACKED",
       "file": "supabase/migrations/20261118021811_seondo_live_notice_preview.sql"
+    },
+    {
+      "version": "20261118024206",
+      "name": "seondo_unified_live_reflection_pages",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261118024206_seondo_unified_live_reflection_pages.sql"
     }
   ]
 }

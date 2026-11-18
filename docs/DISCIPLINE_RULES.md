@@ -104,3 +104,11 @@ recipients before activating the policy in production. Existing reflection eligi
 - **School calendar**: through December 23, 2026, there are no statutory or discretionary school closures beyond Saturdays and Sundays in the regular term.
 - **New reflection-notice activation:** the live policy is scheduled for 00:00 KST on November 18, 2026. Existing reflection records through November 17 remain governed by their prior deadlines; the Seondo lead must explicitly close and post the first new notice.
 - **Pre-transition history review**: authoritative historical training closures were never stored. Derived candidates are staged in `discipline.seondo_legacy_weekly_candidates` but are **not confirmed counts**; November month-end committee closure is gated until the school approves the snapshot. Training-week accrual for the new rule begins at 00:00 KST on November 16 independently from the non-retroactive reflection notice cutover.
+
+## November 18, 2026 — unified live reflection targets
+
+- Immediately after a penalty is recorded, calculate **live reflection pages** from valid forward-only merits (T through T+4 attendance days) and show the same result in the reflection list, dashboard cards, and daily notice preview.
+- Zero-page penalties fully covered by prior merit are **not reflection targets**, without deleting their underlying point records.
+- Before the print cutoff, pages are live computed values and may change as point records change. The print cutoff snapshots the current calculation for the physical notice; publication does not retroactively change earlier posted pages.
+- A reflection submitted before publication must not be resurrected as outstanding or doubled when the notice snapshot is read.
+- Preview reads never insert merit allocations or alter reflection due dates.
