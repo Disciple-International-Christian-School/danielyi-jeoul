@@ -24,7 +24,7 @@ export function isDoubleReflection(row: Pick<ReflectionQueueRecord, 'status' | '
 export function reflectionIsOnNotice(
   reflection: ReflectionQueueRecord, date: string, today: string, managed = false,
 ): boolean {
-  if (!reflection.isCurrentStudent || reflection.status === 'SUBMITTED' || !(reflection.reflectionPages > 0)) return false;
+  if (!reflection.isCurrentStudent || reflection.status === 'SUBMITTED' || !((reflection.reflectionPages ?? 0) > 0)) return false;
   if (managed) return reflection.seondoNoticeDay === date;
   return reflection.recordedAt === date
     || (date === today && reflection.recordedAt < date
@@ -40,7 +40,7 @@ export function reflectionMatchesFilter(
   if (!reflection.isCurrentStudent) return false;
   // An offset/waiver can leave a historical reflection row with zero pages.
   // It remains in the student audit record, not in the active action queues.
-  if (reflection.status !== 'SUBMITTED' && !(reflection.reflectionPages > 0)) return false;
+  if (reflection.status !== 'SUBMITTED' && !((reflection.reflectionPages ?? 0) > 0)) return false;
   if (filter === 'TODAY') return reflectionIsOnNotice(reflection, today, today, managed);
   if (filter === 'MISSING') return reflection.status === 'MISSING' || reflection.status === 'DOUBLE';
   if (filter === 'DOUBLE') return reflection.status === 'DOUBLE';
