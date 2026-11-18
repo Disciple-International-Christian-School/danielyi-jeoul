@@ -499,6 +499,12 @@
       "name": "secondary_training_net_only",
       "status": "TRACKED",
       "file": "supabase/migrations/20261117105328_secondary_training_net_only.sql"
+    },
+    {
+      "version": "20261118021811",
+      "name": "seondo_live_notice_preview",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261118021811_seondo_live_notice_preview.sql"
     }
   ]
 }
