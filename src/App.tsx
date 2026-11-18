@@ -978,6 +978,7 @@ function ReportsPage() {
   const batch = notice.data?.batch;
   const actionTitle = batch ? '게시 확정' : '출력 마감 확정';
   const todayNotice = mode === 'DAILY' && noticeDate === today();
+  const previewMode = todayNotice && managedDate && !batch;
 
   const daily = useListReflections(mode === 'DAILY' && notice.isSuccess && !managedDate);
   const weekly = useWeeklyDisciplineReport(mode === 'WEEKLY' && notice.isSuccess && !finalizedReport && Boolean(admin?.isLead));
@@ -994,7 +995,7 @@ function ReportsPage() {
     || (admin.disciplineScope === 'HIGH' && grade >= 9 && grade <= 12);
 
   const dailyRows = (managedDate
-    ? (notice.data?.entries ?? []).map(row => ({
+    ? (batch ? notice.data?.entries ?? [] : previewMode ? notice.data?.preview_entries ?? [] : []).map(row => ({
       id: row.reflection_id, studentName: row.student_name, grade: row.grade, homeroom: row.homeroom,
       item: row.item, recordedAt: row.occurred_on, pages: row.pages, double: row.is_double, dueAt: row.due_at,
     }))
@@ -1096,7 +1097,12 @@ function ReportsPage() {
           <div>
             {batch ? <p className="muted">출력 마감 {dateTimeLabel(batch.cutoff_at)}
               {batch.published_at ? ' · 게시 ' + dateTimeLabel(batch.published_at) : ' · 게시 대기'}
-            </p> : <p className="muted">출력 마감이 확정되면 명단이 표시됩니다.</p>}
+            </p> : previewMode
+              ? <p className="muted" data-testid="notice-preview-status">
+                실시간 미리보기 {dailyRows.length}건 · 출력 전 <strong>출력 마감 확정</strong> 필요.
+                신규 벌점은 마감할 때 상점 상쇄 후 반성문 페이지 수가 확정됩니다.
+              </p>
+              : <p className="muted">해당 날짜의 확정된 공지가 없습니다.</p>}
             {todayNotice && batch && !batch.published_at && <p className="muted">명단을 인쇄해 게시한 뒤 게시를 확정해 주세요.</p>}
           </div>
           {todayNotice && admin?.isLead && !batch?.published_at &&
@@ -1128,13 +1134,16 @@ function ReportsPage() {
 
       {noticeText.trim() && <p className="print-notice-text" style={{ whiteSpace: 'pre-wrap' }}>{noticeText}</p>}
       {mode === 'DAILY' ? <>
+        {previewMode && <p className="muted" data-testid="notice-preview-disclaimer">
+          마감 전 미리보기 · 상점 상쇄가 반영되지 않은 신규 벌점 후보입니다. 인쇄·게시 전 출력 마감을 확정해 주세요.
+        </p>}
         <div className="print-summary">
           <span>오늘 반성문 미제출 <strong>{filteredDaily.filter((row) => !row.double).length}</strong>건</span>
           <span>2배 제출 대상 <strong>{filteredDaily.filter((row) => row.double).length}</strong>건</span>
           <span>총 제출 필요 <strong>{filteredDaily.length}</strong>건</span>
         </div>
 
-        {dailyGroups.length === 0 ? <div className="print-empty">선택한 날짜/반에 미제출 반성문 또는 2배 제출 대상이 없습니다.</div> :
+        {dailyGroups.length === 0 ? <div className="print-empty">{previewMode ? '현재 입력된 미확정 반성문 후보가 없습니다.' : '선택한 날짜/반에 미제출 반성문 또는 2배 제출 대상이 없습니다.'}</div> :
           dailyGroups.map(([className, rows]) => {
             return <section className="print-group" key={className}>
               <h2>{className}</h2>
@@ -1156,8 +1165,8 @@ function ReportsPage() {
                     </span></td>
                     <td>{row.item}</td>
                     <td className="print-date">{row.recordedAt.slice(5).split('-').map(Number).join('/')}</td>
-                    <td className="print-pages">{pages ?? '—'}</td>
-                    <td>{dateTimeLabel(row.dueAt)}</td>
+                    <td className="print-pages">{pages ?? (previewMode ? '마감 후 확정' : '—')}</td>
+                    <td>{previewMode && !double ? '게시 시 확정' : dateTimeLabel(row.dueAt)}</td>
                   </tr>;
                 })}</tbody>
               </table>
