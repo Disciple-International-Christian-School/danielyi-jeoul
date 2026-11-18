@@ -218,3 +218,7 @@ revoke all on function private.seondo_calculate_notice(timestamptz,timestamptz)
   from public, anon;
 grant execute on function private.seondo_calculate_notice(timestamptz,timestamptz)
   to authenticated, service_role;
+
+-- Calendar predicates reveal dates only, not student records.
+grant execute on function private.seondo_merit_valid(date,date),
+  private.seondo_is_school_day(date) to authenticated;
