@@ -1195,20 +1195,29 @@ export function reflectionIsOnNotice(reflection: Reflection, date: string, today
       && (reflection.status === 'DOUBLE' || reflection.submissionDeadline === date));
 }
 
+export interface SeondoNoticeEntry {
+  reflection_id: number;
+  point_record_id: number;
+  core_student_id: string;
+  student_id: number;
+  student_name: string;
+  grade: number;
+  homeroom: string | null;
+  item: string;
+  occurred_on: string;
+  points: number;
+  pages: number;
+  is_double: boolean;
+  due_at: string;
+}
+
 export interface SeondoNotice {
   active: boolean;
   managed_date: boolean;
   batch: { day: string; cutoff_at: string; published_at: string | null } | null;
-  entries: {
-    reflection_id: number; student_name: string; grade: number; homeroom: string | null;
-    item: string; occurred_on: string; pages: number; is_double: boolean; due_at: string;
-  }[];
-  // Unfrozen read-only candidates, never considered a published notice.
-  // New penalties have unknown page counts until the cutoff consumes merits.
-  preview_entries?: {
-    reflection_id: number; student_name: string; grade: number; homeroom: string | null;
-    item: string; occurred_on: string; pages: number | null; is_double: boolean; due_at: string;
-  }[];
+  entries: SeondoNoticeEntry[];
+  // Live, read-only calculated pages. No merit points are consumed until cutoff.
+  preview_entries?: SeondoNoticeEntry[];
 }
 
 export function useSeondoNotice(day: string) {
@@ -1278,6 +1287,65 @@ export function useSeondoCommitteeAccess() {
   });
 }
 
+// The dashboard, reflection management, and print notice all use one current
+// read model. Historic reflections stay in v_reflections; unposted current
+// penalties are overlaid from the same read-only notice calculation as print.
+function mergeCurrentSeondoReflections(reflections: Reflection[], notice: SeondoNotice, noticeDay: string): Reflection[] {
+  if (!notice.managed_date) return reflections;
+  const entries = notice.batch ? notice.entries : notice.preview_entries ?? [];
+  if (!entries.length) return reflections;
+
+  const rows = new Map(reflections.map(row => [row.id, row]));
+  for (const entry of entries) {
+    const previous = rows.get(entry.reflection_id);
+    const pages = entry.is_double ? entry.pages / 2 : entry.pages;
+    if (previous) {
+      rows.set(entry.reflection_id, {
+        ...previous,
+        reflectionPages: pages,
+        seondoNoticeDay: noticeDay,
+        actionDueAt: entry.due_at,
+        status: entry.is_double ? 'DOUBLE' : previous.status,
+      });
+      continue;
+    }
+    const dueDay = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date(entry.due_at));
+    const grade = entry.grade;
+    const scope: Exclude<DisciplineScope, 'ALL'> =
+      grade <= 6 ? 'ELEMENTARY' : grade <= 8 ? 'MIDDLE' : 'HIGH';
+    rows.set(entry.reflection_id, {
+      id: entry.reflection_id,
+      pointRecordId: entry.point_record_id,
+      studentId: entry.student_id,
+      coreStudentId: entry.core_student_id,
+      studentName: entry.student_name,
+      grade,
+      homeroom: entry.homeroom,
+      weekStart: entry.occurred_on,
+      weeklyNet: 0,
+      reflectionPages: pages,
+      seondoManaged: Boolean(notice.batch?.published_at),
+      seondoNoticeDay: noticeDay,
+      isCurrentStudent: true,
+      item: entry.item,
+      points: entry.points,
+      recordedAt: entry.occurred_on,
+      submitted: false,
+      submissionDeadline: dueDay,
+      dueAt: entry.due_at,
+      actionDueAt: entry.due_at,
+      deadlineChangeReason: null,
+      submittedAt: null,
+      status: entry.is_double ? 'DOUBLE' : 'MISSING',
+      assignedScope: scope,
+    });
+  }
+  return Array.from(rows.values()).sort((a, b) =>
+    b.recordedAt.localeCompare(a.recordedAt) || b.id - a.id);
+}
+
 export function useListReflections(enabled = true) {
   return useQuery({
     queryKey: getListReflectionsQueryKey(),
@@ -1294,8 +1362,14 @@ export function useListReflections(enabled = true) {
             .range(offset, offset + pageSize - 1),
         );
         reflections.push(...rows.map(mapReflection));
-        if (rows.length < pageSize) return reflections;
+        if (rows.length < pageSize) break;
       }
+      const kstToday = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+      }).format(new Date());
+      const { data, error } = await supabase.rpc('get_seondo_notice', { p_day: kstToday });
+      if (error) throw new Error(error.message);
+      return mergeCurrentSeondoReflections(reflections, data as SeondoNotice, kstToday);
     },
   });
 }
