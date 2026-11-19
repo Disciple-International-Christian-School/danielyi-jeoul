@@ -511,6 +511,12 @@
       "name": "seondo_unified_live_reflection_pages",
       "status": "TRACKED",
       "file": "supabase/migrations/20261118024206_seondo_unified_live_reflection_pages.sql"
+    },
+    {
+      "version": "20261119024500",
+      "name": "notice_day_isolation",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261119024500_notice_day_isolation.sql"
     }
   ]
 }

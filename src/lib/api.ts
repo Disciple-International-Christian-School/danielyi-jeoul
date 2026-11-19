@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from './supabase';
 import { useAuth } from './auth';
 import { isDoubleReflection } from './reflection-queue';
+import { selectNoticeForDay } from './seondo-notice-day';
 export { reflectionIsOnNotice } from './reflection-queue';
 import type { WeeklySourceRow } from './weekly-import';
 
@@ -1206,6 +1207,8 @@ export interface SeondoNoticeEntry {
 }
 
 export interface SeondoNotice {
+  notice_day: string;
+  blocked_by_unpublished_day: string | null;
   active: boolean;
   managed_date: boolean;
   batch: { day: string; cutoff_at: string; published_at: string | null } | null;
@@ -1223,7 +1226,11 @@ export function useSeondoNotice(day: string) {
     queryFn: async (): Promise<SeondoNotice> => {
       const { data, error } = await supabase.rpc('get_seondo_notice', { p_day: day });
       if (error) throw new Error(error.message);
-      return data as SeondoNotice;
+      const notice = data as SeondoNotice;
+      if (!notice || !selectNoticeForDay(notice, day, true).valid) {
+        throw new Error('공지 요청 날짜와 서버 응답 날짜가 다릅니다. 이전 명단의 표시와 인쇄를 중단했습니다.');
+      }
+      return notice;
     },
   });
 }
