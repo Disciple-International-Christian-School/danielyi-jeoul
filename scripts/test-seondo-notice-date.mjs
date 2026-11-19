@@ -1,0 +1,29 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+
+const src = readFileSync(new URL('../src/lib/seondo-notice-day.ts', import.meta.url), 'utf8');
+const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+const { selectNoticeForDay } = await import('data:text/javascript;base64,' + Buffer.from(js).toString('base64'));
+const old = { notice_day: '2026-11-18', managed_date: true, batch: {day:'2026-11-18'},
+  entries:[{reflection_id:18,pages:3}],preview_entries:[] };
+const today = { notice_day: '2026-11-19', managed_date: true, batch: null,
+  entries:[],preview_entries:[{reflection_id:19,pages:2},{reflection_id:20,pages:4,is_double:true}] };
+const back = selectNoticeForDay(old,'2026-11-18',false);
+assert.equal(back.valid,true);
+assert.deepEqual(back.entries,[{reflection_id:18,pages:3}]);
+const mismatch=selectNoticeForDay(old,'2026-11-19',true);
+assert.equal(mismatch.valid,false);
+assert.deepEqual(mismatch.entries,[],'Never render yesterday under today title');
+const current=selectNoticeForDay(today,'2026-11-19',true);
+assert.equal(current.valid,true);
+assert.equal(current.preview,true);
+assert.deepEqual(current.entries.map(x=>x.pages),[2,4]);
+assert.deepEqual(selectNoticeForDay(old,'2026-11-18',false).entries,back.entries,'Back navigation restores frozen batch');
+const afterRefresh=selectNoticeForDay({...today,preview_entries:[{reflection_id:19,pages:3}]},'2026-11-19',true);
+assert.deepEqual(afterRefresh.entries.map(x=>x.pages),[3],'Open preview uses newest response');
+const newBatch=selectNoticeForDay({...today,batch:{day:'2026-11-19'},entries:[{reflection_id:19,pages:2}]},'2026-11-19',true);
+assert.equal(newBatch.preview,false);
+assert.deepEqual(newBatch.entries.map(x=>x.pages),[2],'Published/cutoff batch freezes stored pages');
+assert.equal(selectNoticeForDay({...today,batch:{day:'2026-11-18'}},'2026-11-19',true).valid,false);
+console.log('Seondo notice date isolation tests passed.');

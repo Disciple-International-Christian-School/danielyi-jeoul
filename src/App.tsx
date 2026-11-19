@@ -115,6 +115,7 @@ import { AuthProvider, useAuth } from '@/lib/auth';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
 import './index.css';
 import { DashboardView } from '@/components/dashboard';
+import { selectNoticeForDay } from '@/lib/seondo-notice-day';
 import { isDoubleReflection, reflectionMatchesFilter, type ReflectionListFilter } from '@/lib/reflection-queue';
 
 const queryClient = new QueryClient();
@@ -975,16 +976,20 @@ function ReportsPage() {
   const settlement = useSeondoSettlement(mode === 'MONTHLY' ? 'MONTHLY' : 'WEEKLY',
     settlementPeriod ? (mode === 'MONTHLY' ? settlementPeriod + '-01' : settlementPeriod) : null,
     finalizedReport && Boolean(admin?.isLead));
-  const batch = notice.data?.batch;
-  const actionTitle = batch ? '게시 확정' : '출력 마감 확정';
   const todayNotice = mode === 'DAILY' && noticeDate === today();
-  const previewMode = todayNotice && managedDate && !batch;
+  const noticeSelection = notice.data
+    ? selectNoticeForDay(notice.data, mode === 'DAILY' ? noticeDate : today(), todayNotice)
+    : null;
+  const batch = noticeSelection?.valid ? notice.data?.batch : null;
+  const actionTitle = batch ? '게시 확정' : '출력 마감 확정';
+  const previewMode = Boolean(noticeSelection?.preview);
+  const blockedByDraft = todayNotice ? notice.data?.blocked_by_unpublished_day : null;
 
   const daily = useListReflections(mode === 'DAILY' && notice.isSuccess && !managedDate);
   const weekly = useWeeklyDisciplineReport(mode === 'WEEKLY' && notice.isSuccess && !finalizedReport && Boolean(admin?.isLead));
 
   const reportQuery = mode === 'DAILY' ? (managedDate ? notice : daily) : finalizedReport ? settlement : weekly;
-  const loading = notice.isLoading || reportQuery.isLoading;
+  const loading = notice.isLoading || reportQuery.isLoading || (mode === 'DAILY' && notice.isSuccess && !noticeSelection?.valid);
   const error = notice.error ?? reportQuery.error;
 
   const scopeMatchesGrade = (grade: number) =>
@@ -995,7 +1000,7 @@ function ReportsPage() {
     || (admin.disciplineScope === 'HIGH' && grade >= 9 && grade <= 12);
 
   const dailyRows = (managedDate
-    ? (batch ? notice.data?.entries ?? [] : previewMode ? notice.data?.preview_entries ?? [] : []).map(row => ({
+    ? (noticeSelection?.entries ?? []).map(row => ({
       id: row.reflection_id, studentName: row.student_name, grade: row.grade, homeroom: row.homeroom,
       item: row.item, recordedAt: row.occurred_on, pages: row.pages, double: row.is_double, dueAt: row.due_at,
     }))
@@ -1095,6 +1100,9 @@ function ReportsPage() {
         </div>
         {mode === 'DAILY' && managedDate && <div className="section-row">
           <div>
+            {blockedByDraft && <p className="danger-text" role="status" data-testid="notice-unpublished-draft-warning">
+              {blockedByDraft} 출력 마감 초안이 아직 게시 대기 중입니다. 오늘 명단은 별도로 실시간 표시하지만, 이전 초안을 검토하기 전에는 오늘 출력 마감을 확정할 수 없습니다.
+            </p>}
             {batch ? <p className="muted">출력 마감 {dateTimeLabel(batch.cutoff_at)}
               {batch.published_at ? ' · 게시 ' + dateTimeLabel(batch.published_at) : ' · 게시 대기'}
             </p> : previewMode
@@ -1106,7 +1114,7 @@ function ReportsPage() {
             {todayNotice && batch && !batch.published_at && <p className="muted">명단을 인쇄해 게시한 뒤 게시를 확정해 주세요.</p>}
           </div>
           {todayNotice && admin?.isLead && !batch?.published_at &&
-            <button className="btn btn-outline" disabled={noticeAction.isPending} onClick={() => {
+            <button className="btn btn-outline" disabled={noticeAction.isPending || Boolean(blockedByDraft) || !noticeSelection?.valid} onClick={() => {
               if (batch && !window.confirm('게시판에 이 명단을 게시했나요?')) return;
               noticeAction.mutate(Boolean(batch), {
                 onSuccess: () => notify(batch ? '공지 게시를 확정했습니다.' : '출력 마감 시각을 확정했습니다.'),

@@ -80,6 +80,9 @@ jobs:
       - name: Reflection queue regression checks
         run: node scripts/test-reflection-queue.mjs
 
+      - name: Notice date isolation regression checks
+        run: node scripts/test-seondo-notice-date.mjs
+
       - name: Typecheck
         run: npm run typecheck
 
