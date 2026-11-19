@@ -87,8 +87,8 @@ returns jsonb language sql stable set search_path = '' as $function$
         'student_name', e.student_name, 'grade', e.grade,
         'homeroom', e.homeroom, 'item', e.item, 'occurred_on', e.occurred_on,
         'pages', e.pages, 'is_double', e.is_double, 'due_at',
-          case when b.published_at is null and not e.is_double
-            then private.seondo_deadline(greatest(b.notice_day, private.kst_today()), e.grade, false)
+          case when b.published_at is null and b.notice_day = private.kst_today() and not e.is_double
+            then private.seondo_deadline(b.notice_day, e.grade, false)
             else e.due_at end
       ) order by e.grade, e.homeroom, e.student_name, e.reflection_id)
       from discipline.seondo_notice_entries e
