@@ -18,3 +18,12 @@ export function selectNoticeForDay(notice: SeondoNotice, day: string, isToday: b
 export function previewReflectionStatus(isDouble: boolean): 'MISSING' | 'DOUBLE' {
   return isDouble ? 'DOUBLE' : 'MISSING';
 }
+
+/** Earlier unpublished drafts are informational, not a blocker for today's cutoff. */
+export function canFinalizeDailyNotice(
+  notice: SeondoNotice | undefined, selectedDay: string, todayDay: string,
+  isLead: boolean, isPending: boolean,
+): boolean {
+  if (!notice || selectedDay !== todayDay || !isLead || isPending) return false;
+  return selectNoticeForDay(notice, selectedDay, true).valid && !notice.batch?.published_at;
+}

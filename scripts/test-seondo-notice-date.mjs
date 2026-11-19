@@ -4,7 +4,7 @@ import ts from 'typescript';
 
 const src = readFileSync(new URL('../src/lib/seondo-notice-day.ts', import.meta.url), 'utf8');
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
-const { selectNoticeForDay, previewReflectionStatus } = await import('data:text/javascript;base64,' + Buffer.from(js).toString('base64'));
+const { selectNoticeForDay, previewReflectionStatus, canFinalizeDailyNotice } = await import('data:text/javascript;base64,' + Buffer.from(js).toString('base64'));
 const old = { notice_day: '2026-11-18', managed_date: true, batch: {day:'2026-11-18'},
   entries:[{reflection_id:18,pages:3}],preview_entries:[] };
 const today = { notice_day: '2026-11-19', managed_date: true, batch: null,
@@ -29,3 +29,12 @@ assert.equal(selectNoticeForDay({...today,batch:{day:'2026-11-18'}},'2026-11-19'
 console.log('Seondo notice date isolation tests passed.');
 assert.equal(previewReflectionStatus(false),'MISSING','Unpublished prior-day initial items are not doubled');
 assert.equal(previewReflectionStatus(true),'DOUBLE','True carried double items remain doubled');
+
+// A prior-day unpublished draft must not prevent today's cutoff.
+const todayWithPriorDraft = {...today,blocked_by_unpublished_day:'2026-11-18'};
+assert.equal(canFinalizeDailyNotice(todayWithPriorDraft,'2026-11-19','2026-11-19',true,false),true);
+assert.equal(canFinalizeDailyNotice(todayWithPriorDraft,'2026-11-18','2026-11-19',true,false),false);
+assert.equal(canFinalizeDailyNotice(todayWithPriorDraft,'2026-11-19','2026-11-19',false,false),false);
+assert.equal(canFinalizeDailyNotice(todayWithPriorDraft,'2026-11-19','2026-11-19',true,true),false);
+assert.equal(canFinalizeDailyNotice({...todayWithPriorDraft,batch:{day:'2026-11-19',published_at:'2026-11-19T08:00:00Z'}},'2026-11-19','2026-11-19',true,false),false);
+assert.equal(canFinalizeDailyNotice({...todayWithPriorDraft,batch:{day:'2026-11-19',published_at:null}},'2026-11-19','2026-11-19',true,false),true);
