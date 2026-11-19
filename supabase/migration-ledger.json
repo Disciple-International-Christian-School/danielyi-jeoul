@@ -517,6 +517,12 @@
       "name": "notice_day_isolation",
       "status": "TRACKED",
       "file": "supabase/migrations/20261119025308_notice_day_isolation.sql"
+    },
+    {
+      "version": "20261119040300",
+      "name": "independent_daily_notice_cutoffs",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261119040300_independent_daily_notice_cutoffs.sql"
     }
   ]
 }

@@ -115,7 +115,7 @@ import { AuthProvider, useAuth } from '@/lib/auth';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
 import './index.css';
 import { DashboardView } from '@/components/dashboard';
-import { selectNoticeForDay } from '@/lib/seondo-notice-day';
+import { selectNoticeForDay, canFinalizeDailyNotice } from '@/lib/seondo-notice-day';
 import { isDoubleReflection, reflectionMatchesFilter, type ReflectionListFilter } from '@/lib/reflection-queue';
 
 const queryClient = new QueryClient();
@@ -1100,9 +1100,9 @@ function ReportsPage() {
         </div>
         {mode === 'DAILY' && managedDate && <div className="section-row">
           <div>
-            {blockedByDraft && <p className="danger-text" role="status" data-testid="notice-unpublished-draft-warning">
-              {blockedByDraft} 출력 마감 초안이 아직 게시 대기 중입니다. 오늘 명단은 별도로 실시간 표시하지만, 이전 초안을 검토하기 전에는 오늘 출력 마감을 확정할 수 없습니다.
-            </p>}
+            {blockedByDraft && !batch && <p className="muted" role="status" data-testid="notice-unpublished-draft-warning">
+              {blockedByDraft} 미게시 초안은 이전 날짜 기록으로 보관됩니다. 오늘 출력 마감 및 게시는 독립적으로 진행할 수 있습니다.
+            </p>
             {batch ? <p className="muted">출력 마감 {dateTimeLabel(batch.cutoff_at)}
               {batch.published_at ? ' · 게시 ' + dateTimeLabel(batch.published_at) : ' · 게시 대기'}
             </p> : previewMode
@@ -1114,7 +1114,7 @@ function ReportsPage() {
             {todayNotice && batch && !batch.published_at && <p className="muted">명단을 인쇄해 게시한 뒤 게시를 확정해 주세요.</p>}
           </div>
           {todayNotice && admin?.isLead && !batch?.published_at &&
-            <button className="btn btn-outline" disabled={noticeAction.isPending || Boolean(blockedByDraft) || !noticeSelection?.valid} onClick={() => {
+            <button className="btn btn-outline" disabled={!canFinalizeDailyNotice(notice.data, noticeDate, today(), Boolean(admin?.isLead), noticeAction.isPending)} onClick={() => {
               if (batch && !window.confirm('게시판에 이 명단을 게시했나요?')) return;
               noticeAction.mutate(Boolean(batch), {
                 onSuccess: () => notify(batch ? '공지 게시를 확정했습니다.' : '출력 마감 시각을 확정했습니다.'),
