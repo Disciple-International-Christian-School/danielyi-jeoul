@@ -1102,7 +1102,7 @@ function ReportsPage() {
           <div>
             {blockedByDraft && !batch && <p className="muted" role="status" data-testid="notice-unpublished-draft-warning">
               {blockedByDraft} 미게시 초안은 이전 날짜 기록으로 보관됩니다. 오늘 출력 마감 및 게시는 독립적으로 진행할 수 있습니다.
-            </p>
+            </p>}
             {batch ? <p className="muted">출력 마감 {dateTimeLabel(batch.cutoff_at)}
               {batch.published_at ? ' · 게시 ' + dateTimeLabel(batch.published_at) : ' · 게시 대기'}
             </p> : previewMode
