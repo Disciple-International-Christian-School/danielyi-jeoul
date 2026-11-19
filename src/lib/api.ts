@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from './supabase';
 import { useAuth } from './auth';
 import { isDoubleReflection } from './reflection-queue';
-import { selectNoticeForDay } from './seondo-notice-day';
+import { selectNoticeForDay, previewReflectionStatus } from './seondo-notice-day';
 export { reflectionIsOnNotice } from './reflection-queue';
 import type { WeeklySourceRow } from './weekly-import';
 
@@ -1308,7 +1308,8 @@ function mergeCurrentSeondoReflections(reflections: Reflection[], notice: Seondo
         reflectionPages: pages,
         seondoNoticeDay: noticeDay,
         actionDueAt: entry.due_at,
-        status: entry.is_double ? 'DOUBLE' : previous.status,
+        // A prior unpublished first notice is not an overdue doubled obligation.
+        status: previewReflectionStatus(entry.is_double),
       });
       continue;
     }

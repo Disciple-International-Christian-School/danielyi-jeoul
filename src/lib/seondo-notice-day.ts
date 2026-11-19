@@ -13,3 +13,8 @@ export function selectNoticeForDay(notice: SeondoNotice, day: string, isToday: b
     entries: !valid ? [] : notice.batch ? notice.entries : preview ? notice.preview_entries ?? [] : [],
   };
 }
+
+/** Today's live notice is authoritative for an unsubmitted record's action state. */
+export function previewReflectionStatus(isDouble: boolean): 'MISSING' | 'DOUBLE' {
+  return isDouble ? 'DOUBLE' : 'MISSING';
+}
