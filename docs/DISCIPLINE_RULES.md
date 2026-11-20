@@ -112,3 +112,11 @@ recipients before activating the policy in production. Existing reflection eligi
 - Before the print cutoff, pages are live computed values and may change as point records change. The print cutoff snapshots the current calculation for the physical notice; publication does not retroactively change earlier posted pages.
 - A reflection submitted before publication must not be resurrected as outstanding or doubled when the notice snapshot is read.
 - Preview reads never insert merit allocations or alter reflection due dates.
+
+## 2026-11-20 — Submission clocks survive unpublished notices
+
+Original `reflection_records.due_at` controls doubling even when printing or publication has not been confirmed. Today's preview must not replace an earlier first deadline with today's deadline or downgrade DOUBLE to MISSING. Second deadlines follow the school calendar; overdue pages double once and remain open until submission.
+
+Migration `20261120022738_reflection_deadlines_without_publication` preserves all student records and past notice entries. Carryover snapshots reference their source batch, leaving one canonical initial obligation and one merit allocation. This also fixes the unique-index error on consecutive daily cutoffs. Cutoff and publication no longer restart submission clocks.
+
+Production verification under the authorized Seondo role: 8 actionable November 18 cases and 21 November 19 cases returned `is_double=true` after application. A rolled-back rehearsal produced the same counts. Synthetic database checks covered missing publication, secondary and elementary deadlines, consecutive/idempotent cutoffs, unchanged earlier pages/deadlines, submitted exclusions, and weekend skipping. Live browser rendering remains to be checked after frontend deployment.

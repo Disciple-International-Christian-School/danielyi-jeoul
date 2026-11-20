@@ -69,3 +69,7 @@ The [operations roadmap](OPERATIONS_ROADMAP.md) includes **photo-based demerit-s
 - When older roadmap checkboxes conflict with later cut-over evidence, favor the later verified record.
 - Never commit student PII, student numbers, PINs, passwords or identity-mapping rows.
 - These are **documentation summaries**, not new GitHub issues or approved engineering priorities.
+
+### 2026-11-20 — Overdue reflection carryover
+
+Production migration `20261120022738` corrects unpublished-notice deadline resets and consecutive-cutoff conflicts. Authorized API verification: 29 actionable cases from November 18–19 now return doubled. Original student records were not rewritten. See [discipline rules](DISCIPLINE_RULES.md#2026-11-20--submission-clocks-survive-unpublished-notices). Frontend deployment and browser verification are pending.

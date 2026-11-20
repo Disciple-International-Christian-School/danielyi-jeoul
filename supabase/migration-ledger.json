@@ -523,6 +523,12 @@
       "name": "independent_daily_notice_cutoffs",
       "status": "TRACKED",
       "file": "supabase/migrations/20261119032704_independent_daily_notice_cutoffs.sql"
+    },
+    {
+      "version": "20261120022738",
+      "name": "reflection_deadlines_without_publication",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261120022738_reflection_deadlines_without_publication.sql"
     }
   ]
 }
