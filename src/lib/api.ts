@@ -1204,6 +1204,8 @@ export interface SeondoNoticeEntry {
   pages: number;
   is_double: boolean;
   due_at: string;
+  first_due_at?: string;
+  double_due_at?: string;
 }
 
 export interface SeondoNotice {
@@ -1307,15 +1309,16 @@ function mergeCurrentSeondoReflections(reflections: Reflection[], notice: Seondo
         ...previous,
         reflectionPages: pages,
         seondoNoticeDay: noticeDay,
+        dueAt: entry.first_due_at ?? previous.dueAt,
         actionDueAt: entry.due_at,
-        // A prior unpublished first notice is not an overdue doubled obligation.
+        // The server preserves the original first deadline across daily notices.
         status: previewReflectionStatus(entry.is_double),
       });
       continue;
     }
     const dueDay = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
-    }).format(new Date(entry.due_at));
+    }).format(new Date(entry.first_due_at ?? entry.due_at));
     const eventDate = new Date(entry.occurred_on + 'T00:00:00Z');
     eventDate.setUTCDate(eventDate.getUTCDate() - (eventDate.getUTCDay() + 6) % 7);
     const grade = entry.grade;
@@ -1340,7 +1343,7 @@ function mergeCurrentSeondoReflections(reflections: Reflection[], notice: Seondo
       recordedAt: entry.occurred_on,
       submitted: false,
       submissionDeadline: dueDay,
-      dueAt: entry.due_at,
+      dueAt: entry.first_due_at ?? entry.due_at,
       actionDueAt: entry.due_at,
       deadlineChangeReason: null,
       submittedAt: null,
