@@ -27,3 +27,11 @@ export function canFinalizeDailyNotice(
   if (!notice || selectedDay !== todayDay || !isLead || isPending) return false;
   return selectNoticeForDay(notice, selectedDay, true).valid && !notice.batch?.published_at;
 }
+
+/** Frozen print rows cannot prove an obligation is still actionable. */
+export function selectLiveReflectionEntries(notice: SeondoNotice, day: string): SeondoNoticeEntry[] {
+  if (notice.notice_day !== day) return [];
+  if (notice.live_entries != null) return notice.live_entries;
+  // Compatibility while the database and frontend roll out separately.
+  return notice.batch ? notice.entries : notice.preview_entries ?? [];
+}

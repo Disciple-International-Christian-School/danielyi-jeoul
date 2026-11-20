@@ -529,6 +529,12 @@
       "name": "reflection_deadlines_without_publication",
       "status": "TRACKED",
       "file": "supabase/migrations/20261120022738_reflection_deadlines_without_publication.sql"
+    },
+    {
+      "version": "20261120153500",
+      "name": "cancelled_notice_live_queue",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261120153500_cancelled_notice_live_queue.sql"
     }
   ]
 }

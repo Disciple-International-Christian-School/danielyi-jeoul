@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from './supabase';
 import { useAuth } from './auth';
 import { isDoubleReflection } from './reflection-queue';
-import { selectNoticeForDay, previewReflectionStatus } from './seondo-notice-day';
+import { selectNoticeForDay, previewReflectionStatus, selectLiveReflectionEntries } from './seondo-notice-day';
 export { reflectionIsOnNotice } from './reflection-queue';
 import type { WeeklySourceRow } from './weekly-import';
 
@@ -1217,6 +1217,8 @@ export interface SeondoNotice {
   entries: SeondoNoticeEntry[];
   // Live, read-only calculated pages. No merit points are consumed until cutoff.
   preview_entries?: SeondoNoticeEntry[];
+  live_entries?: SeondoNoticeEntry[] | null;
+  pending_after_cutoff_count?: number;
 }
 
 export function useSeondoNotice(day: string) {
@@ -1295,7 +1297,7 @@ export function useSeondoCommitteeAccess() {
 // penalties are overlaid from the same read-only notice calculation as print.
 function mergeCurrentSeondoReflections(reflections: Reflection[], notice: SeondoNotice, noticeDay: string): Reflection[] {
   if (!notice.managed_date) return reflections;
-  const entries = notice.batch ? notice.entries : notice.preview_entries ?? [];
+  const entries = selectLiveReflectionEntries(notice, noticeDay);
   if (!entries.length) return reflections;
 
   const rows = new Map(reflections.map(row => [row.id, row]));
@@ -1794,6 +1796,7 @@ export function useAssignCurrentGrade9Section() {
 // ---------------------------------------------------------------------------
 
 export function useCreatePointRecord() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ data, requestId }: { data: PointRecordInput; requestId: string }) => {
       const { data: id, error } = await supabase.rpc('create_point_record_once', {
@@ -1808,10 +1811,17 @@ export function useCreatePointRecord() {
       if (error) throw new Error(error.message);
       return id as number;
     },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['seondo-notice'] }),
+        queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() }),
+      ]);
+    },
   });
 }
 
 export function useCreateGroupPenalty() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: {
       grade: number; homeroom: string | null; studentIds: string[];
@@ -1829,10 +1839,17 @@ export function useCreateGroupPenalty() {
       if (error) throw new Error(error.message);
       return count as number;
     },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['seondo-notice'] }),
+        queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() }),
+      ]);
+    },
   });
 }
 
 export function useUpdatePointRecord() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: PointRecordUpdateInput }) => {
       const { error } = await supabase.rpc('update_point_record', {
@@ -1845,14 +1862,27 @@ export function useUpdatePointRecord() {
       });
       if (error) throw new Error(error.message);
     },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['seondo-notice'] }),
+        queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() }),
+      ]);
+    },
   });
 }
 
 export function useDeletePointRecord() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id }: { id: number }) => {
       const { error } = await supabase.from('point_records').update({ deleted_at: new Date().toISOString() }).eq('id', id);
       if (error) throw new Error(error.message);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['seondo-notice'] }),
+        queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() }),
+      ]);
     },
   });
 }
@@ -1875,6 +1905,7 @@ export function useExtendReflectionToNextDay() {
 }
 
 export function useUpdateReflection() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: { submitted: boolean } }) => {
       const { error } = await supabase
@@ -1884,6 +1915,12 @@ export function useUpdateReflection() {
         .select('id')
         .single();
       if (error) throw new Error(error.message);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['seondo-notice'] }),
+        queryClient.invalidateQueries({ queryKey: getListReflectionsQueryKey() }),
+      ]);
     },
   });
 }
