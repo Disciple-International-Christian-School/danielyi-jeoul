@@ -73,3 +73,7 @@ The [operations roadmap](OPERATIONS_ROADMAP.md) includes **photo-based demerit-s
 ### 2026-11-20 — Overdue reflection carryover
 
 Production migration `20261120022738` corrects unpublished-notice deadline resets and consecutive-cutoff conflicts. Authorized API verification: 29 actionable cases from November 18–19 now return doubled. Original student records were not rewritten. See [discipline rules](DISCIPLINE_RULES.md#2026-11-20--submission-clocks-survive-unpublished-notices). Frontend deployment and browser verification are pending.
+
+### 2026-11-21 — Cancelled notice read correction
+
+Applied migration `20261120153500`; cancelled/superseded records are removed from notice reads without deleting audit snapshots. Current reflection actions use the live queue after cutoff instead of reviving frozen rows. Post-cutoff replacements retain their own deadlines and go into the next notice. SQL rollback and synthetic regressions passed; frontend deployment verification is recorded in the pull request.

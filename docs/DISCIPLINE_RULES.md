@@ -120,3 +120,11 @@ Original `reflection_records.due_at` controls doubling even when printing or pub
 Migration `20261120022738_reflection_deadlines_without_publication` preserves all student records and past notice entries. Carryover snapshots reference their source batch, leaving one canonical initial obligation and one merit allocation. This also fixes the unique-index error on consecutive daily cutoffs. Cutoff and publication no longer restart submission clocks.
 
 Production verification under the authorized Seondo role: 8 actionable November 18 cases and 21 November 19 cases returned `is_double=true` after application. A rolled-back rehearsal produced the same counts. Synthetic database checks covered missing publication, secondary and elementary deadlines, consecutive/idempotent cutoffs, unchanged earlier pages/deadlines, submitted exclusions, and weekend skipping. Live browser rendering remains to be checked after frontend deployment.
+
+## 2026-11-21 — Cancelled notice records and current obligations
+
+Notice reads now exclude cancelled/superseded point records from every date, while keeping stored snapshots for audit. Today's print list also omits completed submissions. The current reflection queue consumes a separate `live_entries` array even after cutoff/publication; an empty array is authoritative and never falls back to frozen print rows. This prevents a deleted reflection absent from `v_reflections` from being synthesized as an overdue pending obligation.
+
+A replacement entered after the cutoff remains in the live reflection queue with its own original deadline. It is included in the next notice, and the print screen reports the count of pending post-cutoff entries. Original cutoff membership is preserved. Create/update/delete/submission mutations invalidate both notice and reflection caches.
+
+Migration `20261120153500_cancelled_notice_live_queue` was applied after a rolled-back production rehearsal. Synthetic SQL tests cover cancellation after cutoff, replacement after cutoff, single-page non-double state, submission exclusion and retained audit snapshots. Existing consecutive-cutoff tests, frontend regressions, typecheck and build passed. Production verification confirmed the cancelled case is absent and the valid replacement remains an ordinary obligation. No student source record was rewritten.

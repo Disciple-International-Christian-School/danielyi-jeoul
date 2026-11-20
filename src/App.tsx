@@ -1073,6 +1073,10 @@ function ReportsPage() {
         action={<button className="btn btn-primary" disabled={mode === 'DAILY' && managedDate && !batch} onClick={() => window.print()} data-testid="button-print-report"><Printer size={15} /> 인쇄</button>}
       />
 
+      {mode === 'DAILY' && (notice.data?.pending_after_cutoff_count ?? 0) > 0 && <p className="subheading">
+        출력 마감 이후 접수된 미제출 반성문 {notice.data?.pending_after_cutoff_count}건은 반성문 대상자에서 확인할 수 있으며, 다음 공지에 포함됩니다.
+      </p>}
+
       <div className="card card-pad report-controls" style={{ marginTop: 28 }}>
         <div className="tab-row">
           <button className={'tab ' + (mode === 'DAILY' ? 'active' : '')} onClick={() => resetClassIfMissing('DAILY')} data-testid="button-report-daily">일일 반별 공지</button>
