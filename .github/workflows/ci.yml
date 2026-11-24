@@ -88,3 +88,26 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  teacher-points:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Exercise teacher entry, cancellation, calendar changes and catch-up
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 \
+            -f supabase/tests/fixtures/seondo.sql \
+            -f supabase/migrations/20261116124919_seondo_notice_and_settlements.sql \
+            -f supabase/tests/fixtures/teacher_points.sql \
+            -f supabase/migrations/20261124110151_teacher_points.sql \
+            -f supabase/tests/teacher_points.sql
