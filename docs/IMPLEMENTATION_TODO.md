@@ -26,3 +26,11 @@ Historical checklist for the October 26 cut-over: final secondary-school weekly 
 - [ ] Confirm previously pending student Auth/PIN provisioning without committing identities or credentials.
 - [ ] Confirm individual staff-account assignees.
 - [ ] Connect the shared read API to SP/student dashboards; this feature covered DaS and the shared backend only.
+
+## Teacher point entry (November 2026)
+1. Verify staff identity, school-day calendar, point ledger and notice consumers.
+2. Stage teacher requests, serialize cancellation and posting, and post once to the existing ledger.
+3. Connect teacher forms, personal history and the discipline team's weekly report.
+4. Rehearse SQL with rollback and run regression, type and build checks before rollout.
+
+Teacher activity is grouped by entry date. Discipline uses the actual posting date.
