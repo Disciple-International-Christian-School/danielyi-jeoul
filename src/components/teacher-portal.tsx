@@ -15,7 +15,7 @@ function keyBytes(key:string):Uint8Array<ArrayBuffer> {
 }
 
 export function TeacherPortal(){
- const [path]=useLocation();
+ const [path,navigate]=useLocation();
  const homeroom=path==="/teacher";
  const {session,loading,signOut}=useAuth();
  const committeeAccess = useSeondoCommitteeAccess();
@@ -36,9 +36,18 @@ export function TeacherPortal(){
   }).catch(()=>{});
   return()=>{cancelled=true;};
  },[supported,session?.user.id]);
+ useEffect(()=>{
+  if(!session || path!=='/teacher') return;
+  const target=sessionStorage.getItem('teacher-login-destination');
+  sessionStorage.removeItem('teacher-login-destination');
+  if(target && ['/teacher/dashboard','/teacher/positive','/teacher/negative','/teacher/history'].includes(target)){
+   navigate(target,{replace:true});
+  }
+ },[session,path,navigate]);
  async function login(){
   setPending(true);setMessage('');
-  const {error}=await supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+path,queryParams:{prompt:'select_account'}}});
+  sessionStorage.setItem('teacher-login-destination',path);
+  const {error}=await supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+'/teacher',queryParams:{prompt:'select_account'}}});
   if(error){setMessage(error.message);setPending(false);}
  }
  async function enable(){
