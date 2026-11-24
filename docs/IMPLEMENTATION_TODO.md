@@ -35,12 +35,10 @@ Historical checklist for the October 26 cut-over: final secondary-school weekly 
 
 Teacher activity is grouped by entry date. Discipline uses the actual posting date.
 
-Branch verification: phases 1–4 implemented. The proposed SQL is in
-`supabase/proposals/teacher_points.sql`. The shared schema rehearsal was rolled back.
+Branch verification: phases 1–4 implemented. The applied migration is in
+`supabase/migrations/20261124110151_teacher_points.sql`. The shared schema rehearsal was rolled back.
 Disposable database tests cover duplicate submissions, concurrent cancellation and posting,
 calendar changes, delayed jobs, retries and actor preservation. Browser checks use synthetic
 teacher and student records. Team reports use the existing SEONDO console role.
 
-Rollout remains pending: apply the reviewed SQL, record the live migration version in
-the ledger, update the SQL test path, deploy the matching UI, then check an authorized
-teacher session and the first scheduled run.
+Production migration 20261124110151 was applied on November 24. Verify a registered teacher session and the first midnight run after frontend deployment.

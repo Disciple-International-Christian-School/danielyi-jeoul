@@ -109,5 +109,5 @@ jobs:
             -f supabase/tests/fixtures/seondo.sql \
             -f supabase/migrations/20261116124919_seondo_notice_and_settlements.sql \
             -f supabase/tests/fixtures/teacher_points.sql \
-            -f supabase/proposals/teacher_points.sql \
+            -f supabase/migrations/20261124110151_teacher_points.sql \
             -f supabase/tests/teacher_points.sql

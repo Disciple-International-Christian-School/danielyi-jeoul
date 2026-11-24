@@ -535,6 +535,12 @@
       "name": "cancelled_notice_live_queue",
       "status": "TRACKED",
       "file": "supabase/migrations/20261120153500_cancelled_notice_live_queue.sql"
+    },
+    {
+      "version": "20261124110151",
+      "name": "teacher_points",
+      "status": "TRACKED",
+      "file": "supabase/migrations/20261124110151_teacher_points.sql"
     }
   ]
 }
