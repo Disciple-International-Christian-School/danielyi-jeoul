@@ -2,6 +2,13 @@
 
 **Language / 언어:** [English](CHANGELOG.md) | [한국어](CHANGELOG.ko.md)
 
+## 2026-11-24~25 — 교사 상벌점 입력과 운영 검증
+
+- 등록된 교사는 Google 로그인 후 상·벌점 1~5점을 입력하고, 당일 본인의 반영 대기 건을 취소하거나 개인 기록을 조회할 수 있다. 선도부에는 다음 등교일 반영 내역과 입력일 기준 주간 종합 기록을 추가했다. [PR #59](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/pull/59)
+- 교사 입력을 다음 등교일 00:00 KST에 기존 원장에 한 번 반영하도록 예약했다. 학생 처분은 실제 반영일을 기준으로 계산한다. 11월 24일 운영 마이그레이션 `20261124110151_teacher_points`를 적용했다. [PR #59](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/pull/59)
+- 교사 하위 화면에서 Google 로그인할 때 등록된 `/teacher`를 거쳐 처음 열었던 화면으로 돌아오도록 수정했다. 운영 로그인과 학생 선택 목록, 개인 기록 조회를 확인했다. [PR #60](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/pull/60)
+- 11월 25일 00:00 KST 첫 자정 실행이 성공했다. 반영 대상은 0건이어서 실제 교사 입력의 첫 운영 반영은 확인이 남아 있다.
+
 ## 2026-11-16 — 다니엘 전용 가상 검색 프로필
 
 초등용 G0와 중고등용 G13 테스트 인물을 학생 명부 및 상벌점 입력 검색에 추가했다. 로그인 후 전용 프로필로 이동하며 학생 API를 호출하지 않는다. CORE 신원이 아니므로 공식 명부 인원·보고서·변경 요청에 포함되지 않는다. DB 변경은 없다. 이번 범위는 검색·프로필 확인이며, 점수 저장 및 규칙 시뮬레이션은 아직 구현하지 않았다.

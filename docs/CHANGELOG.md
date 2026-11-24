@@ -2,6 +2,13 @@
 
 **Language / 언어:** [English](CHANGELOG.md) | [한국어](CHANGELOG.ko.md)
 
+## 2026-11-24 to 2026-11-25 — Teacher point entry and production verification
+
+- Added Google sign-in for registered teachers, merit and demerit entry (1–5 points), same-day cancellation of their own pending entries, and personal history. The discipline team can view next-school-day entries and a weekly report grouped by entry date. [PR #59](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/pull/59)
+- Scheduled teacher entries to post once to the existing ledger on the next school day at 00:00 KST. Discipline uses the actual posting date. Migration `20261124110151_teacher_points` was applied on November 24. [PR #59](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/pull/59)
+- Fixed Google sign-in from teacher subpages by using the registered `/teacher` callback and then restoring the requested teacher page. Verified the production login, student selector, and personal history. [PR #60](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/pull/60)
+- The first midnight run on November 25 succeeded at 00:00 KST. The queue had zero due entries, so the first production posting with a real entry remains unverified.
+
 ## 2026-11-16 — Daniel-only fictional search profiles
 
 Added two explicitly fictional profiles for elementary (G0) and secondary (G13) testing, searchable from the student roster and point-entry search. Dedicated authenticated profile routes do not call student APIs. These fixtures are not CORE identities and never enter official roster counts, reporting, or mutations. No database changes. This delivery supports search/profile verification only; score writes and rule-engine simulation remain unimplemented.

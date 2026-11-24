@@ -41,4 +41,7 @@
 입력 주체 보존을 확인했다. 브라우저 검증에는 가상 교사와 학생을 사용했다.
 종합 기록에는 기존 선도부 콘솔 권한을 적용했다.
 
-11월 24일 운영 마이그레이션 20261124110151 적용 완료. 화면 배포 후 등록된 교사 세션과 첫 자정 실행을 확인한다.
+- [x] 11월 24일 운영 마이그레이션 `20261124110151_teacher_points`를 적용하고 화면을 배포한다. [PR #59](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/pull/59)
+- [x] 로그인 복귀 수정 후 등록된 교사 계정으로 로그인해 학생 선택 목록과 개인 기록을 확인한다. [PR #60](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/pull/60)
+- [x] 11월 25일 운영 첫 자정 작업을 확인한다. 반영 대상 0건에서 정상 실행됐다.
+- [ ] 첫 실제 교사 입력이 반영 예정 등교일에 학생 원장에 한 번만 기록되는지 확인한다. 배포 검증 내역은 [개발일지](DEVELOPMENT_JOURNAL.ko.md)에 있다.

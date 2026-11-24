@@ -41,4 +41,7 @@ Disposable database tests cover duplicate submissions, concurrent cancellation a
 calendar changes, delayed jobs, retries and actor preservation. Browser checks use synthetic
 teacher and student records. Team reports use the existing SEONDO console role.
 
-Production migration 20261124110151 was applied on November 24. Verify a registered teacher session and the first midnight run after frontend deployment.
+- [x] Apply production migration `20261124110151_teacher_points` on November 24 and deploy the matching frontend. [PR #59](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/pull/59)
+- [x] Verify a registered teacher can sign in and load the student selector and personal history after the callback fix. [PR #60](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/pull/60)
+- [x] Verify the first production midnight run on November 25. The job succeeded with zero due entries.
+- [ ] Verify the first real teacher entry posts once to the student ledger on its scheduled school day. See the [development journal](DEVELOPMENT_JOURNAL.md) for the rollout evidence.
