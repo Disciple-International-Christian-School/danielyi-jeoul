@@ -105,7 +105,7 @@ begin
 end $$;
 
 create function public.teacher_point_history(p_team boolean default false,p_week date default null)
-returns table(id uuid,teacher text,student text,kind public.point_type,reason text,points integer,
+returns table(id uuid,staff_id uuid,teacher text,student text,kind public.point_type,reason text,points integer,
   entered_at timestamptz,scheduled_on date,posted_at timestamptz,cancelled_at timestamptz,state text,in_week boolean,next_school_day boolean)
 language plpgsql stable security definer set search_path='' as $$
 declare week_start date:=date_trunc('week',coalesce(p_week,private.kst_today())::timestamp)::date;
@@ -114,7 +114,7 @@ begin
     if private.current_admin_role() is distinct from 'SEONDO' then raise exception '선도부 권한이 필요합니다.' using errcode='42501'; end if;
   elsif private.current_homeroom_staff() is null then raise exception '등록된 교사 계정이 필요합니다.' using errcode='42501';
   end if;
-  return query select r.id,r.staff_name,r.student_name,r.kind,r.reason,r.points,r.entered_at,r.scheduled_on,r.posted_at,r.cancelled_at,
+  return query select r.id,r.staff_id,r.staff_name,r.student_name,r.kind,r.reason,r.points,r.entered_at,r.scheduled_on,r.posted_at,r.cancelled_at,
     case when r.cancelled_at is not null then '취소' when r.posted_at is not null then '반영 완료'
     when r.failed_at is not null then '반영 실패' else '반영 대기' end,
     (r.entered_at at time zone 'Asia/Seoul')::date between week_start and week_start+6,

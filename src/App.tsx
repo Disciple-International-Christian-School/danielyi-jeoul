@@ -2450,7 +2450,7 @@ function ProtectedRoutes() {
   const { session, admin, loading, signOut } = useAuth();
   if (loading) return <LoadingState />;
   if (!session) return <Redirect to="/sign-in" />;
-  if (!admin) return <div className="app-loading"><div className="error-box"><AlertTriangle size={24} /><p>관리자 권한이 없는 계정입니다. 운영 담당자에게 문의해주세요.</p><button className="btn btn-outline" onClick={() => signOut()} data-testid="button-no-admin-sign-out"><LogOut size={14} /> 로그아웃</button></div></div>;
+  if (!admin) return <div className="app-loading"><div className="error-box"><AlertTriangle size={24} /><p>관리자 권한이 없는 계정입니다. 교사는 교사 페이지를 이용해주세요.</p><Link href="/teacher/dashboard" className="btn btn-primary">교사 페이지</Link><button className="btn btn-outline" onClick={() => signOut()} data-testid="button-no-admin-sign-out"><LogOut size={14} /> 로그아웃</button></div></div>;
   if (!admin.isActive) return <div className="app-loading"><div className="error-box"><ShieldAlert size={24} /><p>비활성화된 관리자 계정입니다. 선도부장에게 문의해주세요.</p><button className="btn btn-outline" onClick={() => signOut()}><LogOut size={14} /> 로그아웃</button></div></div>;
   if (admin.mustChangePassword) return <ChangePasswordPage />;
   return <AppShell role={admin.role}><Switch>

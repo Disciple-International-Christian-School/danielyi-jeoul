@@ -56,10 +56,10 @@ export function TeacherEntry({kind}: {kind: Kind}) {
     <h2 className="section-title">{title}</h2>
     <fieldset className="teacher-fields" disabled={save.isPending}>
       <label>학생 검색<input className="input" ref={search} value={filter} onChange={e=>{setFilter(e.target.value);setStudent('');}} placeholder="이름 또는 학급"/></label>
-      <label>학생 선택<select required className="input" value={student} onChange={e=>setStudent(e.target.value)}>
+      <label>학생 선택<select aria-label="학생 선택" required className="input" value={student} onChange={e=>setStudent(e.target.value)}>
         <option value="">학생 선택</option>{students.data?.filter(s=>(s.homeroom+' '+s.name).includes(filter.trim())).map(s=><option key={s.id} value={s.id}>{s.homeroom} · {s.name}</option>)}</select></label>
       <label>사유<input required maxLength={80} className="input" value={reason} onChange={e=>setReason(e.target.value)}/></label>
-      <label>점수<select required className="input" value={points} onChange={e=>setPoints(e.target.value)}><option value="">점수 선택</option>
+      <label>점수<select aria-label="점수" required className="input" value={points} onChange={e=>setPoints(e.target.value)}><option value="">점수 선택</option>
         {[1,2,3,4,5].map(n=><option key={n} value={n}>{n}점</option>)}</select></label>
       <label><input type="checkbox" checked={continuous} onChange={e=>setContinuous(e.target.checked)}/> 연속 입력</label>
       <button className="btn btn-primary" disabled={!student||!reason.trim()||!points}>{save.isPending?'저장 중…':'등록'}</button>
@@ -69,15 +69,22 @@ export function TeacherEntry({kind}: {kind: Kind}) {
   </form>;
 }
 
-type Row = {id:string;teacher:string;student:string;kind:Kind;reason:string;points:number;entered_at:string;
+type Row = {id:string;staff_id:string;teacher:string;student:string;kind:Kind;reason:string;points:number;entered_at:string;
   scheduled_on:string;posted_at:string|null;cancelled_at:string|null;state:string;in_week:boolean;next_school_day:boolean};
 export function TeacherHistory({team=false}:{team?:boolean}) {
   const {session}=useAuth();
   const cache=useQueryClient();
   const [date,setDate]=useState(day);
   const history=useQuery({queryKey:['teacher-point-history',session?.user.id,team,team?date:null],refetchInterval:30000,queryFn:async()=>{
-    const {data,error}=await supabase.rpc('teacher_point_history',{p_team:team,p_week:team?date:null});
-    if(error)throw error;return data as Row[];
+    const rows: Row[] = [];
+    const size = 500;
+    for (;;) {
+      const {data,error}=await supabase.rpc('teacher_point_history',{p_team:team,p_week:team?date:null})
+        .order('entered_at',{ascending:false}).order('id').range(rows.length,rows.length+size-1);
+      if(error) throw error;
+      rows.push(...data as Row[]);
+      if(data.length<size) return rows;
+    }
   }});
   const cancel=useMutation({mutationFn:async(id:string)=>{
     const {error}=await supabase.rpc('cancel_teacher_point',{p_id:id});if(error)throw error;
@@ -93,16 +100,16 @@ export function TeacherHistory({team=false}:{team?:boolean}) {
         {!team&&today(r)&&!r.posted_at&&!r.cancelled_at&&<button className="btn btn-outline" disabled={cancel.isPending} onClick={()=>cancel.mutate(r.id)}>취소</button>}</td></tr>)}</tbody></table></div>}</section>;
   }
   const weekly=records.filter(r=>r.in_week);
-  const totals=new Map<string,{positive:number;negative:number}>();
+  const totals=new Map<string,{name:string;positive:number;negative:number}>();
   for(const r of weekly.filter(r=>!r.cancelled_at)){
-    const t=totals.get(r.teacher)??{positive:0,negative:0};
-    t[r.kind==='POSITIVE'?'positive':'negative']+=r.points;totals.set(r.teacher,t);
+    const t=totals.get(r.staff_id)??{name:r.teacher,positive:0,negative:0};
+    t[r.kind==='POSITIVE'?'positive':'negative']+=r.points;totals.set(r.staff_id,t);
   }
   return <div className="teacher-records">{team&&<label>기준일 <input className="input" type="date" value={date} onChange={e=>{if(e.target.value)setDate(e.target.value);}}/></label>}
     {cancel.isError&&<p role="alert">{message(cancel.error)}</p>}
     {history.isPending?<p role="status">불러오는 중…</p>:history.isError?<p role="alert">{message(history.error)} <button onClick={()=>history.refetch()}>다시 확인</button></p>:team?
     <>{table('다음 등교일 반영 기록',records.filter(r=>r.next_school_day))}
-    <section className="card card-pad"><h2 className="section-title">교사별 주간 합계</h2>{Array.from(totals,([name,t])=><p key={name}>{name} · 상점 +{t.positive} · 벌점 −{t.negative}</p>)}</section>
+    <section className="card card-pad"><h2 className="section-title">교사별 주간 합계</h2>{Array.from(totals,([id,t])=><p key={id}>{t.name} · 상점 +{t.positive} · 벌점 −{t.negative}</p>)}</section>
     {table('주간 입력 기록',weekly)}</>:<>{table('오늘 입력',records.filter(today))}{table('이전 기록',records.filter(r=>!today(r)))}</>}
   </div>;
 }
