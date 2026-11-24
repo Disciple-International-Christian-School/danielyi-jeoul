@@ -762,3 +762,14 @@ html { -webkit-text-size-adjust: 100%; }
   .reflections-table { min-width: 1010px; }
   .reflections-table td { padding-block: 7px; }
 }
+
+.teacher-workspace { display:grid; grid-template-columns: minmax(145px, 185px) minmax(0, 1fr); gap:16px; }
+.teacher-menu, .teacher-records, .teacher-shortcuts { display:grid; align-content:start; gap:10px; min-width:0; }
+.teacher-menu [aria-current=page] { background:hsl(var(--muted)); font-weight:700; }
+.teacher-fields { border:0; padding:0; margin:16px 0 0; display:grid; gap:12px; }
+.teacher-fields label { display:grid; gap:4px; }
+.teacher-fields label:has([type=checkbox]) { display:block; }
+@media(max-width:680px) {
+  .teacher-workspace { grid-template-columns:minmax(0,1fr); }
+  .teacher-menu { display:flex; flex-wrap:wrap; }
+}

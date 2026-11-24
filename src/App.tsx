@@ -1,4 +1,5 @@
 import { TestProfilePage, TestProfileResults, findTestProfiles } from '@/components/test-profiles';
+import { TeacherHistory } from '@/components/teacher-points';
 import { TeacherPortal } from '@/components/teacher-portal';
 import { SeondoSettlementRows } from '@/components/seondo-settlement';
 import { StudentHistory } from '@/components/point-history';
@@ -266,6 +267,7 @@ function AppShell({ children, role }: { children: ReactNode; role: Role }) {
     { href: '/reflections', label: '반성문 대상자', icon: BookOpenCheck, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: false },
     { href: '/reports', label: '공지·출력', icon: Printer, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: false },
     { href: '/students', label: '학생 명부', icon: Users, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: false },
+    { href: '/teacher-records', label: '교사 상벌점 종합 기록', icon: BookOpenCheck, roles: ['SEONDO'] as Role[], leadOnly: false, group: 'work', child: false },
     { href: '/punishments', label: '기숙사 처분', icon: BedDouble, roles: ['SASAENG'] as Role[], leadOnly: false, group: 'work', child: false },
     { href: '/admins', label: '관리자 계정', icon: ShieldAlert, roles: ['SEONDO'] as Role[], leadOnly: true, group: 'manage', child: false },
     { href: '/core-setup', label: 'Core 설정', icon: Users, roles: ['SEONDO'] as Role[], leadOnly: true, group: 'manage', child: false },
@@ -2348,7 +2350,7 @@ function LoginPage() {
     }
     // On success the auth listener updates the session and the redirect above renders.
   };
-  return <div className="landing" style={{ display: 'grid', placeItems: 'center', minHeight: '100dvh', padding: 20 }}><div className="login-theme"><ThemeToggle dark={dark} toggle={toggle} /></div><div className="login-panel"><div style={{ textAlign: 'center', marginBottom: 24 }}><Brand /><p className="subheading">관리자 계정으로 운영 콘솔에 들어갑니다.</p></div><form className="card card-pad" onSubmit={submit}><div className="eyebrow">관리자 로그인</div><h1 className="modal-title" style={{ marginTop: 8 }}>다니엘의 저울</h1><p className="section-copy" style={{ marginTop: 6 }}>승인된 운영 담당자만 로그인할 수 있습니다.</p><div className="form-grid" style={{ marginTop: 22 }}><div className="field full"><label htmlFor="login-id">아이디</label><input id="login-id" className="input" required autoComplete="username" value={loginId} onChange={(event) => setLoginId(event.target.value)} data-testid="input-login-id" /></div><div className="field full"><label htmlFor="login-password">비밀번호</label><input id="login-password" className="input" type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} data-testid="input-login-password" /></div></div>{error && <p className="danger-text" style={{ fontSize: 12, marginTop: 14 }} role="alert" data-testid="text-login-error">{error}</p>}<div className="modal-actions"><button className="btn btn-primary" style={{ width: '100%' }} disabled={pending} data-testid="button-submit-login">{pending ? '로그인 중' : '로그인'}</button></div></form><Link href="/teacher" className="btn btn-outline" style={{ marginTop: 16, width: '100%' }}>담임 로그인 · 알림</Link></div></div>;
+  return <div className="landing" style={{ display: 'grid', placeItems: 'center', minHeight: '100dvh', padding: 20 }}><div className="login-theme"><ThemeToggle dark={dark} toggle={toggle} /></div><div className="login-panel"><div style={{ textAlign: 'center', marginBottom: 24 }}><Brand /><p className="subheading">관리자 계정으로 운영 콘솔에 들어갑니다.</p></div><form className="card card-pad" onSubmit={submit}><div className="eyebrow">관리자 로그인</div><h1 className="modal-title" style={{ marginTop: 8 }}>다니엘의 저울</h1><p className="section-copy" style={{ marginTop: 6 }}>승인된 운영 담당자만 로그인할 수 있습니다.</p><div className="form-grid" style={{ marginTop: 22 }}><div className="field full"><label htmlFor="login-id">아이디</label><input id="login-id" className="input" required autoComplete="username" value={loginId} onChange={(event) => setLoginId(event.target.value)} data-testid="input-login-id" /></div><div className="field full"><label htmlFor="login-password">비밀번호</label><input id="login-password" className="input" type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} data-testid="input-login-password" /></div></div>{error && <p className="danger-text" style={{ fontSize: 12, marginTop: 14 }} role="alert" data-testid="text-login-error">{error}</p>}<div className="modal-actions"><button className="btn btn-primary" style={{ width: '100%' }} disabled={pending} data-testid="button-submit-login">{pending ? '로그인 중' : '로그인'}</button></div></form><Link href="/teacher/dashboard" className="btn btn-outline" style={{ marginTop: 16, width: '100%' }}>교사 로그인 · 상벌점</Link></div></div>;
 }
 
 function ChangePasswordPage() {
@@ -2465,6 +2467,7 @@ function ProtectedRoutes() {
     <Route path="/reports" component={() => <RoleGate role="SEONDO"><ReportsPage /></RoleGate>} />
     <Route path="/history/import" component={() => <LeadGate><WeeklyImportPage /></LeadGate>} />
     <Route path="/settlement"><Redirect to="/dashboard" /></Route>
+    <Route path="/teacher-records" component={() => <RoleGate role="SEONDO"><TeacherHistory team /></RoleGate>} />
     <Route path="/punishments" component={() => <RoleGate role="SASAENG"><PunishmentsPage /></RoleGate>} />
     <Route path="/admins" component={() => <LeadGate><AdminAccountsPage /></LeadGate>} />
     <Route path="/core-setup" component={() => <LeadGate><CoreSetupPage /></LeadGate>} />
@@ -2480,7 +2483,7 @@ function NotFoundInline() {
 }
 
 function Router() {
-  return <Switch><Route path="/teacher" component={TeacherPortal} /><Route path="/sign-in" component={LoginPage} /><Route path="/" component={PublicHome} /><Route component={ProtectedRoutes} /></Switch>;
+  return <Switch><Route path="/teacher/:section" component={TeacherPortal} /><Route path="/teacher" component={TeacherPortal} /><Route path="/sign-in" component={LoginPage} /><Route path="/" component={PublicHome} /><Route component={ProtectedRoutes} /></Switch>;
 }
 
 function MissingEnvScreen() {
