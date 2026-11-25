@@ -773,3 +773,43 @@ html { -webkit-text-size-adjust: 100%; }
   .teacher-workspace { grid-template-columns:minmax(0,1fr); }
   .teacher-menu { display:flex; flex-wrap:wrap; }
 }
+
+.teacher-positive {
+  --teacher-ink: 158 49% 25%;
+  --teacher-tint: 153 33% 91%;
+  --teacher-action: 158 54% 25%;
+}
+.teacher-negative {
+  --teacher-ink: 8 54% 36%;
+  --teacher-tint: 12 57% 93%;
+  --teacher-action: 8 59% 38%;
+}
+.dark .teacher-positive { --teacher-ink: 150 48% 84%; --teacher-tint: 158 32% 23%; }
+.dark .teacher-negative { --teacher-ink: 11 73% 86%; --teacher-tint: 8 34% 26%; }
+.teacher-entry { overflow: hidden; }
+.teacher-entry-header {
+  display: flex; align-items: center; gap: 16px; padding: 24px;
+  background: hsl(var(--teacher-tint)); color: hsl(var(--teacher-ink));
+}
+.teacher-entry-header .section-copy { color: inherit; margin-bottom: 0; }
+.teacher-entry .teacher-fields { padding: 22px 24px 24px; margin: 0; gap: 17px; min-width: 0; }
+.teacher-entry .teacher-fields .check-row { display: flex; align-items: center; gap: 8px; }
+.teacher-score { border: 0; padding: 0; margin: 0; min-width: 0; }
+.teacher-score legend { font-size: 14px; font-weight: 650; margin-bottom: 7px; }
+.teacher-score-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.teacher-score-options label { display: grid; position: relative; }
+.teacher-score-options input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.teacher-score-options span {
+  display: grid; place-items: center; min-height: 44px; border: 1px solid hsl(var(--border));
+  border-radius: 10px; color: hsl(var(--teacher-ink)); font-weight: 750; font-variant-numeric: tabular-nums;
+}
+.teacher-score-options input:checked + span { background: hsl(var(--teacher-tint)); border-color: currentColor; }
+.teacher-score-options input:focus-visible + span { outline: 2px solid currentColor; outline-offset: 2px; }
+.teacher-entry-actions { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 12px; }
+.teacher-register { background: hsl(var(--teacher-action)); color: white; min-height: 44px; }
+.teacher-entry-feedback { margin: 0; padding: 0 24px 20px; }
+@media(max-width: 480px) {
+  .teacher-entry-header, .teacher-entry .teacher-fields { padding: 18px; }
+  .teacher-entry-actions { justify-content: stretch; }
+  .teacher-entry-actions .btn { width: 100%; }
+}

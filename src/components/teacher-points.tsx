@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
+import { CircleMinus, CirclePlus, Search } from 'lucide-react';
 import { Link } from 'wouter';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -32,6 +33,8 @@ export function TeacherEntry({kind}: {kind: Kind}) {
   const request = useRef({key:'',id:''});
   const locked = useRef(false);
   const search = useRef<HTMLInputElement>(null);
+  const select = useRef<HTMLSelectElement>(null);
+  const reasonInput = useRef<HTMLInputElement>(null);
   const students = useQuery({queryKey:['teacher-point-students',session?.user.id],queryFn:async()=>{
     const {data,error}=await supabase.rpc('teacher_point_students');
     if(error) throw error;
@@ -45,27 +48,91 @@ export function TeacherEntry({kind}: {kind: Kind}) {
     if(error) throw error;
   },onSuccess:()=>{
     request.current={key:'',id:''};
-    setStatus('저장했습니다. 다음 등교일에 반영됩니다.');
+    setStatus(`${kind === 'POSITIVE' ? '상점' : '벌점'} 예약을 저장했습니다.`);
     setStudent(''); setFilter('');
     if(!continuous){setReason('');setPoints('');}
     void cache.invalidateQueries({queryKey:['teacher-point-history']});
     requestAnimationFrame(()=>search.current?.focus());
   },onSettled:()=>{locked.current=false;}});
-  const title=kind==='POSITIVE'?'상점 입력':'벌점 입력';
-  return <form className="card card-pad" onSubmit={e=>{e.preventDefault();if(locked.current)return;locked.current=true;setStatus('');save.mutate();}}>
-    <h2 className="section-title">{title}</h2>
+  const negative = kind === 'NEGATIVE';
+  const label = negative ? '벌점' : '상점';
+  const sign = negative ? '−' : '+';
+  const Icon = negative ? CircleMinus : CirclePlus;
+  const needle = filter.trim();
+  const matches = (students.data ?? []).filter(s => `${s.homeroom} ${s.name}`.includes(needle));
+  const selected = matches.find(s => s.id === student);
+  const ready = Boolean(selected && reason.trim() && points);
+
+  function handleStudentEnter(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    if (selected || (needle && matches.length === 1)) {
+      setStudent(selected?.id ?? matches[0].id);
+      reasonInput.current?.focus();
+    } else if (needle && matches.length > 1) {
+      select.current?.focus();
+    }
+  }
+
+  return <form className={`card teacher-entry ${negative ? 'teacher-negative' : 'teacher-positive'}`} onSubmit={event => {
+    event.preventDefault();
+    if (!ready || locked.current) return;
+    locked.current = true;
+    setStatus('');
+    save.mutate();
+  }}>
+    <header className="teacher-entry-header">
+      <Icon size={32} aria-hidden="true" />
+      <div><h2 className="section-title">{label} 입력</h2>
+        <p className="section-copy">다음 등교일 00:00에 {label}으로 반영됩니다.</p>
+      </div>
+    </header>
     <fieldset className="teacher-fields" disabled={save.isPending}>
-      <label>학생 검색<input className="input" ref={search} value={filter} onChange={e=>{setFilter(e.target.value);setStudent('');}} placeholder="이름 또는 학급"/></label>
-      <label>학생 선택<select aria-label="학생 선택" required className="input" value={student} onChange={e=>setStudent(e.target.value)}>
-        <option value="">학생 선택</option>{students.data?.filter(s=>(s.homeroom+' '+s.name).includes(filter.trim())).map(s=><option key={s.id} value={s.id}>{s.homeroom} · {s.name}</option>)}</select></label>
-      <label>사유<input required maxLength={80} className="input" value={reason} onChange={e=>setReason(e.target.value)}/></label>
-      <label>점수<select aria-label="점수" required className="input" value={points} onChange={e=>setPoints(e.target.value)}><option value="">점수 선택</option>
-        {[1,2,3,4,5].map(n=><option key={n} value={n}>{n}점</option>)}</select></label>
-      <label><input type="checkbox" checked={continuous} onChange={e=>setContinuous(e.target.checked)}/> 연속 입력</label>
-      <button className="btn btn-primary" disabled={!student||!reason.trim()||!points}>{save.isPending?'저장 중…':'등록'}</button>
+      <div className="field">
+        <label htmlFor="teacher-student-search">학생 검색</label>
+        <div className="search-box"><Search size={16} aria-hidden="true" />
+          <input id="teacher-student-search" ref={search} className="input" value={filter}
+            onChange={event => { setFilter(event.target.value); setStudent(''); }}
+            onKeyDown={handleStudentEnter} placeholder="이름 또는 학급" autoComplete="off" lang="ko" />
+        </div>
+        <select aria-label="학생 선택" ref={select} required className="select" value={student}
+          onChange={event => setStudent(event.target.value)}>
+          <option value="">학생 선택</option>
+          {matches.map(s => <option key={s.id} value={s.id}>{s.homeroom} · {s.name}</option>)}
+        </select>
+        {students.isPending && <span className="record-meta" role="status">학생 목록을 불러오는 중입니다.</span>}
+        {needle && students.isSuccess && !selected && <span className="record-meta" role="status">
+          {matches.length === 0 ? '일치하는 학생이 없습니다.' :
+            matches.length === 1 ? 'Enter를 누르면 학생을 선택하고 사유로 이동합니다.' : `${matches.length}명 중 학생을 선택하세요.`}
+        </span>}
+      </div>
+      <div className="field">
+        <label htmlFor="teacher-point-reason">{label} 사유</label>
+        <input id="teacher-point-reason" ref={reasonInput} required maxLength={80} className="input"
+          value={reason} onChange={event => setReason(event.target.value)} />
+      </div>
+      <fieldset className="teacher-score">
+        <legend>{label} 점수</legend>
+        <div className="teacher-score-options">{[1, 2, 3, 4, 5].map(n => <label key={n}>
+          <input type="radio" name="teacher-points" value={n} checked={points === String(n)}
+            onChange={event => setPoints(event.target.value)} required />
+          <span>{sign}{n}</span>
+        </label>)}</div>
+      </fieldset>
+      <label className="check-row">
+        <input type="checkbox" checked={continuous} onChange={event => setContinuous(event.target.checked)} />
+        연속 입력 · 사유와 점수 유지
+      </label>
+      <div className="teacher-entry-actions">
+        {selected && points && <span className="record-meta">{selected.homeroom} · {selected.name}</span>}
+        <button className="btn teacher-register" disabled={!ready}>
+          {save.isPending ? '저장 중…' : `${label}${points ? ` ${sign}${points}점` : ''} 등록`}
+        </button>
+      </div>
     </fieldset>
-    {students.isError&&<p role="alert">{message(students.error)} <button type="button" onClick={()=>students.refetch()}>다시 확인</button></p>}
-    {save.isError&&<p role="alert">{message(save.error)}</p>}{status&&<p role="status">{status}</p>}
+    {students.isError && <p className="teacher-entry-feedback" role="alert">{message(students.error)} <button type="button" onClick={() => students.refetch()}>다시 확인</button></p>}
+    {save.isError && <p className="teacher-entry-feedback" role="alert">{message(save.error)}</p>}
+    {status && <p className="teacher-entry-feedback success-text" role="status">{status}</p>}
   </form>;
 }
 
