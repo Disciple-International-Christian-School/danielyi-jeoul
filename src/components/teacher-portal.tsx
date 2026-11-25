@@ -1,6 +1,6 @@
-import { TeacherEntry, TeacherHistory, TeacherLinks } from './teacher-points';
+import { TeacherDashboard, TeacherEntry, TeacherHistory, TeacherLinks } from './teacher-points';
 import { useLocation } from 'wouter';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
@@ -14,7 +14,7 @@ function keyBytes(key:string):Uint8Array<ArrayBuffer> {
  const binary=atob(key.replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(binary,c=>c.charCodeAt(0));
 }
 
-export function TeacherPortal(){
+export function TeacherPortal({themeControl}: {themeControl: ReactNode}){
  const [path,navigate]=useLocation();
  const homeroom=path==="/teacher";
  const {session,loading,signOut}=useAuth();
@@ -71,13 +71,13 @@ export function TeacherPortal(){
  }
  async function action(fn:()=>Promise<void>){setPending(true);setMessage('');try{await fn();}catch(error){setMessage(errorText(error));}finally{setPending(false);}}
  const rows=portal.data?.reflections??[];
- return <main className="teacher-portal"><header className="section-row"><div><div className="eyebrow">다니엘저울</div><h1 className="heading">{homeroom?"담임 알림":"교사 상벌점"}</h1></div>{session&&<button className="btn btn-outline" disabled={pending} onClick={()=>action(async()=>{if(supported)await disable();await signOut();})}>로그아웃</button>}</header>
+ return <main className="teacher-portal"><header className="teacher-topbar"><div><div className="teacher-brand">Daniel Scale</div><h1 className="heading">{homeroom?"담임 알림":"Teacher Dashboard"}</h1></div><div className="teacher-topbar-actions">{themeControl}{session&&<button className="btn btn-outline" disabled={pending} onClick={()=>action(async()=>{if(supported)await disable();await signOut();})}>로그아웃</button>}</div></header>
  {loading?<p role="status">로그인 확인 중…</p>:!session?<section className="card card-pad"><h2 className="section-title">교사 계정으로 시작하기</h2><p className="section-copy">학교에 등록된 구글 계정으로 로그인해주세요.</p><button className="btn btn-primary" disabled={pending} onClick={login}>Google로 로그인</button></section>:portal.isPending?<p role="status">담당 학급 확인 중…</p>:portal.isError?<section className="card card-pad"><p role="alert">{errorText(portal.error)}</p><button className="btn btn-outline" onClick={()=>portal.refetch()}>다시 확인</button></section>:portal.data&&<div className="teacher-workspace"><TeacherLinks/><div className="teacher-records">{homeroom?<>
  <section className="card card-pad"><h2 className="section-title">{portal.data.name} 선생님 · {portal.data.classes.join(', ')}</h2><p className="section-copy">담당 학급에 반성문 대상자가 새로 발생하면 이 기기로 알려드립니다.</p>
  {ios&&!installed?<p>아이폰에서는 Safari의 공유 메뉴 → 홈 화면에 추가 후, 추가된 아이콘으로 열어주세요.</p>:!supported?<p>이 브라우저는 푸시 알림을 지원하지 않습니다. 최신 Chrome 또는 홈 화면에 추가한 Safari 앱을 이용해주세요.</p>:<div className="teacher-actions"><button className="btn btn-primary" disabled={pending||!portal.data.publicKey} onClick={enable}>{subscribed?'알림 등록 갱신':'이 기기에서 알림 받기'}</button>{subscribed&&<><button className="btn btn-outline" disabled={pending} onClick={()=>action(async()=>{const {error}=await supabase.rpc('test_homeroom_push',{p_endpoint:endpoint});if(error)throw error;setMessage('테스트 알림을 요청했습니다. 약 1분 이내 도착합니다.');})}>테스트 알림</button><button className="btn btn-outline" disabled={pending} onClick={()=>action(async()=>{await disable();setMessage('이 기기의 알림을 해제했습니다.');})}>알림 해제</button></>}</div>}
  {!portal.data.publicKey&&<p>알림 서버 설정을 준비 중입니다.</p>}</section>
  <section className="card card-pad"><div className="section-row"><h2 className="section-title">담당 학급 반성문</h2><button className="btn btn-outline" onClick={()=>portal.refetch()}>새로고침</button></div>{rows.length===0?<p>현재 반성문 기록이 없습니다.</p>:<div className="table-wrap"><table className="data-table"><thead><tr><th>학급</th><th>학생</th><th>발생일</th><th>상태</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td>{r.homeroom}</td><td>{r.student_name}</td><td>{r.recorded_at.slice(0,10)}</td><td>{r.submitted?'제출 완료':r.status==='DOUBLE'?'2배 제출 대상':'미제출'}</td></tr>)}</tbody></table></div>}</section>
- </>:path==='/teacher/history'?<TeacherHistory/>:path==='/teacher/positive'||path==='/teacher/negative'?<TeacherEntry key={path} kind={path.endsWith('positive')?'POSITIVE':'NEGATIVE'}/>:<TeacherLinks dashboard/>}</div></div>}{homeroom && session && committeeAccess.data === true && <section className="card card-pad">
+ </>:path==='/teacher/history'?<TeacherHistory/>:path==='/teacher/positive'||path==='/teacher/negative'?<TeacherEntry key={path} kind={path.endsWith('positive')?'POSITIVE':'NEGATIVE'}/>:<TeacherDashboard name={portal.data.name} followups={rows.filter(row => !row.submitted).length}/>}</div></div>}{homeroom && session && committeeAccess.data === true && <section className="card card-pad">
    <h2 className="section-title">월간 징계 결산</h2>
    {committeeReport.isPending ? <p role="status">결산을 불러오는 중입니다.</p>
      : committeeReport.isError ? <><p role="alert">{errorText(committeeReport.error)}</p><button className="btn btn-outline" onClick={() => committeeReport.refetch()}>다시 확인</button></>
