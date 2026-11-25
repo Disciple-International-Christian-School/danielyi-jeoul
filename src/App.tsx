@@ -2482,8 +2482,13 @@ function NotFoundInline() {
   return <div className="error-box"><CircleHelp size={28} /><h1 className="section-title">페이지를 찾을 수 없습니다</h1><Link href="/dashboard" className="btn btn-primary" data-testid="link-not-found-dashboard">대시보드로 돌아가기</Link></div>;
 }
 
+function TeacherRoute() {
+  const { dark, toggle } = useTheme();
+  return <TeacherPortal themeControl={<ThemeToggle dark={dark} toggle={toggle} />} />;
+}
+
 function Router() {
-  return <Switch><Route path="/teacher/:section" component={TeacherPortal} /><Route path="/teacher" component={TeacherPortal} /><Route path="/sign-in" component={LoginPage} /><Route path="/" component={PublicHome} /><Route component={ProtectedRoutes} /></Switch>;
+  return <Switch><Route path="/teacher/:section" component={TeacherRoute} /><Route path="/teacher" component={TeacherRoute} /><Route path="/sign-in" component={LoginPage} /><Route path="/" component={PublicHome} /><Route component={ProtectedRoutes} /></Switch>;
 }
 
 function MissingEnvScreen() {
