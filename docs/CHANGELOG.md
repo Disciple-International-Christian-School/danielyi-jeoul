@@ -2,6 +2,12 @@
 
 **Language / 언어:** [English](CHANGELOG.md) | [한국어](CHANGELOG.ko.md)
 
+## 2026-11-25 — Teacher dashboard and point entry
+
+- The Teacher Dashboard shows today's entries, entries awaiting posting, unsubmitted reflections for assigned classes, and recent activity.
+- Enter selects a sole student result and moves to the reason field. With multiple results it moves to the student selector.
+- Merit and demerit forms use distinct symbols, colors, signed scores, and registration labels. The teacher portal uses the same theme control as the main dashboard.
+
 ## 2026-11-24 to 2026-11-25 — Teacher point entry and production verification
 
 - Added Google sign-in for registered teachers, merit and demerit entry (1–5 points), same-day cancellation of their own pending entries, and personal history. The discipline team can view next-school-day entries and a weekly report grouped by entry date. [PR #59](https://github.com/Disciple-International-Christian-School/danielyi-jeoul/pull/59)
